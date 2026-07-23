@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(which pandoc; which python3; ls \"/Users/blackseedlabs/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/ed2efad2-5aa7-48b4-9542-4bde7ce05ed2/2eafbc8e-5a56-4a4d-b8be-1296bf2ac837/skills/docx/scripts/\")",
+      "Bash(python3 \"/Users/blackseedlabs/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/ed2efad2-5aa7-48b4-9542-4bde7ce05ed2/2eafbc8e-5a56-4a4d-b8be-1296bf2ac837/skills/docx/scripts/office/unpack.py\" \"CrimeAI-Production-Roadmap-v1.docx\" /tmp/crimeai_unpacked/)",
+      "Read(//tmp/crimeai_unpacked/**)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(node scripts/generate-data.mjs)",
+      "Bash(npm run *)",
+      "Bash(curl -s -X POST http://localhost:3000/api/crimeai/ask -H \"Content-Type: application/json\" -d '{\"question\":\"How does Wynwood compare to the rest of Miami?\",\"address\":\"Wynwood\"}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(' engine:',d['engine']\\); print\\(' ',d['answer'][:260]\\)\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/)",
+      "Bash(echo \" / -> $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/\\)\")",
+      "Bash(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/dashboard)",
+      "Bash(echo \" /dashboard -> $\\(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/dashboard\\)\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(pkill -f \"next\")",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill -9)",
+      "Bash(curl -s -o /dev/null -w \"warm: %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"incidents api: %{http_code}\\\\n\" \"http://localhost:3000/api/incidents?lat=25.7607&lon=-80.1918&radius=1.5&days=30\")",
+      "Bash(curl -s -o /dev/null -w \"warm /: %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(npm install *)",
+      "Bash(perl -0pi -e 's/<path d=\"m12 2 2\\\\.4 1\\\\.8 3 \\\\.2\\\\.2 3L19\\\\.4 9\\\\.6 21 12l-1\\\\.6 2\\\\.4\\\\.2 3-3 \\\\.2L14\\\\.4 19\\\\.4 12 21l-2\\\\.4-1\\\\.6-3 \\\\.2-\\\\.2-3L4\\\\.6 14\\\\.4 3 12l1\\\\.6-2\\\\.4-\\\\.2-3 3-\\\\.2L9\\\\.6 4\\\\.6 12 3Z\" fill=\"currentColor\" stroke=\"none\" \\\\/>\\\\n    <path d=\"m9 12 2 2 4-4\" stroke=\"#0b2447\" strokeWidth=\\\\{2\\\\.2\\\\} \\\\/>/<path d=\"m12 2 2.4 1.8 3 .2.2 3L19.4 9.6 21 12l-1.6 2.4.2 3-3 .2L14.4 19.4 12 21l-2.4-1.6-3 .2-.2-3L4.6 14.4 3 12l1.6-2.4-.2-3 3-.2L9.6 4.6 12 3Z\" style=\\\\{\\\\{ fill: \"rgb\\(var\\(--c-blu\\)\\)\" \\\\}\\\\} stroke=\"none\" \\\\/>\\\\n    <path d=\"m9 12 2 2 4-4\" stroke=\"#fff\" strokeWidth=\\\\{2.2\\\\} \\\\/>/' components/Icons.tsx)"
+    ]
+  }
+}

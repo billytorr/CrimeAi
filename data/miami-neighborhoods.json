@@ -1,0 +1,122 @@
+[
+  {
+    "name": "Downtown Miami",
+    "lat": 25.7743,
+    "lon": -80.1937
+  },
+  {
+    "name": "Brickell",
+    "lat": 25.7607,
+    "lon": -80.1918
+  },
+  {
+    "name": "Wynwood",
+    "lat": 25.801,
+    "lon": -80.199
+  },
+  {
+    "name": "Little Havana",
+    "lat": 25.7659,
+    "lon": -80.2197
+  },
+  {
+    "name": "Coconut Grove",
+    "lat": 25.7282,
+    "lon": -80.2436
+  },
+  {
+    "name": "Coral Gables",
+    "lat": 25.7215,
+    "lon": -80.2684
+  },
+  {
+    "name": "South Beach",
+    "lat": 25.7826,
+    "lon": -80.1341
+  },
+  {
+    "name": "Mid-Beach",
+    "lat": 25.8127,
+    "lon": -80.1267
+  },
+  {
+    "name": "North Beach",
+    "lat": 25.8487,
+    "lon": -80.122
+  },
+  {
+    "name": "Liberty City",
+    "lat": 25.837,
+    "lon": -80.22
+  },
+  {
+    "name": "Little Haiti",
+    "lat": 25.8254,
+    "lon": -80.1936
+  },
+  {
+    "name": "Overtown",
+    "lat": 25.788,
+    "lon": -80.203
+  },
+  {
+    "name": "Allapattah",
+    "lat": 25.815,
+    "lon": -80.223
+  },
+  {
+    "name": "Edgewater",
+    "lat": 25.795,
+    "lon": -80.188
+  },
+  {
+    "name": "Design District",
+    "lat": 25.813,
+    "lon": -80.193
+  },
+  {
+    "name": "Doral",
+    "lat": 25.8195,
+    "lon": -80.3553
+  },
+  {
+    "name": "Hialeah",
+    "lat": 25.8576,
+    "lon": -80.2781
+  },
+  {
+    "name": "Kendall",
+    "lat": 25.6793,
+    "lon": -80.3173
+  },
+  {
+    "name": "Coral Way",
+    "lat": 25.75,
+    "lon": -80.27
+  },
+  {
+    "name": "Flagami",
+    "lat": 25.762,
+    "lon": -80.316
+  },
+  {
+    "name": "Aventura",
+    "lat": 25.9565,
+    "lon": -80.139
+  },
+  {
+    "name": "Key Biscayne",
+    "lat": 25.6939,
+    "lon": -80.1626
+  },
+  {
+    "name": "Pinecrest",
+    "lat": 25.667,
+    "lon": -80.3083
+  },
+  {
+    "name": "North Miami",
+    "lat": 25.8901,
+    "lon": -80.1867
+  }
+]

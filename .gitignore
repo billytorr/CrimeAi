@@ -1,0 +1,26 @@
+# dependencies & builds
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# env & secrets — NEVER commit these
+.env.local
+.env*.local
+
+# native build artifacts (projects themselves ARE committed)
+ios/App/Pods/
+ios/App/App/public/
+ios/App/output/
+ios/DerivedData/
+android/.gradle/
+android/app/build/
+android/build/
+android/app/src/main/assets/public/
+android/local.properties
+
+# misc
+.DS_Store
+icon-only.png
+icon-foreground.png
+icon-background.png
