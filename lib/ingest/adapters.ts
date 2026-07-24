@@ -112,30 +112,70 @@ export async function fetchGeojson(url: string, conf: Conf): Promise<RawIncident
 
 // ── National Weather Service alerts (live hazards, no key) ─────────
 // url: https://api.weather.gov/alerts/active?point=25.77,-80.19  (or ?area=FL)
+// Most alerts carry no polygon — they reference forecast zones instead,
+// so we resolve each zone's geometry (cached per run) and pin centroids.
+const NWS_HEADERS = { "User-Agent": "PSCC-CrimeAI (team@creativewolf.com)" };
+
+function ringCentroid(ring: number[][]): { lat: number; lon: number } | null {
+  if (!Array.isArray(ring) || !ring.length) return null;
+  const lon = ring.reduce((s, c) => s + c[0], 0) / ring.length;
+  const lat = ring.reduce((s, c) => s + c[1], 0) / ring.length;
+  return { lat, lon };
+}
+function geomCentroid(geom: any): { lat: number; lon: number } | null {
+  if (!geom) return null;
+  if (geom.type === "Polygon") return ringCentroid(geom.coordinates?.[0]);
+  if (geom.type === "MultiPolygon") return ringCentroid(geom.coordinates?.[0]?.[0]);
+  return null;
+}
+
 export async function fetchNws(url: string, _conf: Conf): Promise<RawIncident[]> {
-  const res = await fetch(url, { headers: { "User-Agent": "PSCC-CrimeAI (team@creativewolf.com)" }, signal: AbortSignal.timeout(30000) });
+  const res = await fetch(url, { headers: NWS_HEADERS, signal: AbortSignal.timeout(30000) });
   if (!res.ok) throw new Error(`NWS ${res.status}`);
   const data = (await res.json()) as any;
   const out: RawIncident[] = [];
+  const zoneCache = new Map<string, { lat: number; lon: number } | null>();
+  let zoneFetches = 0;
+
+  async function zoneCentroid(zoneUrl: string): Promise<{ lat: number; lon: number } | null> {
+    if (zoneCache.has(zoneUrl)) return zoneCache.get(zoneUrl)!;
+    if (zoneFetches >= 30) return null; // cap per sync — alerts share zones anyway
+    zoneFetches++;
+    try {
+      const zr = await fetch(zoneUrl, { headers: NWS_HEADERS, signal: AbortSignal.timeout(15000) });
+      const zj = zr.ok ? ((await zr.json()) as any) : null;
+      const c = geomCentroid(zj?.geometry);
+      zoneCache.set(zoneUrl, c);
+      return c;
+    } catch {
+      zoneCache.set(zoneUrl, null);
+      return null;
+    }
+  }
+
   for (const f of data.features || []) {
     const p = f.properties || {};
-    // alerts are polygons; pin at the polygon centroid when present
-    let lat: number | undefined, lon: number | undefined;
-    const coords = f.geometry?.coordinates?.[0];
-    if (Array.isArray(coords) && coords.length) {
-      lon = coords.reduce((s: number, c: number[]) => s + c[0], 0) / coords.length;
-      lat = coords.reduce((s: number, c: number[]) => s + c[1], 0) / coords.length;
+    // prefer the alert's own polygon; fall back to each affected zone
+    const own = geomCentroid(f.geometry);
+    const pins: { lat: number; lon: number; suffix: string }[] = [];
+    if (own) pins.push({ ...own, suffix: "" });
+    else {
+      for (const z of (p.affectedZones || []).slice(0, 4)) {
+        const c = await zoneCentroid(z);
+        if (c) pins.push({ ...c, suffix: `-${String(z).split("/").pop()}` });
+      }
     }
-    if (lat == null || lon == null) continue;
-    out.push({
-      externalId: String(p.id || f.id),
-      type: String(p.event || "Weather alert"),
-      lat, lon,
-      occurredAt: p.onset || p.sent || new Date().toISOString(),
-      categoryOverride: "other",
-      severityOverride: p.severity === "Extreme" ? 4 : p.severity === "Severe" ? 3 : 2,
-      verified: true,
-    });
+    for (const pin of pins) {
+      out.push({
+        externalId: `${String(p.id || f.id)}${pin.suffix}`,
+        type: String(p.event || "Weather alert"),
+        lat: pin.lat, lon: pin.lon,
+        occurredAt: p.onset || p.sent || new Date().toISOString(),
+        categoryOverride: "other",
+        severityOverride: p.severity === "Extreme" ? 4 : p.severity === "Severe" ? 3 : 2,
+        verified: true,
+      });
+    }
   }
   return out;
 }
