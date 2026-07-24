@@ -77,9 +77,10 @@ const PENDING_RESET_KEY = "pscc_pending_reset";
 const CODE_TTL_MS = 10 * 60 * 1000;
 
 function genCode(): string {
+  // 8 digits to match Supabase's OTP length (demo/offline mode)
   const b = new Uint32Array(1);
   crypto.getRandomValues(b);
-  return String(100000 + (b[0] % 900000));
+  return String(10000000 + (b[0] % 90000000));
 }
 function readPending(key: string): any | null {
   try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }

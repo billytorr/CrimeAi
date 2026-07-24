@@ -51,7 +51,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
     const r = await startSignup(name, email, password);
     if (r.alreadyVerified) { await recordAcceptance(); onAuthed(); return; } // backend auto-confirmed
     setDemoCode(r.demoCode || "");
-    setNotice(`We sent a 6-digit code to ${email.trim().toLowerCase()}.`);
+    setNotice(`We sent a verification code to ${email.trim().toLowerCase()}.`);
     setMode("verify"); setCode("");
   });
 
@@ -59,7 +59,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
     const r = await startSignup(name, email, password);
     if (r.alreadyVerified) { await recordAcceptance(); onAuthed(); return; }
     setDemoCode(r.demoCode || "");
-    setNotice(`We sent a 6-digit code to ${email.trim().toLowerCase()}.`);
+    setNotice(`We sent a verification code to ${email.trim().toLowerCase()}.`);
     setMode("verify"); setCode("");
   });
 
@@ -174,7 +174,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
 
         {mode === "forgot" && (
           <>
-            <p className="text-center text-sm text-ink2">Enter your account email and we&apos;ll send a 6-digit recovery code.</p>
+            <p className="text-center text-sm text-ink2">Enter your account email and we&apos;ll send a recovery code.</p>
             <Field label="Email" value={email} onChange={setEmail} placeholder="you@email.com" type="email" onEnter={submitForgot} />
             {error && <p className="text-sm text-red-400">{error}</p>}
             <PrimaryButton busy={busy} onClick={submitForgot}>Send recovery code →</PrimaryButton>
@@ -268,18 +268,21 @@ function PrimaryButton({ busy, onClick, children }: { busy: boolean; onClick: ()
   );
 }
 
+// Supabase emails an 8-digit OTP; accept up to 8 so the full code fits.
+// (A shorter code still works — submit isn't gated on an exact length.)
+const OTP_MAX = 8;
 function CodeField({ value, onChange, onEnter }: { value: string; onChange: (v: string) => void; onEnter?: () => void }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-center text-xs font-medium uppercase tracking-wide text-ink2">6-digit code</span>
+      <span className="mb-1 block text-center text-xs font-medium uppercase tracking-wide text-ink2">Verification code</span>
       <input
         value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, OTP_MAX))}
         onKeyDown={(e) => e.key === "Enter" && onEnter?.()}
         inputMode="numeric"
         autoComplete="one-time-code"
-        placeholder="••••••"
-        className="w-full rounded-xl border border-ink/10 bg-shell px-4 py-3 text-center text-2xl font-bold tracking-[0.5em] outline-none placeholder:text-ink3 focus:border-brand/60"
+        placeholder={"•".repeat(OTP_MAX)}
+        className="w-full rounded-xl border border-ink/10 bg-shell px-4 py-3 text-center text-2xl font-bold tracking-[0.3em] outline-none placeholder:text-ink3 focus:border-brand/60"
       />
     </label>
   );
