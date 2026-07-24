@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveAddress } from "@/lib/geocode";
 import { computeStats, incidentsNear, insideMiamiCoverage, NEIGHBORHOODS } from "@/lib/data";
 import { askCrimeAI, buildContext } from "@/lib/crimeai";
+import { liveIncidentsNear } from "@/lib/ingest/live";
 import type { ResolvedLocation } from "@/lib/types";
 
 // POST /api/crimeai/ask
@@ -35,8 +36,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Provide an address or lat/lon for grounding." }, { status: 422 });
     }
 
-    const stats = computeStats({ lat: loc.lat, lon: loc.lon, radiusMiles, days });
-    const recent = incidentsNear({ lat: loc.lat, lon: loc.lon, radiusMiles, days });
+    const live = await liveIncidentsNear(loc.lat, loc.lon, radiusMiles);
+    const stats = computeStats({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live });
+    const recent = incidentsNear({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live });
     const context = buildContext(loc, stats, recent, radiusMiles, days);
     const { answer, engine } = await askCrimeAI(question, context);
 

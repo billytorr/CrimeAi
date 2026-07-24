@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { incidentsNear } from "@/lib/data";
+import { liveIncidentsNear } from "@/lib/ingest/live";
 
 // GET /api/incidents?lat=&lon=&radius=&days=&categories=&sources=
 // Map + feed data for the area around the user.
@@ -16,6 +17,7 @@ export async function GET(req: NextRequest) {
   const sources = sp.get("sources")?.split(",").filter(Boolean);
   const minSeverity = sp.get("minSeverity") ? parseInt(sp.get("minSeverity")!, 10) : undefined;
 
-  const incidents = incidentsNear({ lat, lon, radiusMiles, days, categories, sources, minSeverity });
-  return NextResponse.json({ incidents, count: incidents.length });
+  const live = await liveIncidentsNear(lat, lon, radiusMiles);
+  const incidents = incidentsNear({ lat, lon, radiusMiles, days, categories, sources, minSeverity, live });
+  return NextResponse.json({ incidents, count: incidents.length, live: live.length >= 3 });
 }

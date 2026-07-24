@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveAddress } from "@/lib/geocode";
 import { computeStats, incidentsNear } from "@/lib/data";
+import { liveIncidentsNear } from "@/lib/ingest/live";
 
 // POST /api/crimeai/lookup
 // { address, radiusMiles?, days? } -> resolved location + area stats + recent incidents
@@ -18,8 +19,9 @@ export async function POST(req: NextRequest) {
         { status: 422 }
       );
     }
-    const stats = computeStats({ lat: loc.lat, lon: loc.lon, radiusMiles, days });
-    const recent = incidentsNear({ lat: loc.lat, lon: loc.lon, radiusMiles, days })
+    const live = await liveIncidentsNear(loc.lat, loc.lon, radiusMiles);
+    const stats = computeStats({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live });
+    const recent = incidentsNear({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live })
       .slice(0, 25);
     return NextResponse.json({ location: loc, stats, recent, radiusMiles, days });
   } catch (e) {

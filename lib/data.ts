@@ -136,12 +136,17 @@ export interface QueryOpts {
   categories?: string[];
   sources?: string[];
   minSeverity?: number;
+  /** Real ingested incidents (lib/ingest/live.ts). When enough exist
+   *  for the area they REPLACE the demo seed / synthetic model. */
+  live?: Incident[];
 }
 
 export function incidentsNear(opts: QueryOpts): Incident[] {
-  const { lat, lon, radiusMiles = 1, days = 30, categories, sources, minSeverity } = opts;
+  const { lat, lon, radiusMiles = 1, days = 30, categories, sources, minSeverity, live } = opts;
   const cutoff = Date.now() - days * 86400000;
-  const pool = insideMiamiCoverage(lat, lon) ? allIncidents() : synthIncidentsNear(lat, lon, radiusMiles);
+  const pool = live && live.length >= 3
+    ? live
+    : insideMiamiCoverage(lat, lon) ? allIncidents() : synthIncidentsNear(lat, lon, radiusMiles);
   return pool.filter((i) => {
     if (+new Date(i.occurred_at) < cutoff) return false;
     if (categories && categories.length && !categories.includes(i.category)) return false;
