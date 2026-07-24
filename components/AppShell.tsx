@@ -17,6 +17,7 @@ import FeedScreen from "@/components/screens/FeedScreen";
 import MapScreen from "@/components/screens/MapScreen";
 import InboxScreen from "@/components/screens/InboxScreen";
 import MeScreen from "@/components/screens/MeScreen";
+import SearchScreen from "@/components/screens/SearchScreen";
 
 export default function AppShell({
   account, onLogout, onChangeAddress,
@@ -30,6 +31,7 @@ export default function AppShell({
   const [composing, setComposing] = useState<null | "post" | "report">(null);
   const [live, setLive] = useState(false);
   const [sosOpen, setSosOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [profileHandle, setProfileHandle] = useState<string | null>(null);
   const [focusPostId, setFocusPostId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -66,7 +68,7 @@ export default function AppShell({
       }}
     >
       <div className="relative flex-1 overflow-hidden">
-        {tab === "feed" && <FeedScreen account={acct} onCompose={() => setComposing("post")} onSos={() => setSosOpen(true)} refreshKey={refreshKey} />}
+        {tab === "feed" && <FeedScreen account={acct} onCompose={() => setComposing("post")} onSos={() => setSosOpen(true)} onSearch={() => setSearchOpen(true)} refreshKey={refreshKey} />}
         {tab === "map" && <MapScreen profile={profile} refreshKey={refreshKey} onReport={() => setComposing("report")} />}
         {tab === "ask" && <AskScreen name={account.name} profile={profile} stats={stats} />}
         {tab === "inbox" && <InboxScreen account={acct} refreshKey={refreshKey} />}
@@ -89,6 +91,7 @@ export default function AppShell({
       </div>
       <BottomNav active={tab} onChange={setTab} inboxDot />
       {/* Full-screen overlays (cover the bottom nav too) */}
+      {searchOpen && <SearchScreen account={acct} onClose={() => setSearchOpen(false)} />}
       {profileHandle && <UserProfile handle={profileHandle} account={acct} onClose={() => setProfileHandle(null)} />}
       {composing && <ComposeSheet account={acct} startTab={composing} onClose={() => setComposing(null)} onPosted={() => setRefreshKey((k) => k + 1)} onGoLive={() => setLive(true)} />}
       {live && <LiveStream account={acct} onClose={() => setLive(false)} onPosted={() => setRefreshKey((k) => k + 1)} />}

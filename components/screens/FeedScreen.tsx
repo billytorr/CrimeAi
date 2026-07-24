@@ -6,12 +6,12 @@ import { getFeed, getInteractions, trendingScore, rankForYou, type Post, type In
 import { milesBetween } from "@/lib/data";
 import FeedList from "@/components/FeedList";
 import { SosPill } from "@/components/SOS";
-import { Plus } from "@/components/Icons";
+import { Plus, Search } from "@/components/Icons";
 
 type FeedTab = "foryou" | "local" | "news" | "trending";
 const TABS: [FeedTab, string][] = [["foryou", "For You"], ["local", "Local"], ["news", "News"], ["trending", "Trending"]];
 
-export default function FeedScreen({ account, onCompose, onSos, refreshKey }: { account: Account; onCompose: () => void; onSos: () => void; refreshKey: number }) {
+export default function FeedScreen({ account, onCompose, onSos, onSearch, refreshKey }: { account: Account; onCompose: () => void; onSos: () => void; onSearch: () => void; refreshKey: number }) {
   const p = account.profile!;
   const [tab, setTab] = useState<FeedTab>("foryou");
   const [all, setAll] = useState<Post[]>([]);
@@ -45,6 +45,7 @@ export default function FeedScreen({ account, onCompose, onSos, refreshKey }: { 
           <h1 className="bg-gradient-to-r from-ink to-brand bg-clip-text text-xl font-extrabold tracking-tight text-transparent">Feed</h1>
           <div className="flex items-center gap-2">
             {account.profile?.sosEnabled !== false && <SosPill onClick={onSos} />}
+            <button onClick={onSearch} className="grid h-9 w-9 place-items-center rounded-full bg-ink/8 text-ink active:scale-95" aria-label="Search"><Search size={19} /></button>
             <button onClick={onCompose} className="grid h-9 w-9 place-items-center rounded-full bg-brand text-white active:scale-95" aria-label="Create post"><Plus size={20} /></button>
           </div>
         </div>
