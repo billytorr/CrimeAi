@@ -11,6 +11,7 @@ import { TrustPanel } from "@/components/CoverageMatrix";
 import { Alert, Car, Eye, Flame, Chevron, Logout, Pin, Sun, Moon, ProBadge } from "@/components/Icons";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 import { accountHandle } from "@/lib/auth";
+import { apiUrl } from "@/lib/api";
 
 const CATS = [
   { id: "violent", label: "Violent", color: "#c0392b", Icon: Alert },
@@ -185,9 +186,22 @@ function ProtectorPanel({ profile, userId, email }: { profile: Profile; userId: 
     return (
       <div className="flex items-start gap-3">
         <ProBadge size={22} />
-        <div>
+        <div className="flex-1">
           <p className="text-sm font-semibold">You&apos;re a Protector</p>
           <p className="mt-0.5 text-xs text-ink2">Your red badge is live on your profile and every post. Thank you for keeping the block safe.</p>
+          <button
+            onClick={async () => {
+              try {
+                const r = await fetch(apiUrl("/api/pay/portal"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
+                const d = await r.json();
+                if (r.ok && d.url) window.open(d.url, "_blank");
+                else alert(d.error || "Contact support to manage your subscription.");
+              } catch { alert("Contact support to manage your subscription."); }
+            }}
+            className="mt-2 text-xs font-medium text-brand"
+          >
+            Manage subscription
+          </button>
         </div>
       </div>
     );

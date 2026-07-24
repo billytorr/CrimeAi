@@ -17,6 +17,20 @@ const PROVIDERS = [
   { id: "custom", label: "Custom / other merchant" },
 ];
 
+// The main app's payment API — the integration status board reads live
+// adapter/env state from it (booleans + env var NAMES only, never values).
+const APP_API =
+  process.env.NEXT_PUBLIC_APP_API ||
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:3000"
+    : "https://app.publicsafetycrimecenter.com");
+
+interface ProviderStatus {
+  id: string; label: string; mode: "api" | "hosted-link";
+  webhook: string | null; requiredEnv: string[]; envMissing: string[];
+  ready: boolean; active: boolean;
+}
+
 export default function Finance({ admin }: { admin: Admin }) {
   const [proUsers, setProUsers] = useState<any[]>([]);
   const [freeCount, setFreeCount] = useState(0);
@@ -32,6 +46,7 @@ export default function Finance({ admin }: { admin: Admin }) {
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [grantEmail, setGrantEmail] = useState("");
   const [grantMsg, setGrantMsg] = useState("");
+  const [integrations, setIntegrations] = useState<ProviderStatus[] | null>(null);
 
   async function load() {
     const [pro, free, pays, plans, pc] = await Promise.all([
@@ -51,6 +66,11 @@ export default function Finance({ admin }: { admin: Admin }) {
     if (f) setFreeFeatures((f.features || []).join("\n"));
     setConf(pc.data);
     setCheckoutUrl(pc.data?.checkout_url || "");
+    // live integration state from the app's payment API (fails soft if unreachable)
+    fetch(`${APP_API}/api/pay/providers`)
+      .then((r) => r.json())
+      .then((d) => setIntegrations(d.providers || []))
+      .catch(() => setIntegrations([]));
   }
   useEffect(() => { load(); }, []);
 
@@ -131,18 +151,36 @@ export default function Finance({ admin }: { admin: Admin }) {
           <p className="mt-3 text-xs leading-relaxed text-ink2">
             The checkout at <span className="text-ink">pay.publicsafetycrimecenter.com/crimeai/checkout</span> uses whichever
             provider is selected here. Secret API keys are never stored in this database — they go in the server&apos;s
-            environment variables (Vercel → Settings → Environment Variables):
+            environment variables (Vercel → Settings → Environment Variables). Any merchant can be fully
+            API-integrated: a developer implements one adapter per <span className="font-mono">PAYMENTS.md</span> in
+            the repo, and checkout, renewals, cancellations and refunds become automatic.
           </p>
-          <ul className="mt-2 space-y-1 text-xs text-ink3">
-            <li>• <span className="text-ink2">Stripe (API-integrated):</span> set <span className="font-mono">STRIPE_SECRET_KEY</span>, <span className="font-mono">STRIPE_WEBHOOK_SECRET</span>, <span className="font-mono">SUPABASE_SERVICE_ROLE_KEY</span> — checkout, renewals and cancellations are fully automatic</li>
-            <li>• <span className="text-ink2">Any other merchant (Chase, Square, PayPal, Authorize.net, custom):</span> paste the provider&apos;s hosted checkout / payment-link URL below — users are sent there with their account reference attached; reconcile completed payments with Grant/Revoke on this page</li>
-          </ul>
-          {conf?.provider && conf.provider !== "none" && conf.provider !== "stripe" && (
+          {conf?.provider && conf.provider !== "none" && integrations?.find((i) => i.active)?.mode === "hosted-link" && (
             <div className="mt-3 flex items-center gap-2">
               <Input placeholder="https://… the merchant's hosted checkout URL" value={checkoutUrl} onChange={(e) => setCheckoutUrl(e.target.value)} />
               <Btn onClick={saveCheckoutUrl}>Save URL</Btn>
             </div>
           )}
+
+          <div className="mt-4 border-t border-line pt-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink3">Integration status</div>
+            {!integrations ? <p className="text-xs text-ink3">Checking adapters…</p>
+              : !integrations.length ? <p className="text-xs text-ink3">Could not reach the app&apos;s payment API.</p> : (
+              <div className="space-y-1.5">
+                {integrations.map((i) => (
+                  <div key={i.id} className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="w-32 font-medium text-ink">{i.label}</span>
+                    <Badge tone={i.mode === "api" ? "ok" : "warn"}>{i.mode === "api" ? "API-integrated" : "hosted link"}</Badge>
+                    {i.active && <Badge tone="blue">active</Badge>}
+                    {i.mode === "api" && (i.envMissing.length
+                      ? <span className="text-ink3">needs env: <span className="font-mono">{i.envMissing.join(", ")}</span></span>
+                      : <span className="text-ok">credentials set{i.webhook ? <> · webhook <span className="font-mono text-ink3">{i.webhook}</span></> : null}</span>)}
+                    {i.mode === "hosted-link" && <span className="text-ink3">redirect + manual reconcile — full adapter: see PAYMENTS.md</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </Panel>
 
         <Panel title="Plan configuration (live in app + checkout)">
@@ -203,7 +241,7 @@ export default function Finance({ admin }: { admin: Admin }) {
                       <Td className="whitespace-nowrap text-ink3">{timeAgo(p.created_at)}</Td>
                       <Td className="text-ink2">{p.email || p.user_id?.slice(0, 8)}</Td>
                       <Td className="font-semibold">{usd(p.amount_cents)}</Td>
-                      <Td><Badge tone="blue">{p.kind}</Badge></Td>
+                      <Td><Badge tone="blue">{p.provider ? `${p.kind} · ${p.provider}` : p.kind}</Badge></Td>
                       <Td><Badge tone={p.status === "paid" ? "ok" : "warn"}>{p.status}</Badge></Td>
                     </tr>
                   ))}

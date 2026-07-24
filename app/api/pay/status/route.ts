@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverDb } from "@/lib/payments/serverdb";
-import { getProvider } from "@/lib/payments/provider";
+import { getProvider } from "@/lib/payments/registry";
 
 // Public: which provider is selected and is it actually ready to charge?
 export async function GET() {

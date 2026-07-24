@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { serverDb } from "@/lib/payments/serverdb";
-import { getProvider } from "@/lib/payments/provider";
+import { getProvider } from "@/lib/payments/registry";
 
 // Creates a hosted checkout with whichever merchant is active.
 export async function POST(req: Request) {
@@ -25,6 +25,7 @@ export async function POST(req: Request) {
       email: email || "",
       priceCents: plan?.price_cents ?? 911,
       planName: plan?.name || "Protector Plan",
+      currency: cfg.currency,
       successUrl: `${base}/crimeai/checkout?done=1`,
       cancelUrl: `${base}/crimeai/checkout?uid=${userId}&canceled=1`,
     }, cfg);
