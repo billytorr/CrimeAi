@@ -11,7 +11,7 @@ import { apiUrl } from "@/lib/api";
 import type { Account } from "@/lib/auth";
 import { useOpenProfile } from "@/lib/profileContext";
 import Avatar from "@/components/Avatar";
-import { Search, Close, ProBadge, Pin, Report as ReportIcon } from "@/components/Icons";
+import { Search, Close, ProBadge, Pin, Report as ReportIcon, Chevron } from "@/components/Icons";
 import { CATEGORIES, catColor, catShort } from "@/lib/categories";
 import { timeAgoShort } from "@/lib/social";
 
@@ -74,6 +74,7 @@ export default function SearchScreen({ account, onClose }: { account: Account; o
     <div className="absolute inset-0 z-[1200] flex flex-col bg-shell fade-in">
       {/* search bar */}
       <div className="safe-top flex items-center gap-2 border-b border-ink/10 px-4 pb-3 pt-4">
+        <button onClick={onClose} className="-ml-1 shrink-0 text-ink2" aria-label="Back"><Chevron size={22} style={{ transform: "rotate(180deg)" }} /></button>
         <div className="flex flex-1 items-center gap-2 rounded-full border border-ink/10 bg-card px-3.5 py-2.5">
           <Search size={17} className="text-ink3" />
           <input
@@ -89,24 +90,23 @@ export default function SearchScreen({ account, onClose }: { account: Account; o
         <button onClick={onClose} className="shrink-0 text-sm font-semibold text-ink2">Cancel</button>
       </div>
 
-      {/* scope tabs (only while searching) */}
-      {searching && (
-        <div className="flex gap-1.5 overflow-x-auto border-b border-ink/10 px-4 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {SCOPES.map((s) => {
-            const n = s.id === "all" ? total : s.id === "people" ? counts.people : s.id === "jail" ? counts.jail : counts.crime;
-            const on = scope === s.id;
-            return (
-              <button
-                key={s.id}
-                onClick={() => setScope(s.id)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${on ? "bg-brand text-white" : "bg-ink/8 text-ink2"}`}
-              >
-                {s.label}{n > 0 && <span className={on ? "text-white/80" : "text-ink3"}> · {n}</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* scope tabs — always visible so users can pick a domain up front;
+          counts appear once a search returns results */}
+      <div className="flex gap-1.5 overflow-x-auto border-b border-ink/10 px-4 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {SCOPES.map((s) => {
+          const n = s.id === "all" ? total : s.id === "people" ? counts.people : s.id === "jail" ? counts.jail : counts.crime;
+          const on = scope === s.id;
+          return (
+            <button
+              key={s.id}
+              onClick={() => setScope(s.id)}
+              className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${on ? "bg-brand text-white" : "bg-ink/8 text-ink2"}`}
+            >
+              {s.label}{searching && n > 0 && <span className={on ? "text-white/80" : "text-ink3"}> · {n}</span>}
+            </button>
+          );
+        })}
+      </div>
 
       <div className="scroll-area flex-1 pb-24">
         {!searching ? (
