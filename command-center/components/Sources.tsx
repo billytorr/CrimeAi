@@ -20,6 +20,7 @@ const KINDS = [
   { id: "socrata", label: "Socrata / SODA dataset" },
   { id: "geojson", label: "GeoJSON feed" },
   { id: "nws", label: "NWS weather alerts" },
+  { id: "citizen", label: "Citizen (unofficial)" },
 ];
 const AUDIENCES = [
   { id: "public", label: "Public app" },

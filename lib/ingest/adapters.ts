@@ -110,6 +110,35 @@ export async function fetchGeojson(url: string, conf: Conf): Promise<RawIncident
   return out;
 }
 
+// ── Citizen (UNOFFICIAL, undocumented) — real-time 911-derived pins ─
+// url: https://citizen.com/api/incident/trending?lowerLatitude=25.5&lowerLongitude=-80.5&upperLatitude=25.95&upperLongitude=-80.05&fullResponse=true&limit=200
+// The same live incident stream Citizen's own app renders (including
+// ShotSpotter events). No auth — but no SLA either, and their ToS does
+// not authorize third-party use: business/legal risk is on us, so this
+// source ships DISABLED. Enable consciously from Command Center after
+// counsel review. Poll-based; idempotent on the record `key`.
+export async function fetchCitizen(url: string, conf: Conf): Promise<RawIncident[]> {
+  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (PSCC research)" }, signal: AbortSignal.timeout(30000) });
+  if (!res.ok) throw new Error(`Citizen ${res.status}`);
+  const data = (await res.json()) as any;
+  const rows: any[] = data.results || data.incidents || [];
+  const sevMap: Record<string, number> = { grey: 2, yellow: 3, red: 5 };
+  return rows
+    .filter((r) => typeof r.latitude === "number" && typeof r.longitude === "number" && r.cs)
+    .map((r): RawIncident => ({
+      externalId: String(r.key || `${r.latitude},${r.longitude},${r.cs}`),
+      type: String(r.title || "911 incident").slice(0, 120),
+      lat: r.latitude,
+      lon: r.longitude,
+      occurredAt: new Date(r.cs).toISOString(),
+      reportedAt: r.ts ? new Date(r.ts).toISOString() : undefined,
+      block: r.address ? String(r.address) : undefined,
+      neighborhood: r.police ? String(r.police) : undefined,
+      severityOverride: sevMap[r.severity] ?? undefined,
+      verified: true, // 911/dispatch-derived
+    }));
+}
+
 // ── National Weather Service alerts (live hazards, no key) ─────────
 // url: https://api.weather.gov/alerts/active?point=25.77,-80.19  (or ?area=FL)
 // Most alerts carry no polygon — they reference forecast zones instead,

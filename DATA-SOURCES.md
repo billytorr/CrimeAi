@@ -92,33 +92,68 @@ re-sync, and they reclassify on the next upsert.
 
 ---
 
-## Source directory
+## Source directory — TESTED July 2026
 
-### Live now
-- **NWS Weather Alerts (FL)** — `api.weather.gov/alerts/active?area=FL`.
-  Official, free, no key. Severe-weather/hazard alerts as map pins.
+Every endpoint below was actually fetched and verified (or verified dead).
 
-### Government open data (free — the priority pipeline)
-- **Miami-Dade Sheriff's Office** — MDSO launched a Crime Data Dashboard
-  (2025); the county's legacy Socrata portal migrated to ArcGIS Hub
-  (`gis-mdc.opendata.arcgis.com`). The incident-level FeatureServer behind
-  the dashboard is the #1 feed to wire — see "Finding an ArcGIS feed" below.
-- **City of Miami** — `miami.gov/Open-APIs-Datasets` + `datahub-miamigis.opendata.arcgis.com`.
-- **Neighboring cities** — Miami Beach, Coral Gables, Hialeah each publish
-  open-data portals; add each as its own source row when found.
-- **FBI Crime Data API** — aggregate statistics only (no incident points);
-  useful later for "vs national average" context, not for map pins.
+### Registered in Command Center now
+- **NWS Weather Alerts (FL)** — ✅ ENABLED, syncing.
+  `api.weather.gov/alerts/active?area=FL`. Official, free, no key
+  (descriptive User-Agent required). Zone-based alerts are pinned at
+  zone centroids under the "Other" category.
+- **Citizen real-time (Miami metro)** — ⏸ REGISTERED BUT DISABLED,
+  pending a business/legal decision.
+  `citizen.com/api/incident/trending?lowerLatitude=…&fullResponse=true&limit=200`
+  Returns the same live 911-derived incident stream Citizen's own app
+  shows for Miami — titles, lat/lon, timestamps, severity, responsible
+  PD, even ShotSpotter detections. Minutes-fresh, no auth. **BUT it is
+  an unofficial, undocumented API and Citizen's ToS does not authorize
+  third-party use** — it can break or be blocked at any time and using
+  a direct competitor's private API carries obvious risk. Have counsel
+  look before enabling. One click in Sources turns it on.
 
-### Commercial / partner feeds (when revenue justifies)
-- **SpotCrime** — licensed data partner program (contact-based pricing).
-- **CrimeoMeter** — paid incident API with per-call pricing.
-- **LexisNexis Community Crime Map** — powers many sheriff dashboards
-  (including Miami-Dade's public map); data partnerships are contact-based.
-- **Police scanners** — Broadcastify feeds + speech-to-text is the
-  Citizen-style real-time layer; a future dedicated ingest worker.
+### Official but limited (tested)
+- **Miami-Dade Jail Bookings** (ArcGIS, official, daily) —
+  `services.arcgis.com/8Pc9XBTAsYuxx9Ny/arcgis/rest/services/miamidade_jail_data/FeatureServer/0`
+  Every county arrest since 2015 with charges. **Do NOT map it**: it has
+  no offense coordinates — the only address is the *defendant's home*,
+  and pinning arrestees' homes in a public app is a privacy disaster.
+  Future use: aggregate charge trends for CrimeAI context only.
+- **FBI Crime Data Explorer** — `api.usa.gov/crime/fbi/cde/…` with a free
+  api.data.gov key. Aggregate monthly rates per agency, no incidents/no
+  coordinates. Future use: "robberies here are down 8% this year" context
+  in CrimeAI answers.
+- **GDELT news API** — `api.gdeltproject.org/api/v2/doc/doc?query=…` —
+  free local crime-news articles (rate limit: 1 request/5s). Future use:
+  the news layer in CrimeAI chat, not map pins.
+
+### Confirmed dead ends (do not chase again)
+- **MDSO Crime Data Dashboard** — it's a Power BI Gov embed, NOT ArcGIS.
+  No public API behind it; internals return aggregates only.
+- **Miami-Dade + City of Miami open-data hubs** — searched exhaustively:
+  no incident-level crime layer exists on either. Only boundaries, jail
+  bookings, and police-accountability data. The county deliberately
+  routes the public to crimemapping.com and Power BI.
+- **crimemapping.com / LexisNexis Community Crime Map** — browser-only,
+  WAF-protected, ToS-prohibited. The data partnership route is a
+  business-development conversation with CentralSquare / LexisNexis.
+- **Miami Beach / Coral Gables / Hialeah** — no incident-level open data.
+- **opendata.miamidade.gov (Socrata)** — decommissioned (404).
+
+### Paid / partner options
+- **SpotCrime** — API exists (`api.spotcrime.com`), keys are
+  partner-only; contact SpotCrime for licensing.
+- **CrimeoMeter** — paid incident API by lat/lon radius.
+- **CentralSquare / LexisNexis** — the two vendors that actually hold
+  agency-fed incident data for South Florida; partnership = the durable
+  official pipeline, worth pursuing once funded.
+- **Police scanners (Broadcastify) + speech-to-text** — the build-your-own
+  Citizen route; a future dedicated ingest worker (this is also the
+  backbone of the police-units path).
 
 ### Finding an ArcGIS feed behind a government dashboard
-Most agency "crime dashboards" are ArcGIS apps reading a public FeatureServer:
+Many agency dashboards elsewhere in Florida ARE ArcGIS apps reading a
+public FeatureServer (Miami-Dade's is not, but expansion cities' often are):
 1. Open the dashboard in a browser → DevTools → Network tab.
 2. Filter requests for `FeatureServer` or `/query?` — copy the layer URL.
 3. Test it: `<layer url>/query?where=1=1&resultRecordCount=2&outFields=*&f=json`

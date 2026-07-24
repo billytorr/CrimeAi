@@ -4,13 +4,14 @@
 // on demand from Command Center → Sources → "Sync now".
 import { serverDb } from "@/lib/payments/serverdb";
 import { categorize, type RawIncident } from "./normalize";
-import { fetchArcgis, fetchSocrata, fetchGeojson, fetchNws } from "./adapters";
+import { fetchArcgis, fetchSocrata, fetchGeojson, fetchNws, fetchCitizen } from "./adapters";
 
 const ADAPTERS: Record<string, (url: string, conf: any) => Promise<RawIncident[]>> = {
   arcgis: fetchArcgis,
   socrata: fetchSocrata,
   geojson: fetchGeojson,
   nws: fetchNws,
+  citizen: fetchCitizen,
 };
 
 export interface SyncResult {
