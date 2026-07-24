@@ -259,8 +259,15 @@ function FeedVideo({ src, className, mutePos }: { src: string; className: string
     return () => { io.disconnect(); unregister(); off(); };
   }, []);
 
-  // tapping the video toggles play/pause (like IG); the button toggles sound
-  const togglePlay = () => { const el = ref.current; if (!el) return; el.paused ? el.play().catch(() => {}) : el.pause(); };
+  // Tapping the video is the natural "I want sound" gesture (IG-style):
+  // while muted, a tap turns sound on for this and every later video;
+  // once unmuted, a tap toggles play/pause.
+  const onVideoTap = () => {
+    const el = ref.current;
+    if (!el) return;
+    if (isMuted()) { setMuted(false); el.play().catch(() => {}); return; }
+    el.paused ? el.play().catch(() => {}) : el.pause();
+  };
   const pos = mutePos === "tr" ? "right-3 top-3" : "right-3 bottom-3";
 
   return (
@@ -273,10 +280,19 @@ function FeedVideo({ src, className, mutePos }: { src: string; className: string
         muted={muted}
         playsInline
         preload="metadata"
-        onClick={togglePlay}
+        onClick={onVideoTap}
       />
+      {/* discoverable sound affordance while muted */}
+      {muted && (
+        <button
+          onClick={(e) => { e.stopPropagation(); setMuted(false); ref.current?.play().catch(() => {}); }}
+          className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm active:scale-95"
+        >
+          <SoundOff size={14} /> Tap for sound
+        </button>
+      )}
       <button
-        onClick={(e) => { e.stopPropagation(); setMuted(!isMuted()); }}
+        onClick={(e) => { e.stopPropagation(); setMuted(!isMuted()); ref.current?.play().catch(() => {}); }}
         className={`absolute ${pos} z-10 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm active:scale-90`}
         aria-label={muted ? "Unmute" : "Mute"}
       >

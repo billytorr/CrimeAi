@@ -58,8 +58,15 @@ function schedule() {
 function safePlay(el: HTMLVideoElement) {
   el.muted = muted;
   el.play().catch(() => {
-    // browser refused unmuted autoplay → play muted so it still moves
-    if (!el.muted) { el.muted = true; el.play().catch(() => {}); }
+    // browser refused unmuted autoplay → play muted so it still moves,
+    // and revert the global state so the UI honestly shows "muted"
+    // (the user taps once more to grant sound)
+    if (!el.muted) {
+      el.muted = true;
+      muted = true;
+      muteListeners.forEach((l) => l(true));
+      el.play().catch(() => {});
+    }
   });
 }
 
