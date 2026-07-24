@@ -137,6 +137,18 @@ export const IdCard = (p: P) => (
     <path d="M5.5 16c.5-1.5 1.5-2 2.5-2s2 .5 2.5 2M14 9h5M14 13h5M14 16h3" />
   </S>
 );
+export const SoundOn = (p: P) => (
+  <S {...p}>
+    <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+    <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+  </S>
+);
+export const SoundOff = (p: P) => (
+  <S {...p}>
+    <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+    <path d="m17 9 5 5M22 9l-5 5" />
+  </S>
+);
 export const Laptop = (p: P) => (
   <S {...p}>
     <rect x="4" y="5" width="16" height="11" rx="1.5" />

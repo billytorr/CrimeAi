@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { reportPost, blockUser, getBlockedHandles, REPORT_REASONS } from "@/lib/moderation";
+import { registerVideo, reportRatio, isMuted, setMuted, onMuteChange } from "@/lib/feedVideo";
 import type { Account } from "@/lib/auth";
 import {
   toggleLike, toggleSave, toggleFollow, toggleRepost, getComments, addComment, timeAgoShort, gradientFor, getProfileDirectory,
@@ -10,7 +11,7 @@ import {
 import Avatar from "@/components/Avatar";
 import MessageThread from "@/components/MessageThread";
 import { useOpenProfile } from "@/lib/profileContext";
-import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, ProBadge } from "@/components/Icons";
+import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, ProBadge, SoundOn, SoundOff } from "@/components/Icons";
 
 import { catColor } from "@/lib/categories";
 
@@ -220,12 +221,12 @@ function Media({ post, tall }: { post: Post; tall?: boolean }) {
       // eslint-disable-next-line @next/next/no-img-element
       return <img src={post.media.url} alt="" className={`w-full rounded-xl object-cover ${tall ? "h-[58vh]" : "max-h-80"}`} />;
     }
-    // Reels autoplay (muted/looping, TikTok-style) so the video visibly plays;
-    // standalone video posts get normal controls.
+    // Every feed video autoplays one-at-a-time with sound the user can
+    // mute/unmute (TikTok / Instagram behavior) — see FeedVideo.
     return isReel ? (
-      <video src={post.media.url} className="h-[58vh] w-full rounded-xl object-cover" autoPlay muted loop playsInline preload="auto" />
+      <FeedVideo src={post.media.url} className="h-[58vh] w-full rounded-xl object-cover" mutePos="tr" />
     ) : (
-      <video src={post.media.url} className={`w-full rounded-xl ${tall ? "max-h-[60vh]" : "max-h-80"}`} controls playsInline />
+      <FeedVideo src={post.media.url} className={`w-full rounded-xl object-cover ${tall ? "max-h-[60vh]" : "max-h-80"}`} mutePos="br" />
     );
   }
   // Fallback tile only for media-less posts (rare) — keeps layout stable.
@@ -233,6 +234,54 @@ function Media({ post, tall }: { post: Post; tall?: boolean }) {
     <div className={`relative grid place-items-center overflow-hidden rounded-xl ${tall ? "h-[58vh]" : "h-52"}`} style={{ background: gradientFor(post.id) }}>
       <div className="absolute inset-0 bg-black/10" />
       <span className="absolute bottom-2 left-2 rounded-md bg-black/40 px-2 py-0.5 text-xs text-white/90 backdrop-blur-sm">Local clip</span>
+    </div>
+  );
+}
+
+// Autoplaying feed video. Registers with the shared controller so only
+// the most-visible video plays, and exposes the global mute toggle.
+function FeedVideo({ src, className, mutePos }: { src: string; className: string; mutePos: "tr" | "br" }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [muted, setMutedState] = useState(true);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setMutedState(isMuted());
+    el.muted = isMuted();
+    const unregister = registerVideo(el);
+    const io = new IntersectionObserver(
+      (entries) => { for (const e of entries) reportRatio(el, e.isIntersecting ? e.intersectionRatio : 0); },
+      { threshold: [0, 0.25, 0.5, 0.6, 0.75, 0.9, 1] }
+    );
+    io.observe(el);
+    const off = onMuteChange((m) => { setMutedState(m); if (ref.current) ref.current.muted = m; });
+    return () => { io.disconnect(); unregister(); off(); };
+  }, []);
+
+  // tapping the video toggles play/pause (like IG); the button toggles sound
+  const togglePlay = () => { const el = ref.current; if (!el) return; el.paused ? el.play().catch(() => {}) : el.pause(); };
+  const pos = mutePos === "tr" ? "right-3 top-3" : "right-3 bottom-3";
+
+  return (
+    <div className="relative">
+      <video
+        ref={ref}
+        src={src}
+        className={className}
+        loop
+        muted={muted}
+        playsInline
+        preload="metadata"
+        onClick={togglePlay}
+      />
+      <button
+        onClick={(e) => { e.stopPropagation(); setMuted(!isMuted()); }}
+        className={`absolute ${pos} z-10 grid h-9 w-9 place-items-center rounded-full bg-black/45 text-white backdrop-blur-sm active:scale-90`}
+        aria-label={muted ? "Unmute" : "Mute"}
+      >
+        {muted ? <SoundOff size={16} /> : <SoundOn size={16} />}
+      </button>
     </div>
   );
 }
