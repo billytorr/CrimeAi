@@ -24,3 +24,7 @@ android/local.properties
 icon-only.png
 icon-foreground.png
 icon-background.png
+
+# Apple signing keys — never commit
+AuthKey_*.p8
+*.p8
