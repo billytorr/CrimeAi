@@ -8,7 +8,9 @@ import { deleteMyAccount, getBlockedHandles, unblockUser } from "@/lib/moderatio
 import { useEffect } from "react";
 import Avatar from "@/components/Avatar";
 import { TrustPanel } from "@/components/CoverageMatrix";
-import { Alert, Car, Eye, Flame, Chevron, Logout, Pin, Sun, Moon } from "@/components/Icons";
+import { Alert, Car, Eye, Flame, Chevron, Logout, Pin, Sun, Moon, ProBadge } from "@/components/Icons";
+import { supabase, supabaseEnabled } from "@/lib/supabase";
+import { accountHandle } from "@/lib/auth";
 
 const CATS = [
   { id: "violent", label: "Violent", color: "#c0392b", Icon: Alert },
@@ -63,6 +65,11 @@ export default function SettingsScreen({
           <p className="mt-2 text-[11px] text-ink3">Photo, name, username and bio are edited from your profile → Edit profile.</p>
           <div className="mt-3 text-xs font-medium uppercase tracking-wide text-ink2">Phone</div>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="+1 (305) 555-0123" className="mt-1 w-full rounded-xl border border-ink/10 bg-shell px-3 py-2.5 text-sm outline-none placeholder:text-ink3 focus:border-brand/60" />
+        </Section>
+
+        {/* Protector Plan */}
+        <Section title="Protector Plan">
+          <ProtectorPanel profile={profile} userId={userId} email={email} />
         </Section>
 
         {/* privacy */}
@@ -151,6 +158,58 @@ export default function SettingsScreen({
         </Section>
         <p className="pb-2 text-center text-[11px] text-ink3">CrimeAI · PSCC · BlackSeed Labs / TORR AI · Miami beta · v0.3</p>
       </div>
+    </div>
+  );
+}
+
+// Free → Protector upgrade. Checkout runs on the WEB (pay.publicsafety
+// crimecenter.com) — deliberately outside Apple/Google in-app purchases.
+function ProtectorPanel({ profile, userId, email }: { profile: Profile; userId: string; email: string }) {
+  const [features, setFeatures] = useState<string[]>([]);
+  const [price, setPrice] = useState("$9.11");
+  const isPro = profile.plan === "pro";
+
+  useEffect(() => {
+    if (!supabaseEnabled) return;
+    supabase!.from("plans").select("price_cents, features").eq("id", "pro").maybeSingle().then(({ data }) => {
+      if (data) {
+        setPrice(`$${(data.price_cents / 100).toFixed(2)}`);
+        setFeatures(Array.isArray(data.features) ? data.features : []);
+      }
+    });
+  }, []);
+
+  const checkoutUrl = `https://pay.publicsafetycrimecenter.com/crimeai/checkout?uid=${userId}&email=${encodeURIComponent(email)}`;
+
+  if (isPro) {
+    return (
+      <div className="flex items-start gap-3">
+        <ProBadge size={22} />
+        <div>
+          <p className="text-sm font-semibold">You&apos;re a Protector</p>
+          <p className="mt-0.5 text-xs text-ink2">Your red badge is live on your profile and every post. Thank you for keeping the block safe.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <ProBadge size={18} />
+        <span className="text-sm font-semibold">Become a Protector — {price}/mo</span>
+      </div>
+      <ul className="mt-2.5 space-y-1.5">
+        {(features.length ? features : ["Red Protector badge on your profile and posts", "Priority visibility for your reports", "Extended alert radius"]).map((f, i) => (
+          <li key={i} className="flex items-start gap-2 text-xs text-ink2">
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />{f}
+          </li>
+        ))}
+      </ul>
+      <a href={checkoutUrl} target="_blank" rel="noreferrer" className="mt-3 block w-full rounded-xl bg-brand py-3 text-center text-sm font-bold text-white active:scale-[0.99]">
+        Upgrade to Protector →
+      </a>
+      <p className="mt-2 text-[11px] text-ink3">Secure checkout on publicsafetycrimecenter.com. Cancel anytime.</p>
     </div>
   );
 }

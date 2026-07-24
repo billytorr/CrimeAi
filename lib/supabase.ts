@@ -77,6 +77,7 @@ export function rowToProfile(r: any): Profile {
     handle: r.handle || undefined,
     liveEnabled: !!r.live_enabled,
     isPrivate: !!r.is_private,
+    plan: r.plan === "pro" ? "pro" : "free",
     bio: r.bio || "",
     phone: r.phone || "",
     address: r.address || "",

@@ -2,7 +2,7 @@
   "name": "pscc-miami",
   "version": "0.1.0",
   "private": true,
-  "description": "PSCC (Public Safety Crime Center) \u2014 CrimeAI consumer MVP, Miami beta",
+  "description": "PSCC (Public Safety Crime Center) — CrimeAI consumer MVP, Miami beta",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -26,7 +26,8 @@
     "leaflet.heat": "^0.2.0",
     "next": "14.2.15",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "stripe": "^22.3.2"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.12",

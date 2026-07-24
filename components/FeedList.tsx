@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { reportPost, blockUser, getBlockedHandles, REPORT_REASONS } from "@/lib/moderation";
 import type { Account } from "@/lib/auth";
 import {
-  toggleLike, toggleSave, toggleFollow, toggleRepost, getComments, addComment, timeAgoShort, gradientFor,
+  toggleLike, toggleSave, toggleFollow, toggleRepost, getComments, addComment, timeAgoShort, gradientFor, getProHandles,
   type Post, type Comment, type Interactions,
 } from "@/lib/social";
 import Avatar from "@/components/Avatar";
 import MessageThread from "@/components/MessageThread";
 import { useOpenProfile } from "@/lib/profileContext";
-import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon } from "@/components/Icons";
+import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, ProBadge } from "@/components/Icons";
 
 const CAT_COLOR: Record<string, string> = { violent: "#c0392b", property: "#d98a00", nuisance: "#3b82f6", hazard: "#a855f7" };
 
@@ -21,9 +21,13 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
   const [reporting, setReporting] = useState<Post | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
-  // blocked users vanish from every feed surface (loaded once per mount)
+  const [proHandles, setProHandles] = useState<Set<string>>(new Set());
+
+  // blocked users vanish from every feed surface; Protector (paid) badges
+  // load once per mount
   useEffect(() => {
     getBlockedHandles(account.id).then(setHidden).catch(() => {});
+    getProHandles().then(setProHandles).catch(() => {});
   }, [account.id]);
 
   async function doBlock(p: Post) {
@@ -69,7 +73,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
     likeCount: p.likes + (likeDelta[p.id] || 0), commentCount: p.comments + (commentDelta[p.id] || 0),
     repostCount: (p.reposts || 0) + (repostDelta[p.id] || 0),
     onLike: () => onLike(p), onSave: () => onSave(p), onFollow: () => onFollow(p), onComment: () => setCommenting(p), onShare: () => onShare(p), onRepost: () => onRepost(p),
-    onMessage: () => setMessaging(p), onOpenProfile: () => openProfile(p.handle, p.id), onMenu: () => setMenuPost(p),
+    onMessage: () => setMessaging(p), onOpenProfile: () => openProfile(p.handle, p.id), onMenu: () => setMenuPost(p), pro: proHandles.has(p.handle),
   });
 
   return (
@@ -155,7 +159,7 @@ function ReportSheet({ post, account, onClose }: { post: Post; account: Account;
 type V = {
   post: Post; me?: { photo?: string; name: string }; liked: boolean; saved: boolean; followed: boolean; reposted: boolean;
   likeCount: number; commentCount: number; repostCount: number;
-  onLike: () => void; onSave: () => void; onFollow: () => void; onComment: () => void; onShare: () => void; onMessage: () => void; onOpenProfile: () => void; onRepost: () => void; onMenu: () => void;
+  onLike: () => void; onSave: () => void; onFollow: () => void; onComment: () => void; onShare: () => void; onMessage: () => void; onOpenProfile: () => void; onRepost: () => void; onMenu: () => void; pro: boolean;
 };
 
 function Badge({ post }: { post: Post }) {
@@ -165,7 +169,7 @@ function Badge({ post }: { post: Post }) {
   return null;
 }
 
-function Head({ post, me, followed, onFollow, onMessage, onMenu }: { post: Post; me?: { photo?: string; name: string }; followed: boolean; onFollow: () => void; onMessage: () => void; onMenu: () => void }) {
+function Head({ post, me, followed, onFollow, onMessage, onMenu, pro }: { post: Post; me?: { photo?: string; name: string }; followed: boolean; onFollow: () => void; onMessage: () => void; onMenu: () => void; pro?: boolean }) {
   const open = useOpenProfile();
   return (
     <div className="flex items-center gap-2.5">
@@ -173,6 +177,7 @@ function Head({ post, me, followed, onFollow, onMessage, onMenu }: { post: Post;
       <div className="min-w-0 flex-1">
         <button onClick={() => open(post.handle, post.id)} className="flex items-center gap-1 text-sm">
           <span className="truncate font-semibold text-ink">{post.author}</span>
+          {pro && <ProBadge size={13} />}
           {post.verified && <span className="text-brand"><Verified size={13} /></span>}
           <Badge post={post} />
         </button>
@@ -232,7 +237,7 @@ function StandardCard(v: V) {
   const hasMedia = post.media || post.scene;
   return (
     <article className="px-5 py-4">
-      <Head post={post} me={v.me} followed={v.followed} onFollow={v.onFollow} onMessage={v.onMessage} onMenu={v.onMenu} />
+      <Head post={post} me={v.me} followed={v.followed} onFollow={v.onFollow} onMessage={v.onMessage} onMenu={v.onMenu} pro={v.pro} />
       {post.text && <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-ink">{post.text}</p>}
       {post.thread && post.thread.length > 0 && <div className="mt-2 space-y-2 border-l-2 border-violet-500/40 pl-3">{post.thread.map((t, i) => <p key={i} className="text-[14px] leading-relaxed text-ink2">{t}</p>)}</div>}
       {hasMedia && <div className="mt-2.5"><Media post={post} /></div>}
@@ -261,7 +266,7 @@ function ReelCard(v: V) {
         <div className="absolute inset-x-0 bottom-0 p-5">
           <div className="flex items-center gap-2">
             <button onClick={() => v.onOpenProfile()} className="active:scale-95"><Avatar photo={v.me?.photo} name={v.me?.name || post.author} color={post.color} size={32} /></button>
-            <button onClick={() => v.onOpenProfile()} className="flex items-center gap-1 text-sm font-semibold text-white">{post.author}{post.verified && <Verified size={13} />}</button>
+            <button onClick={() => v.onOpenProfile()} className="flex items-center gap-1 text-sm font-semibold text-white">{post.author}{v.pro && <ProBadge size={13} />}{post.verified && <Verified size={13} />}</button>
             <span className="text-[11px] text-white/70">· {timeAgoShort(post.createdAt)}</span>
             {!post.mine && <button onClick={v.onMessage} aria-label="Message" className="ml-1 grid h-7 w-7 place-items-center rounded-full border border-white/40 text-white active:scale-95"><Mail size={13} /></button>}
             {!post.mine && <button onClick={v.onFollow} className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${v.followed ? "border border-white/30 text-white/80" : "bg-white text-black"}`}>{v.followed ? "Following" : "Follow"}</button>}

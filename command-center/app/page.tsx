@@ -10,6 +10,7 @@ import Analytics from "@/components/Analytics";
 import { Feedback, Issues, Updates, Ambassadors, Legal } from "@/components/Ops";
 import Security from "@/components/Security";
 import Settings from "@/components/Settings";
+import Finance from "@/components/Finance";
 
 type Section = SectionId;
 
@@ -23,6 +24,7 @@ const NAV: { id: Section; label: string }[] = [
   { id: "updates", label: "Updates" },
   { id: "ambassadors", label: "Live Access" },
   { id: "legal", label: "Legal" },
+  { id: "finance", label: "Finance" },
   { id: "security", label: "Security" },
   { id: "settings", label: "Settings" },
 ];
@@ -84,6 +86,7 @@ export default function CommandCenter() {
           {visible === "updates" && <Updates admin={admin} />}
           {visible === "ambassadors" && <Ambassadors admin={admin} />}
           {visible === "legal" && <Legal admin={admin} />}
+          {visible === "finance" && <Finance admin={admin} />}
           {visible === "security" && <Security />}
           {visible === "settings" && <Settings admin={admin} />}
         </div>

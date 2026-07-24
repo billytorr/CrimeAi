@@ -166,7 +166,7 @@ export async function savedPosts(userId: string): Promise<Post[]> {
 // Real follower/following counts straight from the follows table — every
 // account (community personas included) is a real user, so nothing here
 // is a mock number. Returns null in offline demo mode.
-export interface UserStats { followers: number; following: number; isPrivate: boolean; userId?: string; bio?: string; name?: string; photo?: string }
+export interface UserStats { followers: number; following: number; isPrivate: boolean; userId?: string; bio?: string; name?: string; photo?: string; plan?: string }
 export async function getUserStats(handle: string): Promise<UserStats | null> {
   if (!supabaseEnabled) return null;
   const { count: followers } = await supabase!
@@ -174,14 +174,22 @@ export async function getUserStats(handle: string): Promise<UserStats | null> {
   // A user's id comes from profiles.handle; older accounts without a
   // handle fall back to matching the email prefix.
   const { data: profs } = await supabase!
-    .from("profiles").select("id, is_private, bio, name, photo_url").or(`handle.eq.${handle},email.like.${handle}@%`).limit(1);
+    .from("profiles").select("id, is_private, bio, name, photo_url, plan").or(`handle.eq.${handle},email.like.${handle}@%`).limit(1);
   let following = 0;
   if (profs && profs.length) {
     const { count } = await supabase!
       .from("follows").select("*", { count: "exact", head: true }).eq("follower_id", profs[0].id).eq("status", "approved");
     following = count || 0;
   }
-  return { followers: followers || 0, following, isPrivate: !!profs?.[0]?.is_private, userId: profs?.[0]?.id, bio: profs?.[0]?.bio || "", name: profs?.[0]?.name || "", photo: profs?.[0]?.photo_url || "" };
+  return { followers: followers || 0, following, isPrivate: !!profs?.[0]?.is_private, userId: profs?.[0]?.id, bio: profs?.[0]?.bio || "", name: profs?.[0]?.name || "", photo: profs?.[0]?.photo_url || "", plan: profs?.[0]?.plan || "free" };
+}
+
+// Handles of every Protector (paid) user — powers the red badge on
+// posts and profiles app-wide. One cheap query, cached per feed mount.
+export async function getProHandles(): Promise<Set<string>> {
+  if (!supabaseEnabled) return new Set();
+  const { data } = await supabase!.from("profiles").select("handle, email").eq("plan", "pro");
+  return new Set((data || []).map((p) => p.handle || p.email?.split("@")[0] || "").filter(Boolean));
 }
 
 // ── follower / following lists + follow requests ─────────────

@@ -7,7 +7,7 @@ import ProfileGrid from "@/components/ProfileGrid";
 import FollowListSheet from "@/components/FollowList";
 import MessageThread from "@/components/MessageThread";
 import Avatar from "@/components/Avatar";
-import { Chevron, Mail, Verified, Pin } from "@/components/Icons";
+import { Chevron, Mail, Verified, Pin, ProBadge } from "@/components/Icons";
 
 export default function UserProfile({ handle, account, onClose }: { handle: string; account: Account; onClose: () => void }) {
   const myHandle = accountHandle(account);
@@ -41,6 +41,7 @@ export default function UserProfile({ handle, account, onClose }: { handle: stri
   const neighborhood = persona?.neighborhood || (isMe ? account.profile?.location.neighborhood : first?.neighborhood) || "Miami";
   const bio = persona?.bio || (isMe ? account.profile?.bio || "Your CrimeAI profile — your posts and reports appear here." : stats?.bio || "Neighbor on CrimeAI.");
   const photo = isMe ? account.profile?.photo : stats?.photo || undefined;
+  const isPro = isMe ? account.profile?.plan === "pro" : stats?.plan === "pro";
 
   // Instagram follow semantics: public → Following, private → Requested
   // until the owner approves.
@@ -70,7 +71,7 @@ export default function UserProfile({ handle, account, onClose }: { handle: stri
     <div className="absolute inset-0 z-[1200] flex flex-col bg-shell fade-in">
       <div className="safe-top flex items-center gap-3 border-b border-ink/10 px-4 pb-3 pt-4">
         <button onClick={onClose} className="-ml-1 text-ink2"><Chevron size={22} style={{ transform: "rotate(180deg)" }} /></button>
-        <span className="flex items-center gap-1 text-sm font-semibold">{name}{verified && <span className="text-brand"><Verified size={13} /></span>}</span>
+        <span className="flex items-center gap-1 text-sm font-semibold">{name}{isPro && <ProBadge size={13} />}{verified && <span className="text-brand"><Verified size={13} /></span>}</span>
       </div>
 
       <div className="scroll-area pb-24">
@@ -85,7 +86,7 @@ export default function UserProfile({ handle, account, onClose }: { handle: stri
             </div>
           </div>
           <div className="mt-3">
-            <div className="flex items-center gap-1.5 font-semibold">{name}{verified && <span className="text-brand"><Verified size={14} /></span>}<span className="text-xs font-normal text-ink3">@{handle}</span></div>
+            <div className="flex items-center gap-1.5 font-semibold">{name}{isPro && <ProBadge size={14} />}{verified && <span className="text-brand"><Verified size={14} /></span>}<span className="text-xs font-normal text-ink3">@{handle}</span></div>
             <div className="mt-0.5 flex items-center gap-1 text-xs text-ink2"><Pin size={12} /> {neighborhood}, Miami FL</div>
             {isMe && account.email && <div className="text-xs text-ink3">{account.email}</div>}
             <p className="mt-2 text-sm text-ink2">{bio}</p>

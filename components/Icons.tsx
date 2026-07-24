@@ -229,3 +229,11 @@ export const Repost = (p: P) => (
     <path d="M21 13v1a4 4 0 0 1-4 4H3" />
   </S>
 );
+// Protector Plan badge — RED verification, distinct from the blue
+// community-verified check. Paid supporters wear this next to their name.
+export const ProBadge = (p: P) => (
+  <S {...p} filled>
+    <path d="m12 2 2.4 1.8 3 .2.2 3L19.4 9.6 21 12l-1.6 2.4.2 3-3 .2L14.4 19.4 12 21l-2.4-1.6-3 .2-.2-3L4.6 14.4 3 12l1.6-2.4-.2-3 3-.2L9.6 4.6 12 3Z" style={{ fill: "#e31e28" }} stroke="none" />
+    <path d="m9 12 2 2 4-4" stroke="#fff" strokeWidth={2.2} />
+  </S>
+);

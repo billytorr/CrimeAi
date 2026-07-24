@@ -17,18 +17,19 @@ export interface Admin { id: string; email: string; role: Role; name: string }
 // Role model mirrors Facebook's Page roles (Admin/Editor/Moderator/Analyst),
 // adapted to PSCC. Access is enforced twice: sections hidden here, and the
 // database RLS policies reject anything a role isn't allowed to touch.
-export type Role = "owner" | "admin" | "moderator" | "analyst";
-export type SectionId = "overview" | "users" | "content" | "analytics" | "feedback" | "issues" | "updates" | "ambassadors" | "legal" | "security" | "settings";
+export type Role = "owner" | "admin" | "moderator" | "analyst" | "finance";
+export type SectionId = "overview" | "users" | "content" | "analytics" | "feedback" | "issues" | "updates" | "ambassadors" | "legal" | "finance" | "security" | "settings";
 
 export const ROLE_INFO: Record<Role, { label: string; blurb: string }> = {
   owner: { label: "Owner", blurb: "Full control. Manages every team member, including admins. Cannot be removed from the portal." },
   admin: { label: "Admin", blurb: "Full control of the app: users, content, analytics, updates, security. Can invite moderators and analysts." },
   moderator: { label: "Moderator", blurb: "Front-line safety: manage users (ban/unban), moderate content, handle feedback and issues." },
   analyst: { label: "Analyst", blurb: "Read-only insights: overview dashboard and analytics. No moderation or publishing powers." },
+  finance: { label: "Finance", blurb: "Revenue and billing: paid users, payments, plan pricing and benefits, merchant configuration." },
 };
 
 const SECTION_ACCESS: Record<SectionId, Role[]> = {
-  overview: ["owner", "admin", "moderator", "analyst"],
+  overview: ["owner", "admin", "moderator", "analyst", "finance"],
   users: ["owner", "admin", "moderator"],
   content: ["owner", "admin", "moderator"],
   analytics: ["owner", "admin", "analyst"],
@@ -37,6 +38,7 @@ const SECTION_ACCESS: Record<SectionId, Role[]> = {
   updates: ["owner", "admin"],
   ambassadors: ["owner", "admin", "moderator"],
   legal: ["owner", "admin"],
+  finance: ["owner", "admin", "finance"],
   security: ["owner", "admin"],
   settings: ["owner", "admin"],
 };

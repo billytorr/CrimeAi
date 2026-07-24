@@ -11,7 +11,7 @@ import {
 } from "@/lib/admin";
 import { Badge, Btn, Input, Panel, Select, Td, Th } from "@/components/ui";
 
-const GRANTABLE: Role[] = ["admin", "moderator", "analyst"];
+const GRANTABLE: Role[] = ["admin", "moderator", "analyst", "finance"];
 
 export default function Settings({ admin }: { admin: Admin }) {
   const [members, setMembers] = useState<Member[]>([]);
@@ -50,7 +50,7 @@ export default function Settings({ admin }: { admin: Admin }) {
     catch (e) { setError((e as Error).message); }
   }
 
-  const roleTone = (r: Role) => (r === "owner" ? "bad" : r === "admin" ? "blue" : r === "moderator" ? "warn" : "muted") as any;
+  const roleTone = (r: Role) => (r === "owner" ? "bad" : r === "admin" ? "blue" : r === "moderator" ? "warn" : r === "finance" ? "ok" : "muted") as any;
   const iCanManage = (m: Member) => m.role !== "owner" && m.id !== admin.id && (admin.role === "owner" || m.role !== "admin");
 
   return (
