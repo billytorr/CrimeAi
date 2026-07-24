@@ -27,6 +27,16 @@ function Checkout() {
 
   useEffect(() => {
     fetch(apiUrl("/api/pay/status")).then((r) => r.json()).then(setStatus).catch(() => setStatus({ provider: "none", ready: false, plan: null }));
+
+    // canonical checkout home is pay.publicsafetycrimecenter.com — if this
+    // page was reached on another domain, hop over (only once the pay
+    // domain actually resolves, so nothing breaks before DNS is set up)
+    const PAY_HOST = "pay.publicsafetycrimecenter.com";
+    if (typeof window !== "undefined" && window.location.hostname !== PAY_HOST && window.location.hostname !== "localhost") {
+      fetch(`https://${PAY_HOST}/api/pay/status`, { method: "HEAD", mode: "no-cors" })
+        .then(() => window.location.replace(`https://${PAY_HOST}${window.location.pathname}${window.location.search}`))
+        .catch(() => {}); // pay domain not live yet — stay put
+    }
   }, []);
 
   async function pay() {

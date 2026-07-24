@@ -9,8 +9,12 @@ import { Badge, Btn, Input, Panel, Select, StatCard, Td, TextArea, Th } from "@/
 
 const PROVIDERS = [
   { id: "none", label: "Not configured" },
-  { id: "stripe", label: "Stripe" },
+  { id: "stripe", label: "Stripe (API-integrated)" },
   { id: "chase", label: "Chase Payment Solutions" },
+  { id: "square", label: "Square" },
+  { id: "paypal", label: "PayPal" },
+  { id: "authorize", label: "Authorize.net" },
+  { id: "custom", label: "Custom / other merchant" },
 ];
 
 export default function Finance({ admin }: { admin: Admin }) {
@@ -25,6 +29,9 @@ export default function Finance({ admin }: { admin: Admin }) {
   const [freeFeatures, setFreeFeatures] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [checkoutUrl, setCheckoutUrl] = useState("");
+  const [grantEmail, setGrantEmail] = useState("");
+  const [grantMsg, setGrantMsg] = useState("");
 
   async function load() {
     const [pro, free, pays, plans, pc] = await Promise.all([
@@ -43,6 +50,7 @@ export default function Finance({ admin }: { admin: Admin }) {
     if (p) { setPriceStr((p.price_cents / 100).toFixed(2)); setProFeatures((p.features || []).join("\n")); }
     if (f) setFreeFeatures((f.features || []).join("\n"));
     setConf(pc.data);
+    setCheckoutUrl(pc.data?.checkout_url || "");
   }
   useEffect(() => { load(); }, []);
 
@@ -74,6 +82,34 @@ export default function Finance({ admin }: { admin: Admin }) {
     await load();
   }
 
+  async function saveCheckoutUrl() {
+    await supabase.from("payment_config").update({ checkout_url: checkoutUrl.trim(), updated_by: admin.email, updated_at: new Date().toISOString() }).eq("id", 1);
+    await audit(admin, "set_checkout_url", checkoutUrl.trim().slice(0, 80), {});
+    await load();
+  }
+
+  // Manual reconciliation — works with ANY merchant: match a payment on
+  // the provider's dashboard, then grant here (and revoke on cancellation).
+  async function grantProtector() {
+    setGrantMsg("");
+    const email = grantEmail.trim().toLowerCase();
+    if (!email) return;
+    const { data: prof } = await supabase.from("profiles").select("id, name").eq("email", email).maybeSingle();
+    if (!prof) { setGrantMsg("No account with that email."); return; }
+    await supabase.from("profiles").update({ plan: "pro", pro_since: new Date().toISOString() }).eq("id", prof.id);
+    await audit(admin, "grant_protector", email, { manual: true });
+    setGrantMsg(`${prof.name} is now a Protector.`);
+    setGrantEmail("");
+    await load();
+  }
+
+  async function revokeProtector(u: any) {
+    if (!window.confirm(`Remove Protector status from ${u.name}? (Use when a subscription is canceled or refunded.)`)) return;
+    await supabase.from("profiles").update({ plan: "free" }).eq("id", u.id);
+    await audit(admin, "revoke_protector", u.email, { manual: true });
+    await load();
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -98,9 +134,15 @@ export default function Finance({ admin }: { admin: Admin }) {
             environment variables (Vercel → Settings → Environment Variables):
           </p>
           <ul className="mt-2 space-y-1 text-xs text-ink3">
-            <li>• Stripe: <span className="font-mono">STRIPE_SECRET_KEY</span> + <span className="font-mono">STRIPE_WEBHOOK_SECRET</span> + <span className="font-mono">SUPABASE_SERVICE_ROLE_KEY</span></li>
-            <li>• Chase Payment Solutions: integration slot prepared — credentials wired when the merchant account exists</li>
+            <li>• <span className="text-ink2">Stripe (API-integrated):</span> set <span className="font-mono">STRIPE_SECRET_KEY</span>, <span className="font-mono">STRIPE_WEBHOOK_SECRET</span>, <span className="font-mono">SUPABASE_SERVICE_ROLE_KEY</span> — checkout, renewals and cancellations are fully automatic</li>
+            <li>• <span className="text-ink2">Any other merchant (Chase, Square, PayPal, Authorize.net, custom):</span> paste the provider&apos;s hosted checkout / payment-link URL below — users are sent there with their account reference attached; reconcile completed payments with Grant/Revoke on this page</li>
           </ul>
+          {conf?.provider && conf.provider !== "none" && conf.provider !== "stripe" && (
+            <div className="mt-3 flex items-center gap-2">
+              <Input placeholder="https://… the merchant's hosted checkout URL" value={checkoutUrl} onChange={(e) => setCheckoutUrl(e.target.value)} />
+              <Btn onClick={saveCheckoutUrl}>Save URL</Btn>
+            </div>
+          )}
         </Panel>
 
         <Panel title="Plan configuration (live in app + checkout)">
@@ -124,17 +166,24 @@ export default function Finance({ admin }: { admin: Admin }) {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Panel title={`Protector members (${proUsers.length})`}>
+        <Panel title={`Protector members (${proUsers.length})`} action={
+          <div className="flex items-center gap-1.5">
+            <Input placeholder="grant by email…" value={grantEmail} onChange={(e) => setGrantEmail(e.target.value)} className="w-52" />
+            <Btn small tone="ok" onClick={grantProtector}>Grant</Btn>
+          </div>
+        }>
+          {grantMsg && <p className="mb-2 text-xs text-ok">{grantMsg}</p>}
           {!proUsers.length ? <p className="py-8 text-center text-sm text-ink3">No paid members yet — they&apos;ll appear here the moment the first checkout completes.</p> : (
             <div className="max-h-[40vh] overflow-auto">
               <table className="w-full">
-                <thead><tr className="border-b border-line"><Th>Member</Th><Th>Handle</Th><Th>Protector since</Th></tr></thead>
+                <thead><tr className="border-b border-line"><Th>Member</Th><Th>Handle</Th><Th>Protector since</Th><Th>{" "}</Th></tr></thead>
                 <tbody className="divide-y divide-line">
                   {proUsers.map((u) => (
                     <tr key={u.id}>
                       <Td><div className="font-medium">{u.name}</div><div className="text-xs text-ink3">{u.email}</div></Td>
                       <Td className="text-ink2">@{u.handle || "—"}</Td>
                       <Td className="text-ink3">{u.pro_since ? timeAgo(u.pro_since) : "—"}</Td>
+                      <Td><Btn small tone="danger" onClick={() => revokeProtector(u)}>Revoke</Btn></Td>
                     </tr>
                   ))}
                 </tbody>

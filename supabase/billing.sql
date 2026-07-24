@@ -71,3 +71,7 @@ create policy payconf_read on public.payment_config for select using (true);
 drop policy if exists payconf_write on public.payment_config;
 create policy payconf_write on public.payment_config for update
   using (public.has_role(array['owner','admin','finance']));
+
+-- universal provider support: providers with hosted checkout pages/links
+-- (Chase, Square, PayPal, Authorize.net, anything) configure their URL here
+alter table public.payment_config add column if not exists checkout_url text default '';

@@ -1,9 +1,26 @@
 // Merchant-agnostic payment layer (server-side only).
-// The active provider is chosen in payment_config (Command Center →
-// Finance); each provider is an adapter behind this interface, so
-// switching merchants (Stripe today, Chase tomorrow) never touches the
-// app, checkout page, or database schema. Secret keys live ONLY in
-// server env vars — never in the database or the app bundle.
+// Works with ANY payment provider, two integration styles:
+//
+//   1. API-integrated — full programmatic checkout + webhooks.
+//      Stripe ships ready (set STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET).
+//      Deeper integrations (Chase Orbital API, Braintree, etc.) implement
+//      this same interface when their credentials exist.
+//
+//   2. Hosted-link — for every other merchant (Chase hosted checkout,
+//      Square payment links, PayPal subscriptions, Authorize.net pages…):
+//      paste the provider's hosted checkout URL in Command Center →
+//      Finance, and CrimeAI redirects there with the user reference
+//      attached. Payments are reconciled from the Finance page
+//      (grant/revoke Protector) until that provider's webhook is wired.
+//
+// The active provider + its non-secret config live in payment_config;
+// secret keys live ONLY in server env vars.
+export interface PaymentConfig {
+  provider: string;
+  currency: string;
+  checkout_url?: string;
+}
+
 export interface CheckoutRequest {
   userId: string;
   email: string;
@@ -15,12 +32,12 @@ export interface CheckoutRequest {
 
 export interface PaymentProvider {
   id: string;
-  ready(): boolean;                       // are the env keys present?
-  createCheckout(req: CheckoutRequest): Promise<{ url: string }>;
+  ready(conf: PaymentConfig): boolean;
+  createCheckout(req: CheckoutRequest, conf: PaymentConfig): Promise<{ url: string }>;
 }
 
-// ── Stripe (ready to activate: set STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET) ──
-export const stripeProvider: PaymentProvider = {
+// ── Stripe: fully API-integrated ────────────────────────────────────
+const stripeProvider: PaymentProvider = {
   id: "stripe",
   ready: () => !!process.env.STRIPE_SECRET_KEY,
   async createCheckout(req) {
@@ -46,18 +63,28 @@ export const stripeProvider: PaymentProvider = {
   },
 };
 
-// ── Chase Payment Solutions (slot prepared; integration keys TBD) ──
-export const chaseProvider: PaymentProvider = {
-  id: "chase",
-  ready: () => false, // wire Chase Integrated Payments credentials here when the merchant account exists
-  async createCheckout() {
-    throw new Error("Chase merchant integration is not configured yet.");
-  },
-};
+// ── Hosted-link: universal adapter for ANY merchant ─────────────────
+// Redirects to the provider's own hosted checkout, carrying the user id
+// as ?ref= so payments can be matched back to the account.
+function hostedLinkProvider(id: string): PaymentProvider {
+  return {
+    id,
+    ready: (conf) => !!conf.checkout_url?.trim(),
+    async createCheckout(req, conf) {
+      const base = conf.checkout_url!.trim();
+      const sep = base.includes("?") ? "&" : "?";
+      return { url: `${base}${sep}ref=${encodeURIComponent(req.userId)}&email=${encodeURIComponent(req.email)}` };
+    },
+  };
+}
 
 const PROVIDERS: Record<string, PaymentProvider> = {
   stripe: stripeProvider,
-  chase: chaseProvider,
+  chase: hostedLinkProvider("chase"),
+  square: hostedLinkProvider("square"),
+  paypal: hostedLinkProvider("paypal"),
+  authorize: hostedLinkProvider("authorize"),
+  custom: hostedLinkProvider("custom"),
 };
 
 export const getProvider = (id: string): PaymentProvider | null => PROVIDERS[id] || null;
