@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     const loc = await resolveAddress(address);
     if (!loc) {
       return NextResponse.json(
-        { error: "Could not resolve that address. Try a Miami neighborhood, ZIP, or street." },
+        { error: "Could not resolve that address. Try a neighborhood, city, ZIP, or street address." },
         { status: 422 }
       );
     }

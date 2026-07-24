@@ -2,14 +2,7 @@
 
 import type { Incident } from "@/lib/types";
 import { timeAgo } from "@/lib/data";
-
-const CAT_COLOR: Record<string, string> = {
-  violent: "#c0392b",
-  property: "#d98a00",
-  nuisance: "#3b82f6",
-  hazard: "#a855f7",
-  unverified: "#64748b",
-};
+import { catColor } from "@/lib/categories";
 
 export default function IncidentFeed({ incidents, onSelect }: { incidents: Incident[]; onSelect?: (i: Incident) => void }) {
   return (
@@ -25,7 +18,7 @@ export default function IncidentFeed({ incidents, onSelect }: { incidents: Incid
             onClick={() => onSelect?.(i)}
             className="flex w-full items-start gap-3 px-5 py-3 text-left transition hover:bg-ink/5"
           >
-            <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: CAT_COLOR[i.category] }} />
+            <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: catColor(i.category) }} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <span className="truncate text-sm font-medium text-ink">{i.type}</span>

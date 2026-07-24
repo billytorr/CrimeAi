@@ -8,17 +8,18 @@ import { deleteMyAccount, getBlockedHandles, unblockUser } from "@/lib/moderatio
 import { useEffect } from "react";
 import Avatar from "@/components/Avatar";
 import { TrustPanel } from "@/components/CoverageMatrix";
-import { Alert, Car, Eye, Flame, Chevron, Logout, Pin, Sun, Moon, ProBadge } from "@/components/Icons";
+import { Alert, Car, Eye, Chevron, Logout, Pin, Sun, Moon, ProBadge, Home as HomeIcon, Lock, IdCard, Laptop, Report } from "@/components/Icons";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 import { accountHandle } from "@/lib/auth";
 import { apiUrl } from "@/lib/api";
+import { CATEGORIES } from "@/lib/categories";
 
-const CATS = [
-  { id: "violent", label: "Violent", color: "#c0392b", Icon: Alert },
-  { id: "property", label: "Property", color: "#d98a00", Icon: Car },
-  { id: "nuisance", label: "Nuisance", color: "#3b82f6", Icon: Eye },
-  { id: "hazard", label: "Hazard", color: "#a855f7", Icon: Flame },
-];
+// alert-preference chips render from the shared crime taxonomy
+const CAT_ICONS: Record<string, typeof Alert> = {
+  domestic: HomeIcon, sexual: Report, violent: Alert, burglary: Lock,
+  vehicle: Car, identity: IdCard, cyber: Laptop, other: Eye,
+};
+const CATS = CATEGORIES.map((c) => ({ id: c.id, label: c.short, color: c.color, Icon: CAT_ICONS[c.id] || Eye }));
 
 export default function SettingsScreen({
   name, email, userId, profile, onProfile, onLogout, onChangeAddress, onClose,
@@ -94,7 +95,7 @@ export default function SettingsScreen({
         {/* location */}
         <Section title="Location & radius">
           <button onClick={onChangeAddress} className="flex w-full items-center justify-between rounded-xl border border-ink/10 bg-shell px-3 py-3">
-            <span className="flex items-center gap-2 text-sm text-ink"><Pin size={15} /> {profile.location.neighborhood}, Miami FL</span>
+            <span className="flex items-center gap-2 text-sm text-ink"><Pin size={15} /> {[profile.location.neighborhood, profile.location.city, profile.location.state].filter(Boolean).join(", ")}</span>
             <span className="text-sm font-medium text-brand">Change</span>
           </button>
           <div className="mt-3 text-xs font-medium uppercase tracking-wide text-ink2">Alert radius — {profile.alerts.radiusMiles} mi</div>

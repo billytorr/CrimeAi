@@ -8,11 +8,17 @@ import type { Incident } from "@/lib/types";
 import { getFeed, getInteractions, getFollowRequests, answerFollowRequest, timeAgoShort, getProfileDirectory, type Post, type FollowRequest, type ProfileLite } from "@/lib/social";
 import { getConversations, type Conversation } from "@/lib/messages";
 import { milesBetween } from "@/lib/data";
-import { Alert, Car, Eye, Flame, Comment as CommentIcon, Report, Messages as MessagesIcon, Bell, Verified } from "@/components/Icons";
+import { Alert, Car, Eye, Flame, Comment as CommentIcon, Report, Messages as MessagesIcon, Bell, Verified, Home as HomeIcon, Lock, IdCard, Laptop } from "@/components/Icons";
+import { normalizeCat } from "@/lib/categories";
 import Avatar from "@/components/Avatar";
 import MessageThread from "@/components/MessageThread";
 
-const CAT_ICON: Record<string, typeof Alert> = { violent: Alert, property: Car, nuisance: Eye, hazard: Flame };
+const CAT_ICON: Record<string, typeof Alert> = {
+  domestic: HomeIcon, sexual: Report, violent: Alert, burglary: Lock,
+  vehicle: Car, identity: IdCard, cyber: Laptop, other: Eye,
+  // legacy values still stored on old items
+  property: Car, nuisance: Eye, hazard: Flame,
+};
 type Tone = "alert" | "social" | "system";
 type Item = { id: string; cat?: string; tone: Tone; title: string; body: string; ts: string };
 type Tab = "activity" | "messages";
@@ -62,7 +68,7 @@ export default function InboxScreen({ account, refreshKey }: { account: Account;
     const out: Item[] = [];
     incidents
       .filter((i) => i.severity >= p.alerts.severityMin)
-      .filter((i) => p.alerts.categories.length === 0 || p.alerts.categories.includes(i.category))
+      .filter((i) => p.alerts.categories.length === 0 || p.alerts.categories.map(normalizeCat).includes(normalizeCat(i.category)))
       .slice(0, 20)
       .forEach((i) => out.push({ id: `al-${i.incident_id}`, cat: i.category, tone: "alert", title: `${i.type} near you`, body: `${i.source_label} · ${i.block}, ${i.neighborhood}${i.corroborating_sources.length ? ` · ${i.corroborating_sources.length + 1} sources` : i.verified ? "" : " · unverified"}`, ts: i.occurred_at }));
     reports

@@ -7,16 +7,13 @@ import type { Profile } from "@/lib/auth";
 import type { Incident } from "@/lib/types";
 import { milesBetween, timeAgo } from "@/lib/data";
 import { reportsForMap, type Post } from "@/lib/social";
+import { CATEGORIES, normalizeCat, catSeverity } from "@/lib/categories";
 import { Search, Home, Plus, Pin, Flame } from "@/components/Icons";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
-const CATS = [
-  { id: "violent", label: "Violent", color: "#c0392b" },
-  { id: "property", label: "Property", color: "#d98a00" },
-  { id: "nuisance", label: "Nuisance", color: "#3b82f6" },
-  { id: "hazard", label: "Hazard", color: "#a855f7" },
-];
+// map filter chips render straight from the shared taxonomy
+const CATS = CATEGORIES.map((c) => ({ id: c.id, label: c.short, color: c.color }));
 
 // Horizontal scroller that works on every input: touch swipe (pan-x),
 // mouse drag (scrollbars are hidden app-wide), and mouse wheel. Suppresses
@@ -67,25 +64,16 @@ function DragScroll({ className, children }: { className: string; children: Reac
   );
 }
 
-// Community report types (domestic/theft/harassment/unknown from the
-// composer, plus legacy ids) → the map's incident categories + severity.
-const REPORT_TO_INCIDENT: Record<string, { cat: Incident["category"]; sev: number }> = {
-  domestic: { cat: "violent", sev: 4 }, violent: { cat: "violent", sev: 4 },
-  theft: { cat: "property", sev: 2 }, property: { cat: "property", sev: 2 },
-  harassment: { cat: "nuisance", sev: 2 }, nuisance: { cat: "nuisance", sev: 1 },
-  hazard: { cat: "hazard", sev: 1 },
-  unknown: { cat: "nuisance", sev: 1 },
-};
-const mapCat = (c?: string) => REPORT_TO_INCIDENT[c || "unknown"] || REPORT_TO_INCIDENT.unknown;
-
+// Community reports use the shared taxonomy directly; normalizeCat maps
+// legacy composer ids (theft/harassment/unknown…) onto it.
 function reportToIncident(post: Post): Incident {
-  const m = mapCat(post.category);
+  const cat = normalizeCat(post.category) as Incident["category"];
   return {
     incident_id: post.id, source: "community", source_label: `Community · ${post.author}`, verified: false,
-    category: m.cat, type: post.text.slice(0, 40) || "Community report",
+    category: cat, type: post.text.slice(0, 40) || "Community report",
     neighborhood: post.neighborhood, block: "Community report", lat: post.lat, lon: post.lon,
     occurred_at: post.createdAt, reported_at: post.createdAt,
-    severity: m.sev, confidence: 0.4, corroborating_sources: [],
+    severity: catSeverity(post.category), confidence: 0.4, corroborating_sources: [],
   };
 }
 
@@ -146,7 +134,7 @@ export default function MapScreen({ profile, refreshKey, onReport }: { profile: 
     const reports = communityReports
       .filter((p) => +new Date(p.createdAt) >= cutoff)
       .filter((p) => milesBetween(center.lat, center.lon, p.lat, p.lon) <= radius)
-      .filter((p) => active.length === 0 || active.includes(mapCat(p.category).cat))
+      .filter((p) => active.length === 0 || active.includes(normalizeCat(p.category)))
       .map(reportToIncident);
     return [...apiIncidents, ...reports];
   }, [apiIncidents, communityReports, center.lat, center.lon, radius, days, active]);
@@ -173,7 +161,7 @@ export default function MapScreen({ profile, refreshKey, onReport }: { profile: 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && runSearch()}
-            placeholder="Search any Miami area, neighborhood, or ZIP"
+            placeholder="Search any address, neighborhood, city, or ZIP"
             className="w-full bg-transparent text-sm outline-none placeholder:text-ink3"
           />
           {searching ? <span className="text-xs text-ink2">…</span> : query ? <button onClick={runSearch} className="rounded-lg bg-brand px-3 py-1 text-xs font-semibold text-white">Go</button> : null}

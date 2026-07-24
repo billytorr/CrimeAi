@@ -5,22 +5,20 @@
 //   Bottom bar: POST · REPORT · LIVE  (LIVE hands off to the broadcaster)
 //   Mode row:   PHOTO · VIDEO · TEXT  (TEXT composes from scratch)
 //   Shutter:    tap = photo · press-and-hold = record (ring fills red, 2 min max)
-//   After capture/upload → description step; REPORT adds a category
-//   (Domestic Violence / Theft / Hazard / Harassment / Unknown) and pins to the map.
+//   After capture/upload → description step; REPORT adds a crime category
+//   from the shared taxonomy (lib/categories.ts) and pins to the map.
 import { useEffect, useRef, useState } from "react";
 import { accountHandle, type Account } from "@/lib/auth";
 import { addPost, type Post, type PostKind } from "@/lib/social";
 import { supabaseEnabled, uploadMedia } from "@/lib/supabase";
 import { applyForLive, getMyLiveApplication, type LiveApplication } from "@/lib/liveAccess";
 import { Close, Pin, Live as LiveIcon } from "@/components/Icons";
+import { CATEGORIES } from "@/lib/categories";
 
-export const REPORT_CATS: { id: string; label: string; color: string }[] = [
-  { id: "domestic", label: "Domestic Violence", color: "#c0392b" },
-  { id: "theft", label: "Theft", color: "#d98a00" },
-  { id: "hazard", label: "Hazard", color: "#a855f7" },
-  { id: "harassment", label: "Harassment", color: "#3b82f6" },
-  { id: "unknown", label: "Unknown", color: "#64748b" },
-];
+// Report categories come straight from the shared crime taxonomy —
+// anything that involves or can occur in a neighborhood.
+export const REPORT_CATS: { id: string; label: string; color: string }[] =
+  CATEGORIES.map((c) => ({ id: c.id, label: c.label, color: c.color }));
 
 const MAX_RECORD_MS = 2 * 60 * 1000; // 2 minutes
 const HOLD_THRESHOLD_MS = 250; // shorter press = photo, longer = video
@@ -65,7 +63,7 @@ export default function ComposeSheet({
   const [media, setMedia] = useState<{ type: "image" | "video"; url: string } | null>(null);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [text, setText] = useState("");
-  const [category, setCategory] = useState<string>("unknown"); // default per spec
+  const [category, setCategory] = useState<string>("other"); // default until the reporter picks
   const [busy, setBusy] = useState(false);
   const [liveApply, setLiveApply] = useState(false);
 

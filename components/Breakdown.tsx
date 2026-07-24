@@ -1,21 +1,7 @@
 "use client";
 
 import type { AreaStats } from "@/lib/types";
-
-const CAT_COLOR: Record<string, string> = {
-  violent: "#c0392b",
-  property: "#d98a00",
-  nuisance: "#3b82f6",
-  hazard: "#a855f7",
-  unverified: "#64748b",
-};
-const CAT_LABEL: Record<string, string> = {
-  violent: "Violent",
-  property: "Property",
-  nuisance: "Nuisance",
-  hazard: "Hazard",
-  unverified: "Unverified",
-};
+import { catColor, catShort } from "@/lib/categories";
 
 export function CategoryBreakdown({ stats }: { stats: AreaStats }) {
   const entries = Object.entries(stats.byCategory).sort((a, b) => b[1] - a[1]);
@@ -27,13 +13,13 @@ export function CategoryBreakdown({ stats }: { stats: AreaStats }) {
         {entries.map(([cat, n]) => (
           <div key={cat}>
             <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="text-ink2">{CAT_LABEL[cat] || cat}</span>
+              <span className="text-ink2">{catShort(cat)}</span>
               <span className="text-ink2">{n}</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-shell">
               <div
                 className="h-full rounded-full"
-                style={{ width: `${(n / max) * 100}%`, background: CAT_COLOR[cat] }}
+                style={{ width: `${(n / max) * 100}%`, background: catColor(cat) }}
               />
             </div>
           </div>

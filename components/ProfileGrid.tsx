@@ -18,7 +18,7 @@ import { Grid, Film, Report as ReportIcon, Thread as ThreadIcon, Bookmark, Heart
 
 type SubTab = "post" | "reels" | "threads" | "saved" | "repost" | "reports";
 
-const CAT_COLORS: Record<string, string> = { violent: "#c0392b", property: "#d98a00", nuisance: "#3b82f6", hazard: "#a855f7", domestic: "#c0392b", theft: "#d98a00", harassment: "#3b82f6", unknown: "#64748b" };
+import { catColor } from "@/lib/categories";
 
 export default function ProfileGrid({
   posts, saved, reposted, account, interactions, emptyText, publicView, focusPostId, onFocusConsumed,
@@ -213,7 +213,7 @@ function Tile({ post, tall, onOpen }: { post: Post; tall: boolean; onOpen: () =>
       )}
       {post.kind === "report" && post.category && (
         <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded bg-black/55 px-1.5 py-0.5 text-[9px] font-semibold text-white backdrop-blur-sm">
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: CAT_COLORS[post.category] || "#64748b" }} />
+          <span className="h-1.5 w-1.5 rounded-full" style={{ background: catColor(post.category) }} />
           {post.category}
         </span>
       )}

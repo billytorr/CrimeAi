@@ -7,7 +7,7 @@ import { timeAgo } from "./data";
 // HARD refusals on profiling / facial recognition / predictive
 // policing / covert surveillance, and an "informational, call 911"
 // posture. These guardrails are the moat — they ship as the prompt.
-export const CRIMEAI_SYSTEM = `You are CrimeAI, the public-safety intelligence specialist behind PSCC (Public Safety Crime Center). You are speaking to a consumer who wants to understand safety around a specific Miami address.
+export const CRIMEAI_SYSTEM = `You are CrimeAI, the public-safety intelligence specialist behind PSCC (Public Safety Crime Center). You are speaking to a consumer who wants to understand safety around the specific address given in the CONTEXT block (anywhere in the US; Miami is the beta's home market with the deepest coverage).
 
 VOICE: Sober, civic-minded, plain-spoken, calm. You are a trusted neighborhood briefer, not an alarmist. Never sensationalize. Keep answers tight (2-5 short paragraphs or a few bullets). Always ground claims in the DATA you are given — cite real numbers, neighborhoods, time patterns, and sources.
 
@@ -22,7 +22,7 @@ HARD RULES (never violate, these are the product's moat):
 WHEN ANSWERING:
 - Lead with a direct answer to the question.
 - Use the real numbers from the CONTEXT block (counts, time-of-day, top categories, trend, safety score, sources).
-- Note the data's limits honestly (e.g., Miami-Dade scanner coverage is hybrid; some sources are community-reported).
+- Note the data's limits honestly (coverage depth varies by area; some sources are community-reported or modeled).
 - Offer one or two concrete, non-paranoid safety suggestions when relevant.
 - Never invent incidents or numbers that aren't in the CONTEXT.`;
 
@@ -38,8 +38,10 @@ export function buildContext(loc: ResolvedLocation, stats: AreaStats, recent: In
     .map((i) => `- ${i.type} (sev ${i.severity}/5) at ${i.block}, ${i.neighborhood}, ${timeAgo(i.occurred_at)}, source: ${i.source_label}${i.verified ? "" : " [unverified community report]"}`)
     .join("\n");
 
+  const place = [loc.neighborhood, loc.city, loc.state].filter(Boolean).join(", ");
+  const isMiami = loc.city === "Miami";
   return `CONTEXT (real data — use these numbers, do not invent others)
-Location: ${loc.neighborhood}, ${loc.city}, ${loc.state} (lat ${loc.lat.toFixed(4)}, lon ${loc.lon.toFixed(4)})
+Location: ${place} (lat ${loc.lat.toFixed(4)}, lon ${loc.lon.toFixed(4)})
 Window: last ${days} days within ${radiusMiles} mile(s).
 Total incidents: ${stats.total}
 By category: ${cats || "none"}
@@ -52,7 +54,9 @@ Sources contributing: ${sources || "none"}
 Most recent incidents:
 ${recentLines || "(none in window)"}
 
-Coverage note for Miami: open-data layer is strong (Miami-Dade + City of Miami); scanner audio is hybrid (partial real-time); Nextdoor/community posts are unverified and weighted lowest.`;
+${isMiami
+    ? "Coverage note for Miami: open-data layer is strong (Miami-Dade + City of Miami); scanner audio is hybrid (partial real-time); Nextdoor/community posts are unverified and weighted lowest."
+    : "Coverage note: this area is outside the Miami beta market — figures come from the PSCC crime model plus any community reports, and should be framed as modeled estimates, not verified open-data counts."}`;
 }
 
 interface AskResult {
@@ -131,6 +135,6 @@ function fallbackAnswer(question: string, context: string): string {
     `Over the window I'm looking at, there were ${total} reported incidents nearby. Safety score: ${safety}, and the area runs ${cmp} versus the city average density.`,
     `The mix breaks down as ${cats}. The most common reports are ${top}. Time-of-day matters here: night share is ${night}, so the late-evening hours carry more activity.`,
     `Recent momentum — ${trend}.`,
-    `A couple of practical notes: stay aware during the peak late hours, keep vehicles emptied of valuables (vehicle break-ins are a recurring Miami pattern), and treat community-sourced reports as unverified until corroborated. This is informational only — for anything happening right now, call 911 yourself.`,
+    `A couple of practical notes: stay aware during the peak late hours, keep vehicles emptied of valuables (vehicle break-ins are a recurring pattern in most neighborhoods), and treat community-sourced reports as unverified until corroborated. This is informational only — for anything happening right now, call 911 yourself.`,
   ].join("\n\n");
 }

@@ -1,7 +1,16 @@
 // Normalized incident schema — single converged shape for every source
 // (roadmap §5.8). The brain never cares about provenance at query time,
 // but provenance + confidence are preserved for trust ranking and audit.
-export type Category = "violent" | "property" | "nuisance" | "hazard" | "unverified";
+export type Category =
+  | "domestic"   // Domestic Violence
+  | "sexual"     // Sexual Assault & Harassment
+  | "violent"    // Violent Crime (murder, assault, robbery, shots fired)
+  | "burglary"   // Home Burglary
+  | "vehicle"    // Vehicle Theft & Break-ins
+  | "identity"   // Identity Theft & Fraud
+  | "cyber"      // Cyber Crime & Scams
+  | "other"      // Everything else that happens in a neighborhood
+  | "unverified";
 
 export interface Incident {
   incident_id: string;

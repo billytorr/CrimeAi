@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveAddress } from "@/lib/geocode";
-import { computeStats, incidentsNear, NEIGHBORHOODS } from "@/lib/data";
+import { computeStats, incidentsNear, insideMiamiCoverage, NEIGHBORHOODS } from "@/lib/data";
 import { askCrimeAI, buildContext } from "@/lib/crimeai";
 import type { ResolvedLocation } from "@/lib/types";
 
@@ -17,13 +17,15 @@ export async function POST(req: NextRequest) {
 
     let loc: ResolvedLocation | null = null;
     if (typeof lat === "number" && typeof lon === "number") {
+      // only claim Miami when the coords are actually in the Miami area
+      const miami = insideMiamiCoverage(lat, lon);
       loc = {
         query: address || "current location",
         lat,
         lon,
-        neighborhood: neighborhood || nearest(lat, lon),
-        city: "Miami",
-        state: "FL",
+        neighborhood: neighborhood || (miami ? nearest(lat, lon) : "this area"),
+        city: miami ? "Miami" : "",
+        state: miami ? "FL" : "",
         source: "gazetteer",
       };
     } else if (address) {

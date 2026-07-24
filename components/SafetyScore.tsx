@@ -58,7 +58,7 @@ export default function SafetyScore({ stats, neighborhood }: { stats: AreaStats;
       </div>
       <p className="mt-3 text-xs text-ink2">
         Around <span className="text-ink">{neighborhood}</span>. Higher score = fewer, lower-severity incidents
-        per square mile vs the Miami baseline.
+        per square mile vs the citywide baseline.
       </p>
     </div>
   );

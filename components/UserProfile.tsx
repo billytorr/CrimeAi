@@ -87,7 +87,7 @@ export default function UserProfile({ handle, account, onClose }: { handle: stri
           </div>
           <div className="mt-3">
             <div className="flex items-center gap-1.5 font-semibold">{name}{isPro && <ProBadge size={14} />}{verified && <span className="text-brand"><Verified size={14} /></span>}<span className="text-xs font-normal text-ink3">@{handle}</span></div>
-            <div className="mt-0.5 flex items-center gap-1 text-xs text-ink2"><Pin size={12} /> {neighborhood}, Miami FL</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-ink2"><Pin size={12} /> {isMe ? [neighborhood, account.profile?.location.city, account.profile?.location.state].filter(Boolean).join(", ") : neighborhood}</div>
             {isMe && account.email && <div className="text-xs text-ink3">{account.email}</div>}
             <p className="mt-2 text-sm text-ink2">{bio}</p>
             {totalEngagement > 0 && (

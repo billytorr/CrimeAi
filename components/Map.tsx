@@ -3,14 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Incident } from "@/lib/types";
 import { timeAgo } from "@/lib/data";
-
-const CAT_COLOR: Record<string, string> = {
-  violent: "#c0392b",
-  property: "#d98a00",
-  nuisance: "#3b82f6",
-  hazard: "#a855f7",
-  unverified: "#64748b",
-};
+import { catColor } from "@/lib/categories";
 
 interface Props {
   lat: number;
@@ -120,7 +113,7 @@ export default function Map({ lat, lon, radiusMiles, incidents, heat, onSelect }
       const L = (await import("leaflet")).default;
       group.clearLayers();
       for (const i of incidents) {
-        const color = CAT_COLOR[i.category] || "#64748b";
+        const color = catColor(i.category);
         const baseR = heat ? 9 + i.severity * 5 : 4 + i.severity * 1.6;
         const circle = L.circleMarker([i.lat, i.lon], {
           radius: baseR,

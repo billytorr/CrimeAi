@@ -124,6 +124,25 @@ export const Car = (p: P) => (
     <path d="M5 12h14" />
   </S>
 );
+export const Lock = (p: P) => (
+  <S {...p}>
+    <rect x="4" y="11" width="16" height="10" rx="2" />
+    <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+  </S>
+);
+export const IdCard = (p: P) => (
+  <S {...p}>
+    <rect x="2" y="5" width="20" height="14" rx="2" />
+    <circle cx="8" cy="11" r="2" />
+    <path d="M5.5 16c.5-1.5 1.5-2 2.5-2s2 .5 2.5 2M14 9h5M14 13h5M14 16h3" />
+  </S>
+);
+export const Laptop = (p: P) => (
+  <S {...p}>
+    <rect x="4" y="5" width="16" height="11" rx="1.5" />
+    <path d="M2 19h20" />
+  </S>
+);
 export const Eye = (p: P) => (
   <S {...p}>
     <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />

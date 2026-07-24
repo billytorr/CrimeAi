@@ -11,7 +11,7 @@ interface Msg { role: "user" | "assistant"; text: string; engine?: string }
 const STARTERS = [
   "Is it safe to walk here tonight?",
   "What's the biggest risk on my block?",
-  "How does my area compare to the rest of Miami?",
+  "How does my area compare to the city average?",
   "Should I worry about car break-ins?",
   "What happened near me this week?",
 ];

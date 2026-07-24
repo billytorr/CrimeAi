@@ -8,14 +8,12 @@ import type { ResolvedLocation } from "@/lib/types";
 import { Pin } from "@/components/Icons";
 import Avatar from "@/components/Avatar";
 import UsernameField, { type UsernameState } from "@/components/UsernameField";
+import { CATEGORIES } from "@/lib/categories";
+import { milesBetween } from "@/lib/data";
 
-const EXAMPLES = ["Brickell", "South Beach", "Wynwood", "Coral Gables", "Little Havana", "33139"];
-const CATS = [
-  { id: "violent", label: "Violent", color: "#c0392b" },
-  { id: "property", label: "Property", color: "#d98a00" },
-  { id: "nuisance", label: "Nuisance", color: "#3b82f6" },
-  { id: "hazard", label: "Hazard", color: "#a855f7" },
-];
+// Miami examples front and center (beta focus), but any US place works.
+const EXAMPLES = ["Brickell", "South Beach", "Wynwood", "Coral Gables", "33139", "Orlando FL"];
+const CATS = CATEGORIES.map((c) => ({ id: c.id, label: c.short, color: c.color }));
 
 function nearest(lat: number, lon: number) {
   let best = NEIGHBORHOODS[0], d = Infinity;
@@ -56,7 +54,7 @@ export default function Onboarding({
 
   async function resolve(addr: string) {
     const q = addr.trim();
-    if (!q) { setError("Enter a Miami neighborhood, ZIP, or address."); return; }
+    if (!q) { setError("Enter a neighborhood, city, ZIP, or address."); return; }
     setBusy(true); setError("");
     try {
       const res = await fetch(apiUrl("/api/crimeai/lookup"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address: q }) });
@@ -71,9 +69,14 @@ export default function Onboarding({
     if (!navigator.geolocation) { setBusy(false); setError("Location not available — type your address instead."); return; }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const n = nearest(pos.coords.latitude, pos.coords.longitude);
-        setLocation({ query: "My location", lat: n.lat, lon: n.lon, neighborhood: n.name, city: "Miami", state: "FL", source: "gazetteer" });
-        setAddress(n.name); setUsedGeo(true); setBusy(false); setStep(2);
+        const { latitude: lat, longitude: lon } = pos.coords;
+        const n = nearest(lat, lon);
+        // only snap to a Miami neighborhood when the user is actually near it
+        const nearMiami = milesBetween(lat, lon, n.lat, n.lon) <= 30;
+        setLocation(nearMiami
+          ? { query: "My location", lat: n.lat, lon: n.lon, neighborhood: n.name, city: "Miami", state: "FL", source: "gazetteer" }
+          : { query: "My location", lat, lon, neighborhood: "My neighborhood", city: "", state: "", source: "gazetteer" });
+        setAddress(nearMiami ? n.name : "My location"); setUsedGeo(true); setBusy(false); setStep(2);
       },
       () => { setBusy(false); setError("Couldn't get your location — type your address instead."); },
       { timeout: 8000 }

@@ -12,7 +12,7 @@ import MessageThread from "@/components/MessageThread";
 import { useOpenProfile } from "@/lib/profileContext";
 import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, ProBadge } from "@/components/Icons";
 
-const CAT_COLOR: Record<string, string> = { violent: "#c0392b", property: "#d98a00", nuisance: "#3b82f6", hazard: "#a855f7" };
+import { catColor } from "@/lib/categories";
 
 export default function FeedList({ posts, account, interactions, emptyText }: { posts: Post[]; account: Account; interactions: Interactions; emptyText?: string }) {
   const [, force] = useState(0);
@@ -168,7 +168,7 @@ type V = {
 };
 
 function Badge({ post }: { post: Post }) {
-  if (post.kind === "report" && post.category) return <span className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: `${CAT_COLOR[post.category]}22`, color: CAT_COLOR[post.category] }}><Report size={11} />REPORT</span>;
+  if (post.kind === "report" && post.category) return <span className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: `${catColor(post.category)}22`, color: catColor(post.category) }}><Report size={11} />REPORT</span>;
   if (post.kind === "thread") return <span className="flex items-center gap-1 rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-violet-300"><ThreadIcon size={11} />THREAD</span>;
   if (post.kind === "reel") return <span className="flex items-center gap-1 rounded bg-pink-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-pink-300"><Film size={11} />REEL</span>;
   return null;
