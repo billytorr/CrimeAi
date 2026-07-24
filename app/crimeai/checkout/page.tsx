@@ -9,7 +9,6 @@ import Logo from "@/components/Logo";
 import { apiUrl } from "@/lib/api";
 
 interface PayStatus {
-  provider: string;
   ready: boolean;
   plan: { name: string; price_cents: number; tagline: string; features: string[] } | null;
 }
@@ -26,7 +25,7 @@ function Checkout() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch(apiUrl("/api/pay/status")).then((r) => r.json()).then(setStatus).catch(() => setStatus({ provider: "none", ready: false, plan: null }));
+    fetch(apiUrl("/api/pay/status")).then((r) => r.json()).then(setStatus).catch(() => setStatus({ ready: false, plan: null }));
 
     // canonical checkout home is pay.publicsafetycrimecenter.com — if this
     // page was reached on another domain, hop over (only once the pay

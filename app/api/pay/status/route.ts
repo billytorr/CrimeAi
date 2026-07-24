@@ -13,12 +13,13 @@ export async function GET() {
     const provider = conf?.provider || "none";
     const adapter = getProvider(provider);
     const cfg = { provider, currency: conf?.currency || "usd", checkout_url: conf?.checkout_url || "" };
+    // merchant identity is back-office information (Command Center → Finance);
+    // the public checkout only needs to know IF payments are open
     return NextResponse.json({
-      provider,
       ready: !!adapter?.ready(cfg),
       plan: pro || null,
     });
   } catch {
-    return NextResponse.json({ provider: "none", ready: false, plan: null });
+    return NextResponse.json({ ready: false, plan: null });
   }
 }
