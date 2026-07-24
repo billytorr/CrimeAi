@@ -19,7 +19,7 @@ export interface Post {
   isLive?: boolean; viewers?: number; // live streams
 }
 export interface LocalUser { name: string; handle: string; color: string; neighborhood: string; verified: boolean; followers: number; following: number; bio: string; email: string; phone: string }
-export interface Comment { author: string; text: string; ts: string }
+export interface Comment { author: string; text: string; ts: string; photo?: string }
 
 const nb = (name: string) => NEIGHBORHOODS.find((n) => n.name === name) || NEIGHBORHOODS[0];
 const minsAgo = (m: number) => new Date(Date.now() - m * 60000).toISOString();
@@ -186,10 +186,29 @@ export async function getUserStats(handle: string): Promise<UserStats | null> {
 
 // Handles of every Protector (paid) user — powers the red badge on
 // posts and profiles app-wide. One cheap query, cached per feed mount.
+// ── profile directory: handle → photo + Protector badge ──────
+// One cached query powers avatars/badges on every surface (feed,
+// comments, follower lists, inbox, messages) so profile pictures are
+// connected for ALL users, not just your own account.
+export interface ProfileLite { photo: string; pro: boolean }
+let profileDir: Map<string, ProfileLite> | null = null;
+
+export async function getProfileDirectory(force = false): Promise<Map<string, ProfileLite>> {
+  if (!supabaseEnabled) return new Map();
+  if (profileDir && !force) return profileDir;
+  const { data } = await supabase!.from("profiles").select("handle, email, photo_url, plan");
+  const m = new Map<string, ProfileLite>();
+  for (const p of data || []) {
+    const h = p.handle || p.email?.split("@")[0] || "";
+    if (h) m.set(h, { photo: p.photo_url || "", pro: p.plan === "pro" });
+  }
+  profileDir = m;
+  return m;
+}
+
 export async function getProHandles(): Promise<Set<string>> {
-  if (!supabaseEnabled) return new Set();
-  const { data } = await supabase!.from("profiles").select("handle, email").eq("plan", "pro");
-  return new Set((data || []).map((p) => p.handle || p.email?.split("@")[0] || "").filter(Boolean));
+  const dir = await getProfileDirectory();
+  return new Set(Array.from(dir.entries()).filter(([, v]) => v.pro).map(([h]) => h));
 }
 
 // ── follower / following lists + follow requests ─────────────
@@ -348,8 +367,15 @@ export async function toggleFollowState(handle: string, userId?: string): Promis
 
 export async function getComments(postId: string): Promise<Comment[]> {
   if (supabaseEnabled) {
-    const { data } = await supabase!.from("comments").select("author,text,created_at").eq("post_id", postId).order("created_at", { ascending: true });
-    return (data || []).map((c) => ({ author: c.author, text: c.text, ts: c.created_at }));
+    const { data } = await supabase!.from("comments").select("user_id,author,text,created_at").eq("post_id", postId).order("created_at", { ascending: true });
+    // one batched lookup connects each commenter to their profile photo
+    const ids = Array.from(new Set((data || []).map((c) => c.user_id).filter(Boolean)));
+    const photos = new Map<string, string>();
+    if (ids.length) {
+      const { data: profs } = await supabase!.from("profiles").select("id, photo_url").in("id", ids);
+      for (const p of profs || []) if (p.photo_url) photos.set(p.id, p.photo_url);
+    }
+    return (data || []).map((c) => ({ author: c.author, text: c.text, ts: c.created_at, photo: photos.get(c.user_id) }));
   }
   return readComments()[postId] || [];
 }

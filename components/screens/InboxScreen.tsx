@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAnnouncements, type Announcement } from "@/lib/analytics";
 import { accountHandle, type Account } from "@/lib/auth";
 import type { Incident } from "@/lib/types";
-import { getFeed, getInteractions, getFollowRequests, answerFollowRequest, timeAgoShort, type Post, type FollowRequest } from "@/lib/social";
+import { getFeed, getInteractions, getFollowRequests, answerFollowRequest, timeAgoShort, getProfileDirectory, type Post, type FollowRequest, type ProfileLite } from "@/lib/social";
 import { getConversations, type Conversation } from "@/lib/messages";
 import { milesBetween } from "@/lib/data";
 import { Alert, Car, Eye, Flame, Comment as CommentIcon, Report, Messages as MessagesIcon, Bell, Verified } from "@/components/Icons";
@@ -27,6 +27,9 @@ export default function InboxScreen({ account, refreshKey }: { account: Account;
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [open, setOpen] = useState<Conversation | null>(null);
   const [requests, setRequests] = useState<FollowRequest[]>([]);
+  const [dir, setDir] = useState<Map<string, ProfileLite>>(new Map());
+
+  useEffect(() => { getProfileDirectory().then(setDir).catch(() => {}); }, []);
 
   useEffect(() => {
     const params = new URLSearchParams({ lat: String(p.location.lat), lon: String(p.location.lon), radius: String(p.alerts.radiusMiles), days: "7" });
@@ -92,7 +95,7 @@ export default function InboxScreen({ account, refreshKey }: { account: Account;
           {/* follow requests (private-account approvals) come first */}
           {requests.map((r) => (
             <div key={r.followerId} className="flex items-center gap-3 px-5 py-4">
-              <Avatar name={r.name} color="#1b7f3a" size={40} />
+              <Avatar photo={dir.get(r.handle)?.photo} name={r.name} color="#1b7f3a" size={40} />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm"><span className="font-semibold">{r.name}</span> <span className="text-ink3">@{r.handle}</span></div>
                 <p className="text-xs text-ink2">requested to follow you · {timeAgoShort(r.createdAt)}</p>
@@ -125,7 +128,7 @@ export default function InboxScreen({ account, refreshKey }: { account: Account;
           <div className="divide-y divide-ink/5">
             {convos.map((c) => (
               <button key={c.handle} onClick={() => setOpen(c)} className="flex w-full items-center gap-3 px-5 py-3.5 text-left active:bg-ink/5">
-                <Avatar name={c.name} color={c.color} size={48} />
+                <Avatar photo={dir.get(c.handle)?.photo} name={c.name} color={c.color} size={48} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1 truncate text-sm font-semibold text-ink">{c.name}{c.verified && <span className="text-brand"><Verified size={12} /></span>}</span>

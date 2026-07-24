@@ -3,7 +3,7 @@
 // Instagram-style followers / following list sheet. Only reachable when
 // the account is public, it's your own, or your follow was approved.
 import { useEffect, useState } from "react";
-import { getFollowers, getFollowing, type FollowUser } from "@/lib/social";
+import { getFollowers, getFollowing, getProfileDirectory, type FollowUser, type ProfileLite } from "@/lib/social";
 import { useOpenProfile } from "@/lib/profileContext";
 import Avatar from "@/components/Avatar";
 import { Close } from "@/components/Icons";
@@ -14,10 +14,12 @@ export default function FollowListSheet({
   handle: string; kind: "followers" | "following"; onClose: () => void;
 }) {
   const [users, setUsers] = useState<FollowUser[] | null>(null);
+  const [dir, setDir] = useState<Map<string, ProfileLite>>(new Map());
   const openProfile = useOpenProfile();
 
   useEffect(() => {
     (kind === "followers" ? getFollowers(handle) : getFollowing(handle)).then(setUsers).catch(() => setUsers([]));
+    getProfileDirectory().then(setDir).catch(() => {});
   }, [handle, kind]);
 
   return (
@@ -37,7 +39,7 @@ export default function FollowListSheet({
           ) : (
             users.map((u) => (
               <button key={u.handle} onClick={() => { onClose(); openProfile(u.handle); }} className="flex w-full items-center gap-3 py-2.5 text-left active:opacity-70">
-                <Avatar name={u.name} color="#1b7f3a" size={40} />
+                <Avatar photo={dir.get(u.handle)?.photo} name={u.name} color="#1b7f3a" size={40} />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold">{u.name}</div>
                   <div className="text-xs text-ink3">@{u.handle}</div>

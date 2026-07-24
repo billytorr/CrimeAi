@@ -7,6 +7,7 @@
 import { useRef, useState } from "react";
 import { saveProfile, updateName, type Account, type Profile } from "@/lib/auth";
 import { saveHandle } from "@/lib/username";
+import { getProfileDirectory } from "@/lib/social";
 import UsernameField, { type UsernameState } from "@/components/UsernameField";
 import Avatar from "@/components/Avatar";
 import { Camera, Chevron } from "@/components/Icons";
@@ -49,6 +50,7 @@ export default function EditProfile({
       const p: Profile = { ...profile, photo, handle: handleChanged ? handle : profile.handle || currentHandle, bio: bio.trim() };
       await saveProfile(p);
       if (name.trim() !== account.name) await updateName(name); // cascades to all past posts/comments
+      getProfileDirectory(true).catch(() => {}); // refresh cached avatars app-wide
       onSaved(p, name.trim());
       onClose();
     } catch (e) {

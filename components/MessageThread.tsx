@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { getThread, sendDM, markRead, pendingReply, appendReply, type DM } from "@/lib/messages";
-import { timeAgoShort } from "@/lib/social";
+import { timeAgoShort, getProfileDirectory } from "@/lib/social";
 import Avatar from "@/components/Avatar";
 import { useOpenProfile } from "@/lib/profileContext";
 import { Chevron, Send, Verified } from "@/components/Icons";
@@ -14,10 +14,12 @@ export default function MessageThread({
 }) {
   const [thread, setThread] = useState<DM[]>([]);
   const [text, setText] = useState("");
+  const [photo, setPhoto] = useState<string | undefined>(undefined);
   const endRef = useRef<HTMLDivElement>(null);
   const openProfile = useOpenProfile();
 
   useEffect(() => { setThread(getThread(handle)); markRead(handle); }, [handle]);
+  useEffect(() => { getProfileDirectory().then((d) => setPhoto(d.get(handle)?.photo || undefined)).catch(() => {}); }, [handle]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [thread]);
 
   function send() {
@@ -36,7 +38,7 @@ export default function MessageThread({
       <div className="safe-top flex items-center gap-3 border-b border-ink/10 px-4 pb-3 pt-4">
         <button onClick={onClose} className="-ml-1 text-ink2"><Chevron size={22} style={{ transform: "rotate(180deg)" }} /></button>
         <button onClick={() => { openProfile(handle); onClose(); }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <Avatar name={name} color={color} size={36} />
+          <Avatar photo={photo} name={name} color={color} size={36} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1 text-sm font-semibold">{name}{verified && <span className="text-brand"><Verified size={13} /></span>}</div>
             <div className="text-[11px] text-ink3">@{handle} · tap to view profile</div>

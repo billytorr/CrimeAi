@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { reportPost, blockUser, getBlockedHandles, REPORT_REASONS } from "@/lib/moderation";
 import type { Account } from "@/lib/auth";
 import {
-  toggleLike, toggleSave, toggleFollow, toggleRepost, getComments, addComment, timeAgoShort, gradientFor, getProHandles,
-  type Post, type Comment, type Interactions,
+  toggleLike, toggleSave, toggleFollow, toggleRepost, getComments, addComment, timeAgoShort, gradientFor, getProfileDirectory,
+  type Post, type Comment, type Interactions, type ProfileLite,
 } from "@/lib/social";
 import Avatar from "@/components/Avatar";
 import MessageThread from "@/components/MessageThread";
@@ -21,13 +21,13 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
   const [reporting, setReporting] = useState<Post | null>(null);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
-  const [proHandles, setProHandles] = useState<Set<string>>(new Set());
+  const [dir, setDir] = useState<Map<string, ProfileLite>>(new Map());
 
-  // blocked users vanish from every feed surface; Protector (paid) badges
-  // load once per mount
+  // blocked users vanish from every feed surface; the profile directory
+  // (photos + Protector badges for ALL users) loads once per mount
   useEffect(() => {
     getBlockedHandles(account.id).then(setHidden).catch(() => {});
-    getProHandles().then(setProHandles).catch(() => {});
+    getProfileDirectory().then(setDir).catch(() => {});
   }, [account.id]);
 
   async function doBlock(p: Post) {
@@ -68,12 +68,17 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
   }
 
   const view = (p: Post) => ({
-    post: p, me: p.mine ? { photo: account.profile?.photo, name: account.name } : undefined,
+    post: p,
+    me: p.mine
+      ? { photo: account.profile?.photo, name: account.name }
+      : dir.get(p.handle)?.photo
+        ? { photo: dir.get(p.handle)!.photo, name: p.author }
+        : undefined,
     liked: isLiked(p.id), saved: isSaved(p.id), followed: isFollowed(p.handle), reposted: isReposted(p.id),
     likeCount: p.likes + (likeDelta[p.id] || 0), commentCount: p.comments + (commentDelta[p.id] || 0),
     repostCount: (p.reposts || 0) + (repostDelta[p.id] || 0),
     onLike: () => onLike(p), onSave: () => onSave(p), onFollow: () => onFollow(p), onComment: () => setCommenting(p), onShare: () => onShare(p), onRepost: () => onRepost(p),
-    onMessage: () => setMessaging(p), onOpenProfile: () => openProfile(p.handle, p.id), onMenu: () => setMenuPost(p), pro: proHandles.has(p.handle),
+    onMessage: () => setMessaging(p), onOpenProfile: () => openProfile(p.handle, p.id), onMenu: () => setMenuPost(p), pro: !!dir.get(p.handle)?.pro,
   });
 
   return (
@@ -326,7 +331,7 @@ function CommentSheet({ post, account, onClose, onAdded }: { post: Post; account
   async function submit() {
     const t = text.trim(); if (!t) return;
     setText("");
-    setComments((c) => [...c, { author: account.name, text: t, ts: new Date().toISOString() }]);
+    setComments((c) => [...c, { author: account.name, text: t, ts: new Date().toISOString(), photo: account.profile?.photo }]);
     onAdded();
     await addComment(post.id, account.name, t, account.id).catch(() => {});
   }
@@ -340,7 +345,7 @@ function CommentSheet({ post, account, onClose, onAdded }: { post: Post; account
         <div className="flex-1 space-y-3 overflow-y-auto px-5 pb-3">
           {loading ? <p className="py-8 text-center text-sm text-ink3">Loading…</p> : comments.length === 0 ? <p className="py-8 text-center text-sm text-ink3">No comments yet. Be the first.</p> : comments.map((c, i) => (
             <div key={i} className="flex items-start gap-2.5">
-              <Avatar name={c.author} color="#1b7f3a" size={32} />
+              <Avatar photo={c.photo} name={c.author} color="#1b7f3a" size={32} />
               <div className="min-w-0 flex-1"><div className="text-xs"><span className="font-semibold text-ink">{c.author}</span> <span className="text-ink3">· {timeAgoShort(c.ts)}</span></div><p className="text-sm text-ink2">{c.text}</p></div>
             </div>
           ))}

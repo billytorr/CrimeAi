@@ -11,7 +11,7 @@
 //             profile reports live under the Safety tab instead)
 import { useEffect, useMemo, useState } from "react";
 import type { Account } from "@/lib/auth";
-import { gradientFor, timeAgoShort, type Interactions, type Post } from "@/lib/social";
+import { gradientFor, timeAgoShort, getProfileDirectory, type Interactions, type Post } from "@/lib/social";
 import FeedList from "@/components/FeedList";
 import Avatar from "@/components/Avatar";
 import { Grid, Film, Report as ReportIcon, Thread as ThreadIcon, Bookmark, Heart, Comment as CommentIcon, Share, Pin, Chevron, Verified, Repost as RepostIcon } from "@/components/Icons";
@@ -28,6 +28,15 @@ export default function ProfileGrid({
 }) {
   const [tab, setTab] = useState<SubTab>("post");
   const [open, setOpen] = useState<Post | null>(null);
+  const [photos, setPhotos] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    getProfileDirectory().then((d) => {
+      const m = new Map<string, string>();
+      d.forEach((v, h) => { if (v.photo) m.set(h, v.photo); });
+      setPhotos(m);
+    }).catch(() => {});
+  }, []);
 
   // deep-link from the feed: opening your own post lands directly on it
   useEffect(() => {
@@ -92,7 +101,7 @@ export default function ProfileGrid({
       {tab === "threads" && (
         threads.length ? (
           <div className="divide-y divide-ink/5">
-            {threads.map((p) => <ThreadRow key={p.id} post={p} onOpen={() => setOpen(p)} />)}
+            {threads.map((p) => <ThreadRow key={p.id} post={p} photo={p.mine ? account.profile?.photo : photos.get(p.handle)} onOpen={() => setOpen(p)} />)}
           </div>
         ) : <Empty text="No threads yet." />
       )}
@@ -148,11 +157,11 @@ function Empty({ text }: { text: string }) {
 
 // X / Meta-Threads-style row: avatar rail, name + @handle + time, text
 // (with connected thread parts), muted engagement row.
-function ThreadRow({ post, onOpen }: { post: Post; onOpen: () => void }) {
+function ThreadRow({ post, photo, onOpen }: { post: Post; photo?: string; onOpen: () => void }) {
   return (
     <button onClick={onOpen} className="block w-full px-5 py-4 text-left active:bg-ink/5">
       <div className="flex gap-3">
-        <Avatar name={post.author} color={post.color} size={38} />
+        <Avatar photo={photo} name={post.author} color={post.color} size={38} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-sm">
             <span className="font-semibold">{post.author}</span>
