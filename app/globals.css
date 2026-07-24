@@ -87,8 +87,11 @@ body {
   display: flex;
   flex-direction: column;
 }
-/* Tablet / desktop: center as an app-sized column. */
-@media (min-width: 640px) {
+/* Desktop WEBSITE only: center as an app-sized column (phone frame).
+   Keyed on hover+fine pointer, not just width — so real touch devices
+   (phones, tablets, foldables, any dimension/orientation) always get the
+   full-bleed responsive app, while laptops/desktops keep this framed look. */
+@media (min-width: 640px) and (hover: hover) and (pointer: fine) {
   .app-stage {
     align-items: center;
     background:
@@ -115,6 +118,17 @@ body {
 
 /* safe-area helpers for real iOS notch/home-bar, with a comfortable
    minimum so content never hugs the top/bottom edge on any device. */
+/* native iOS/Android shells: always full-bleed, no frame, ever */
+html.native .app-stage { align-items: stretch; background: rgb(var(--c-base)); }
+html.native .app-shell {
+  max-width: none;
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  height: 100dvh;
+}
+
 .safe-top { padding-top: max(env(safe-area-inset-top), 8px); }
 .safe-bottom { padding-bottom: max(env(safe-area-inset-bottom), 6px); }
 

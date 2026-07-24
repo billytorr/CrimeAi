@@ -51,7 +51,7 @@ export const viewport: Viewport = {
 
 // Applies the saved theme before first paint so there's no flash of the
 // wrong theme. Must stay inline and dependency-free.
-const THEME_BOOT = `(function(){try{var t=localStorage.getItem("pscc_theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="light"?"#ffffff":"#0a0b10");}}catch(e){}})();`;
+const THEME_BOOT = `(function(){try{if(location.protocol==="capacitor:"||location.protocol==="ionic:")document.documentElement.classList.add("native");var t=localStorage.getItem("pscc_theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",t==="light"?"#ffffff":"#0a0b10");}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
