@@ -44,7 +44,7 @@ export default function FeedScreen({ account, onCompose, onSos, refreshKey }: { 
         <div className="flex items-center justify-between">
           <h1 className="bg-gradient-to-r from-ink to-brand bg-clip-text text-xl font-extrabold tracking-tight text-transparent">Feed</h1>
           <div className="flex items-center gap-2">
-            <SosPill onClick={onSos} />
+            {account.profile?.sosEnabled !== false && <SosPill onClick={onSos} />}
             <button onClick={onCompose} className="grid h-9 w-9 place-items-center rounded-full bg-brand text-white active:scale-95" aria-label="Create post"><Plus size={20} /></button>
           </div>
         </div>

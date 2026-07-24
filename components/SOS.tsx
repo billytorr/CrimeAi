@@ -1,17 +1,83 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Profile } from "@/lib/auth";
 import { Alert, Walk, Phone } from "@/components/Icons";
 
 // Floating red SOS button (used on Map / Ask / Inbox).
+// Draggable: press and move to park it anywhere on screen so it never
+// blocks content; a tap (no movement) still opens the safety sheet.
+// The chosen spot is remembered on this device.
+const SOS_POS_KEY = "pscc_sos_pos";
+const FAB = 52; // button diameter
+
 export function SosFab({ onClick }: { onClick: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null); // null = default corner
+  const posRef = useRef<{ x: number; y: number } | null>(null); // latest position, immune to render timing
+  const drag = useRef({ active: false, moved: false, dx: 0, dy: 0 });
+
+  const clamp = (p: { x: number; y: number }) => {
+    const parent = ref.current?.offsetParent as HTMLElement | null;
+    if (!parent) return p;
+    return {
+      x: Math.min(Math.max(4, p.x), parent.clientWidth - FAB - 4),
+      y: Math.min(Math.max(8, p.y), parent.clientHeight - FAB - 8),
+    };
+  };
+
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem(SOS_POS_KEY);
+      if (s) { const p = clamp(JSON.parse(s)); posRef.current = p; setPos(p); }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function onPointerDown(e: React.PointerEvent) {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    drag.current = { active: true, moved: false, dx: e.clientX - r.left, dy: e.clientY - r.top };
+    try { el.setPointerCapture(e.pointerId); } catch {}
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!drag.current.active) return;
+    const parent = ref.current?.offsetParent as HTMLElement | null;
+    if (!parent) return;
+    const pr = parent.getBoundingClientRect();
+    const next = clamp({ x: e.clientX - pr.left - drag.current.dx, y: e.clientY - pr.top - drag.current.dy });
+    if (!drag.current.moved) {
+      // small movements are a tap, not a drag
+      const cur = ref.current!.getBoundingClientRect();
+      const dist = Math.abs(e.clientX - (cur.left + drag.current.dx)) + Math.abs(e.clientY - (cur.top + drag.current.dy));
+      if (dist < 6) return;
+      drag.current.moved = true;
+    }
+    posRef.current = next;
+    setPos(next);
+  }
+  function onPointerUp() {
+    if (!drag.current.active) return;
+    drag.current.active = false;
+    if (drag.current.moved && posRef.current) {
+      try { localStorage.setItem(SOS_POS_KEY, JSON.stringify(posRef.current)); } catch {}
+    }
+    // click fires right after pointerup — clear the flag on the next tick
+    setTimeout(() => { drag.current.moved = false; }, 0);
+  }
+
   return (
     <button
-      onClick={onClick}
-      className="pulse absolute bottom-[120px] left-4 z-[1050] grid place-items-center rounded-full bg-signal-red text-ink shadow-lg active:scale-95"
-      style={{ height: 52, width: 52 }}
-      aria-label="Emergency"
+      ref={ref}
+      onClick={() => { if (!drag.current.moved) onClick(); }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      className="pulse absolute z-[1050] grid cursor-grab place-items-center rounded-full bg-signal-red text-ink shadow-lg [touch-action:none] active:scale-95"
+      style={{ height: FAB, width: FAB, ...(pos ? { left: pos.x, top: pos.y } : { bottom: 120, left: 16 }) }}
+      aria-label="Emergency — tap to open, drag to move"
     >
       <span className="text-sm font-bold">SOS</span>
     </button>

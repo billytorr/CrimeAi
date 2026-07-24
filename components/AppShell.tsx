@@ -82,8 +82,9 @@ export default function AppShell({
             onChangeAddress={() => onChangeAddress(profile)}
           />
         )}
-        {/* Floating SOS on Map / Ask / Inbox; Feed uses a header pill so it never covers a reel. */}
-        {(tab === "map" || tab === "ask" || tab === "inbox") && <SosFab onClick={() => setSosOpen(true)} />}
+        {/* Floating SOS on Map / Ask / Inbox; Feed uses a header pill so it never covers a reel.
+            Draggable anywhere; hidden entirely when Settings → Emergency SOS is off. */}
+        {profile.sosEnabled !== false && (tab === "map" || tab === "ask" || tab === "inbox") && <SosFab onClick={() => setSosOpen(true)} />}
         <SosSheets open={sosOpen} onClose={() => setSosOpen(false)} profile={profile} />
       </div>
       <BottomNav active={tab} onChange={setTab} inboxDot />

@@ -18,6 +18,7 @@ export interface Profile {
   handle?: string; // unique @username, chosen at signup (Instagram-style)
   liveEnabled?: boolean; // Live Media Brand Ambassador — granted by admins only
   isPrivate?: boolean; // private account: posts visible to approved followers only
+  sosEnabled?: boolean; // floating SOS button on/off (Settings → Emergency SOS); default on
   plan?: "free" | "pro"; // Protector Plan — set by the payment webhook only
   bio?: string; // shown on the profile page
   phone?: string;

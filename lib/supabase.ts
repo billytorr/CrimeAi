@@ -77,6 +77,7 @@ export function rowToProfile(r: any): Profile {
     handle: r.handle || undefined,
     liveEnabled: !!r.live_enabled,
     isPrivate: !!r.is_private,
+    sosEnabled: r.sos_enabled !== false, // default on
     plan: r.plan === "pro" ? "pro" : "free",
     bio: r.bio || "",
     phone: r.phone || "",
@@ -109,6 +110,7 @@ export function profileToRow(p: Profile, id: string, name: string, email: string
     photo_url: p.photo || "",
     handle: p.handle || null,
     is_private: !!p.isPrivate,
+    sos_enabled: p.sosEnabled !== false,
     bio: p.bio || "",
     phone: p.phone || "",
     address: p.address,

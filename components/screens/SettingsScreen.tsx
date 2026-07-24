@@ -74,6 +74,20 @@ export default function SettingsScreen({
           <ProtectorPanel profile={profile} userId={userId} email={email} />
         </Section>
 
+        {/* emergency SOS */}
+        <Section title="Emergency SOS">
+          <Toggle
+            label="Show SOS button"
+            on={profile.sosEnabled !== false}
+            onChange={(v) => { const np = { ...profile, sosEnabled: v }; onProfile(np); saveProfile(np).catch(() => {}); }}
+          />
+          <p className="mt-2 text-[11px] leading-relaxed text-ink3">
+            The floating SOS button gives one-tap access to &quot;I&apos;m not safe&quot;, Walk-with-me and Call 911.
+            When it&apos;s on, press and drag it to park it anywhere on screen so it never blocks your view.
+            Turning it off hides it everywhere, including the Feed header.
+          </p>
+        </Section>
+
         {/* privacy */}
         <Section title="Privacy">
           <Toggle
