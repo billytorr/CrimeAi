@@ -1,7 +1,7 @@
 "use client";
 
 import { apiUrl } from "@/lib/api";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { Account, Profile } from "@/lib/auth";
 import type { AreaStats } from "@/lib/types";
 import BottomNav, { Tab } from "@/components/BottomNav";
@@ -25,11 +25,6 @@ export default function AppShell({
   account: Account; onLogout: () => void; onChangeAddress: (current: Profile) => void;
 }) {
   const [tab, setTab] = useState<Tab>("feed"); // Feed is the home
-  // remember the tab in view before the current one, so overlays like
-  // Search can send the back button to where the user actually came from
-  const prevTab = useRef<Tab>("feed");
-  const changeTab = (t: Tab) => { if (t !== tab) prevTab.current = tab; setTab(t); };
-  const [searchReturn, setSearchReturn] = useState<Tab>("feed");
   const [profile, setProfile] = useState<Profile>(account.profile!);
   const [name, setName] = useState(account.name); // Edit profile renames propagate app-wide
   const [stats, setStats] = useState<AreaStats | null>(null);
@@ -65,7 +60,7 @@ export default function AppShell({
           if (handle === accountHandle(acct)) {
             setProfileHandle(null);
             setFocusPostId(postId || null);
-            changeTab("you");
+            setTab("you");
           } else {
             setProfileHandle(handle);
           }
@@ -73,7 +68,7 @@ export default function AppShell({
       }}
     >
       <div className="relative flex-1 overflow-hidden">
-        {tab === "feed" && <FeedScreen account={acct} onCompose={() => setComposing("post")} onSos={() => setSosOpen(true)} onSearch={() => { setSearchReturn(prevTab.current); setSearchOpen(true); }} refreshKey={refreshKey} />}
+        {tab === "feed" && <FeedScreen account={acct} onCompose={() => setComposing("post")} onSos={() => setSosOpen(true)} onSearch={() => setSearchOpen(true)} refreshKey={refreshKey} />}
         {tab === "map" && <MapScreen profile={profile} refreshKey={refreshKey} onReport={() => setComposing("report")} />}
         {tab === "ask" && <AskScreen name={account.name} profile={profile} stats={stats} />}
         {tab === "inbox" && <InboxScreen account={acct} refreshKey={refreshKey} />}
@@ -94,9 +89,11 @@ export default function AppShell({
         {profile.sosEnabled !== false && (tab === "map" || tab === "ask" || tab === "inbox") && <SosFab onClick={() => setSosOpen(true)} />}
         <SosSheets open={sosOpen} onClose={() => setSosOpen(false)} profile={profile} />
       </div>
-      <BottomNav active={tab} onChange={changeTab} inboxDot />
-      {/* Full-screen overlays (cover the bottom nav too) */}
-      {searchOpen && <SearchScreen account={acct} onClose={() => { setSearchOpen(false); setTab(searchReturn); }} />}
+      <BottomNav active={tab} onChange={setTab} inboxDot />
+      {/* Full-screen overlays (cover the bottom nav too). Search is a plain
+          overlay — closing it reveals the exact tab it was opened over, so
+          Back always returns to the page the user came from. */}
+      {searchOpen && <SearchScreen account={acct} onClose={() => setSearchOpen(false)} />}
       {profileHandle && <UserProfile handle={profileHandle} account={acct} onClose={() => setProfileHandle(null)} />}
       {composing && <ComposeSheet account={acct} startTab={composing} onClose={() => setComposing(null)} onPosted={() => setRefreshKey((k) => k + 1)} onGoLive={() => setLive(true)} />}
       {live && <LiveStream account={acct} onClose={() => setLive(false)} onPosted={() => setRefreshKey((k) => k + 1)} />}
