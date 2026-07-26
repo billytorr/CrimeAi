@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { login, startSignup, verifySignup, resendSignupCode, requestPasswordReset, completePasswordReset, ssoLogin } from "@/lib/auth";
+import { login, startSignup, verifySignup, resendSignupCode, requestPasswordReset, verifyResetCode, setNewPassword as setNewPasswordApi, ssoLogin } from "@/lib/auth";
 import Logo from "@/components/Logo";
 import LegalGate from "@/components/LegalGate";
 import { flushAcceptance } from "@/lib/legal";
 import { getCurrentAccount } from "@/lib/auth";
 
-type Mode = "signup" | "login" | "verify" | "forgot" | "reset";
+// reset is now two steps: "reset" (enter code) → "reset-pw" (new password)
+type Mode = "signup" | "login" | "verify" | "forgot" | "reset" | "reset-pw";
 
 export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
   const [mode, setMode] = useState<Mode>("signup");
@@ -16,6 +17,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -29,7 +31,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
   const [pendingAction, setPendingAction] = useState<null | "signup" | "google" | "apple">(null);
 
   function switchMode(m: Mode) {
-    setMode(m); setError(""); setNotice(""); setCode(""); setDemoCode("");
+    setMode(m); setError(""); setNotice(""); setCode(""); setDemoCode(""); setNewPassword(""); setConfirmPassword("");
   }
 
   async function run(fn: () => Promise<void>) {
@@ -92,8 +94,16 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
     setMode("reset"); setCode("");
   });
 
-  const submitReset = () => run(async () => {
-    await completePasswordReset(email, code, newPassword);
+  // step 1: verify the code, then advance to the new-password page
+  const submitResetCode = () => run(async () => {
+    await verifyResetCode(email, code);
+    setNewPassword(""); setConfirmPassword("");
+    setMode("reset-pw");
+  });
+
+  // step 2: set (and confirm) the new password
+  const submitSetPassword = () => run(async () => {
+    await setNewPasswordApi(email, newPassword, confirmPassword);
     onAuthed();
   });
 
@@ -108,7 +118,8 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
     login: "Public Safety Crime Center",
     verify: "Verify your email",
     forgot: "Reset your password",
-    reset: "Reset your password",
+    reset: "Enter your recovery code",
+    "reset-pw": "Choose a new password",
   };
 
   return (
@@ -182,18 +193,30 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
           </>
         )}
 
+        {/* reset step 1 — verification code only */}
         {mode === "reset" && (
           <>
             {notice && <p className="text-center text-sm text-ink2">{notice}</p>}
             {demoCode && <DemoCodeHint code={demoCode} />}
-            <CodeField value={code} onChange={setCode} />
-            <Field label="New password" value={newPassword} onChange={setNewPassword} placeholder="8+ characters" type="password" onEnter={submitReset} />
+            <CodeField value={code} onChange={setCode} onEnter={submitResetCode} />
             {error && <p className="text-sm text-red-400">{error}</p>}
-            <PrimaryButton busy={busy} onClick={submitReset}>Set new password →</PrimaryButton>
+            <PrimaryButton busy={busy} onClick={submitResetCode}>Continue →</PrimaryButton>
             <div className="flex items-center justify-between px-1 text-sm">
               <button onClick={() => switchMode("login")} className="text-ink2">← Back</button>
               <button onClick={submitForgot} className="font-medium text-brand">Resend code</button>
             </div>
+          </>
+        )}
+
+        {/* reset step 2 — new password + confirmation */}
+        {mode === "reset-pw" && (
+          <>
+            <p className="text-center text-sm text-ink2">Your code checked out. Set a new password you&apos;ll remember.</p>
+            <Field label="New password" value={newPassword} onChange={setNewPassword} placeholder="8+ characters" type="password" />
+            <Field label="Confirm new password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Re-enter password" type="password" onEnter={submitSetPassword} />
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            <PrimaryButton busy={busy} onClick={submitSetPassword}>Set new password →</PrimaryButton>
+            <button onClick={() => switchMode("reset")} className="w-full py-1 text-center text-sm text-ink2">← Back to code</button>
           </>
         )}
       </div>

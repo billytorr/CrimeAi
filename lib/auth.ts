@@ -114,10 +114,13 @@ export async function startSignup(name: string, email: string, password: string)
 }
 
 // Step 2 of signup: verify the emailed code, then the account goes live.
+// Supabase OTPs are 6–10 digits (this project's are 8); accept any in range.
+const OTP_RE = /^\d{6,10}$/;
+
 export async function verifySignup(email: string, code: string): Promise<Account> {
   const key = email.trim().toLowerCase();
   const token = code.trim();
-  if (token.length !== 6) throw new Error("Enter the 6-digit code.");
+  if (!OTP_RE.test(token)) throw new Error("Enter the code we emailed you.");
 
   if (supabaseEnabled) {
     const { data, error } = await supabase!.auth.verifyOtp({ email: key, token, type: "signup" });
@@ -201,27 +204,45 @@ export async function requestPasswordReset(email: string): Promise<{ demoCode?: 
   return { demoCode: code };
 }
 
-// Reset password: verify the code, set the new password, sign them in.
-export async function completePasswordReset(email: string, code: string, newPassword: string): Promise<Account> {
+// Reset password — STEP 1: verify the emailed recovery code. On success
+// Supabase holds a recovery session; the new password is set in step 2.
+export async function verifyResetCode(email: string, code: string): Promise<void> {
   const key = email.trim().toLowerCase();
   const token = code.trim();
-  if (token.length !== 6) throw new Error("Enter the 6-digit code.");
-  if (newPassword.length < 8) throw new Error("Password must be at least 8 characters.");
+  if (!OTP_RE.test(token)) throw new Error("Enter the code we emailed you.");
 
   if (supabaseEnabled) {
-    const { data, error } = await supabase!.auth.verifyOtp({ email: key, token, type: "recovery" });
+    const { error } = await supabase!.auth.verifyOtp({ email: key, token, type: "recovery" });
     if (error) throw new Error("That code didn't match. Check the email and try again.");
-    const { error: e2 } = await supabase!.auth.updateUser({ password: newPassword });
-    if (e2) throw new Error(e2.message);
-    const id = data.user?.id || "";
-    const { profile, name } = await sbProfile(id);
-    return { id, name, email: key, profile };
+    return;
   }
 
   const pending = readPending(PENDING_RESET_KEY);
   if (!pending || pending.email !== key) throw new Error("Start over — request a new code.");
   if (Date.now() > pending.exp) throw new Error("That code expired. Request a new one.");
   if (pending.code !== token) throw new Error("That code didn't match. Try again.");
+  // mark verified so step 2 can proceed without re-entering the code
+  localStorage.setItem(PENDING_RESET_KEY, JSON.stringify({ ...pending, verified: true }));
+}
+
+// Reset password — STEP 2: set the new password (code already verified),
+// then sign them in.
+export async function setNewPassword(email: string, newPassword: string, confirmPassword: string): Promise<Account> {
+  const key = email.trim().toLowerCase();
+  if (newPassword.length < 8) throw new Error("Password must be at least 8 characters.");
+  if (newPassword !== confirmPassword) throw new Error("Passwords don't match.");
+
+  if (supabaseEnabled) {
+    const { error } = await supabase!.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
+    const { data } = await supabase!.auth.getUser();
+    const id = data.user?.id || "";
+    const { profile, name } = await sbProfile(id);
+    return { id, name, email: key, profile };
+  }
+
+  const pending = readPending(PENDING_RESET_KEY);
+  if (!pending || pending.email !== key || !pending.verified) throw new Error("Verify your code first.");
   const accounts = readAccounts();
   const acc = accounts[key];
   if (!acc) throw new Error("Account missing.");
