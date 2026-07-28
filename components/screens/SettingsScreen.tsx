@@ -363,22 +363,23 @@ function LanguagePicker() {
   const { lang, setLang, t } = useLang();
   return (
     <div>
-      <div className="space-y-1.5">
-        {LANGS.map((l) => {
-          const on = lang === l.code;
-          return (
-            <button key={l.code} onClick={() => setLang(l.code)}
-              className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left transition ${on ? "border-brand/50 bg-brand/10" : "border-ink/10 bg-shell"}`}>
-              <span>
-                <span className="text-sm font-semibold text-ink">{l.label}</span>
-                {l.code !== "en" && <span className="ml-2 text-xs text-ink3">{t(l.english)}</span>}
-              </span>
-              {on && <span className="grid h-5 w-5 place-items-center rounded-full bg-brand text-white">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>
-              </span>}
-            </button>
-          );
-        })}
+      <div className="relative">
+        <select
+          value={lang}
+          onChange={(e) => setLang(e.target.value as (typeof LANGS)[number]["code"])}
+          className="w-full appearance-none rounded-xl border border-ink/10 bg-shell px-3.5 py-3 pr-10 text-sm font-semibold text-ink outline-none focus:border-brand/60"
+          aria-label={t("App language")}
+        >
+          {LANGS.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.label}{l.code !== "en" ? ` · ${l.english}` : ""}
+            </option>
+          ))}
+        </select>
+        {/* chevron */}
+        <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-ink3">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+        </span>
       </div>
       <p className="mt-2.5 text-[11px] leading-relaxed text-ink3">{t("Choose the language for the whole app. It follows your device by default.")}</p>
     </div>
