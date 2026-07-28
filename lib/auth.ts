@@ -309,10 +309,15 @@ export async function getCurrentAccount(): Promise<Account | null> {
     if (!data.user) return null;
     if (await isBanned(data.user.id)) { await supabase!.auth.signOut(); return null; }
     const { profile, name, email, handle } = await sbProfile(data.user.id);
-    // the username chosen at signup lives in user_metadata until the
-    // profile row is written at the end of onboarding
-    const draftHandle = handle || (data.user.user_metadata?.handle as string | undefined);
-    return { id: data.user.id, name, email: email || data.user.email || "", profile, draftHandle };
+    const meta = data.user.user_metadata || {};
+    // SAFEGUARD: once a profile exists, its name is AUTHORITATIVE — Google/
+    // Apple SSO metadata can NEVER overwrite it (that's what changed a name
+    // to the Gmail name before). Only a brand-new account (no profile yet)
+    // prefills its name from the SSO identity, which the user edits in
+    // onboarding. Same for the username/handle.
+    const displayName = profile ? name : ((meta.name as string) || (meta.full_name as string) || name);
+    const draftHandle = handle || (meta.handle as string | undefined);
+    return { id: data.user.id, name: displayName, email: email || data.user.email || "", profile, draftHandle };
   }
   if (typeof window === "undefined") return null;
   const key = localStorage.getItem(SESSION_KEY);
