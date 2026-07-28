@@ -1,21 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { login, startSignup, verifySignup, resendSignupCode, requestPasswordReset, verifyResetCode, setNewPassword as setNewPasswordApi, ssoLogin } from "@/lib/auth";
+import { login, startEmailSignup, verifyEmailSignup, setSignupCredentials, resendSignupCode, requestPasswordReset, verifyResetCode, setNewPassword as setNewPasswordApi, ssoLogin } from "@/lib/auth";
 import Logo from "@/components/Logo";
 import LegalGate from "@/components/LegalGate";
+import UsernameField, { type UsernameState } from "@/components/UsernameField";
 import { flushAcceptance } from "@/lib/legal";
 import { getCurrentAccount } from "@/lib/auth";
 
-// reset is now two steps: "reset" (enter code) → "reset-pw" (new password)
-type Mode = "signup" | "login" | "verify" | "forgot" | "reset" | "reset-pw";
+// Signup is Instagram/TikTok-style: email → code → username+password →
+// legal → (profile is built in Onboarding). reset stays two steps.
+type Mode = "signup" | "verify" | "credentials" | "login" | "forgot" | "reset" | "reset-pw";
 
 export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
   const [mode, setMode] = useState<Mode>("signup");
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [username, setUsername] = useState("");
+  const [handleState, setHandleState] = useState<UsernameState>("idle");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,14 +27,12 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
   // Local demo mode has no email service — the code is surfaced on-screen
   // so the whole flow stays demo-able. Absent once Supabase SMTP is live.
   const [demoCode, setDemoCode] = useState("");
-  // click-through agreement (TikTok-style): shown as its own step right
-  // AFTER tapping Create account; agreeing continues the signup automatically
-  const [agreed, setAgreed] = useState(false);
+  // legal is acknowledged AFTER username+password, right before onboarding
   const [legalOpen, setLegalOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<null | "signup" | "google" | "apple">(null);
+  const [pendingAction, setPendingAction] = useState<null | "google" | "apple">(null);
 
   function switchMode(m: Mode) {
-    setMode(m); setError(""); setNotice(""); setCode(""); setDemoCode(""); setNewPassword(""); setConfirmPassword("");
+    setMode(m); setError(""); setNotice(""); setCode(""); setDemoCode(""); setPassword(""); setNewPassword(""); setConfirmPassword("");
   }
 
   async function run(fn: () => Promise<void>) {
@@ -48,32 +49,38 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
     } catch {}
   }
 
-  const submitSignup = () => run(async () => {
-    if (!agreed) { setPendingAction("signup"); setLegalOpen(true); return; }
-    const r = await startSignup(name, email, password);
-    if (r.alreadyVerified) { await recordAcceptance(); onAuthed(); return; } // backend auto-confirmed
+  // step 1: email → send the verification code
+  const submitEmail = () => run(async () => {
+    const r = await startEmailSignup(email);
     setDemoCode(r.demoCode || "");
     setNotice(`We sent a verification code to ${email.trim().toLowerCase()}.`);
     setMode("verify"); setCode("");
   });
 
-  const submitSignupAgreed = () => run(async () => {
-    const r = await startSignup(name, email, password);
-    if (r.alreadyVerified) { await recordAcceptance(); onAuthed(); return; }
-    setDemoCode(r.demoCode || "");
-    setNotice(`We sent a verification code to ${email.trim().toLowerCase()}.`);
-    setMode("verify"); setCode("");
+  // step 2: verify the code → advance to username + password
+  const submitVerify = () => run(async () => {
+    await verifyEmailSignup(email, code);
+    setUsername(""); setPassword(""); setConfirmPassword("");
+    setMode("credentials");
+  });
+
+  // step 3: set username + password → then the legal step
+  const submitCredentials = () => run(async () => {
+    const ok = handleState === "available";
+    if (!ok) throw new Error(handleState === "taken" ? "That username is taken — pick another." : "Choose an available username.");
+    await setSignupCredentials(email, username, password, confirmPassword);
+    setLegalOpen(true); // step 4: legal acknowledgement, then onboarding
+  });
+
+  // step 4: legal accepted → record + hand off to onboarding
+  const afterLegal = () => run(async () => {
+    await recordAcceptance();
+    onAuthed();
   });
 
   const ssoAgreed = (provider: "google" | "apple") => run(async () => {
     const acct = await ssoLogin(provider);
     if (acct) { await flushAcceptance(acct.id).catch(() => {}); onAuthed(); }
-  });
-
-  const submitVerify = () => run(async () => {
-    await verifySignup(email, code);
-    await recordAcceptance();
-    onAuthed();
   });
 
   const resend = () => run(async () => {
@@ -108,15 +115,17 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
   });
 
   const sso = (provider: "google" | "apple") => run(async () => {
-    if (mode === "signup" && !agreed) { setPendingAction(provider); setLegalOpen(true); return; }
+    // SSO on signup still acknowledges legal first
+    if (mode === "signup") { setPendingAction(provider); setLegalOpen(true); return; }
     const acct = await ssoLogin(provider);
     if (acct) { await flushAcceptance(acct.id).catch(() => {}); onAuthed(); } // with real OAuth the browser redirects instead
   });
 
   const sub: Record<Mode, string> = {
-    signup: "Public Safety Crime Center",
-    login: "Public Safety Crime Center",
+    signup: "Create your account",
     verify: "Verify your email",
+    credentials: "Pick a username & password",
+    login: "Public Safety Crime Center",
     forgot: "Reset your password",
     reset: "Enter your recovery code",
     "reset-pw": "Choose a new password",
@@ -144,13 +153,11 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
       <div className="mt-5 space-y-3">
         {mode === "signup" && (
           <>
-            <Field label="Name" value={name} onChange={setName} placeholder="Maria" />
-            <Field label="Email" value={email} onChange={setEmail} placeholder="you@email.com" type="email" />
-            <Field label="Password" value={password} onChange={setPassword} placeholder="8+ characters" type="password" onEnter={submitSignup} />
+            <Field label="Email" value={email} onChange={setEmail} placeholder="you@email.com" type="email" onEnter={submitEmail} />
             {error && <p className="text-sm text-red-400">{error}</p>}
-            <PrimaryButton busy={busy} onClick={submitSignup}>Create account →</PrimaryButton>
+            <PrimaryButton busy={busy} onClick={submitEmail}>Continue →</PrimaryButton>
             <p className="text-center text-[11px] leading-relaxed text-ink3">
-              Next you&apos;ll review and agree to the <span className="font-medium text-ink2">Terms of Service</span> and <span className="font-medium text-ink2">Privacy Policy</span>.
+              We&apos;ll email you a code to confirm it&apos;s you. You&apos;ll pick a username and password next.
             </p>
             <SsoButtons busy={busy} onPick={sso} />
           </>
@@ -180,6 +187,20 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
               <button onClick={() => switchMode("signup")} className="text-ink2">← Back</button>
               <button onClick={resend} className="font-medium text-brand">Resend code</button>
             </div>
+          </>
+        )}
+
+        {mode === "credentials" && (
+          <>
+            <p className="text-center text-sm text-ink2">Email confirmed. Choose how neighbors find you and secure your account.</p>
+            <UsernameField value={username} onChange={setUsername} onState={setHandleState} name="" email={email} />
+            <Field label="Password" value={password} onChange={setPassword} placeholder="8+ characters" type="password" />
+            <Field label="Confirm password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Re-enter password" type="password" onEnter={submitCredentials} />
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            <PrimaryButton busy={busy} onClick={submitCredentials}>Continue →</PrimaryButton>
+            <p className="text-center text-[11px] leading-relaxed text-ink3">
+              Next: review the <span className="font-medium text-ink2">Terms</span> &amp; <span className="font-medium text-ink2">Privacy Policy</span>, then set up your profile.
+            </p>
           </>
         )}
 
@@ -231,10 +252,11 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
       {legalOpen && (
         <LegalGate
           onAgreed={() => {
-            setAgreed(true); setLegalOpen(false); setError("");
-            // continue exactly what the user was doing
-            if (pendingAction === "signup") setTimeout(() => submitSignupAgreed(), 0);
-            else if (pendingAction) setTimeout(() => ssoAgreed(pendingAction), 0);
+            setLegalOpen(false); setError("");
+            // SSO signup: run the provider login; email signup: credentials
+            // are already set — just record acceptance and enter onboarding
+            if (pendingAction) setTimeout(() => ssoAgreed(pendingAction), 0);
+            else setTimeout(() => afterLegal(), 0);
             setPendingAction(null);
           }}
           onClose={() => { setLegalOpen(false); setPendingAction(null); }}

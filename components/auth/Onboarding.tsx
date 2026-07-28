@@ -5,8 +5,7 @@ import { useRef, useState } from "react";
 import { defaultAlerts, saveProfile, type AlertPrefs, type Profile } from "@/lib/auth";
 import { NEIGHBORHOODS } from "@/lib/data";
 import type { ResolvedLocation } from "@/lib/types";
-import { Pin } from "@/components/Icons";
-import Avatar from "@/components/Avatar";
+import { Pin, Camera } from "@/components/Icons";
 import UsernameField, { type UsernameState } from "@/components/UsernameField";
 import { CATEGORIES } from "@/lib/categories";
 import { milesBetween } from "@/lib/data";
@@ -24,16 +23,49 @@ function nearest(lat: number, lon: number) {
   return best;
 }
 
+// Downscale + compress the picked image to a square-ish JPEG data URL so
+// it reliably saves to the profile (raw multi-MB phone photos would bloat
+// or fail the upsert — that's the "photo didn't save" bug).
+function resizeImage(file: File, max = 512): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("no canvas"));
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = () => reject(new Error("bad image"));
+      img.src = String(reader.result);
+    };
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Onboarding({
-  name: initialName, email, userId, existing, onDone,
+  name: initialName, email, userId, existing, draftHandle, onDone,
 }: {
-  name: string; email: string; userId: string; existing?: Profile | null; onDone: (p: Profile) => void;
+  name: string; email: string; userId: string; existing?: Profile | null; draftHandle?: string; onDone: (p: Profile) => void;
 }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(initialName === "Neighbor" ? "" : initialName);
   const [photo, setPhoto] = useState(existing?.photo || "");
-  const [handle, setHandle] = useState(existing?.handle || "");
+  const [bio, setBio] = useState(existing?.bio || "");
+  // username chosen during email signup is carried in via draftHandle;
+  // SSO users (no credentials step) pick it here instead.
+  const presetHandle = existing?.handle || draftHandle || "";
+  const [handle, setHandle] = useState(presetHandle);
   const [handleState, setHandleState] = useState<UsernameState>("idle");
+  const needsUsername = !presetHandle;
+  const handleOk = !needsUsername || handleState === "available";
   const [address, setAddress] = useState("");
   const [location, setLocation] = useState<ResolvedLocation | null>(null);
   const [usedGeo, setUsedGeo] = useState(false);
@@ -41,15 +73,12 @@ export default function Onboarding({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  // re-running onboarding (e.g. changing address) keeps an already-claimed handle
-  const handleOk = handleState === "available" || (!!existing?.handle && handle === existing.handle);
 
-  function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    const r = new FileReader();
-    r.onload = () => setPhoto(String(r.result));
-    r.readAsDataURL(f);
+    try { setPhoto(await resizeImage(f)); }
+    catch { setError("Couldn't read that image — try another."); }
   }
 
   async function resolve(addr: string) {
@@ -86,16 +115,16 @@ export default function Onboarding({
   async function finish() {
     if (!location) return;
     const profile: Profile = {
-      photo, handle, address, location, usedGeolocation: usedGeo,
+      photo, handle, bio: bio.trim(), address, location, usedGeolocation: usedGeo,
       phone: existing?.phone || "", contacts: existing?.contacts || [], alerts,
     };
     try {
-      await saveProfile(profile);
+      // pass name/email so the name entered here is persisted (not just metadata)
+      await saveProfile(profile, { id: userId, name: name.trim() || "Neighbor", email });
     } catch (e) {
       // unique-constraint race on the handle: someone claimed it mid-flow
       if (String((e as Error).message).includes("duplicate")) {
-        setError("Your username was just taken — go back and pick another.");
-        setStep(0);
+        setError("Your username was just taken — an admin can help, or start over.");
         return;
       }
       throw e;
@@ -112,39 +141,46 @@ export default function Onboarding({
         {[0, 1, 2].map((i) => <span key={i} className={`h-1.5 flex-1 rounded-full ${step >= i ? "bg-brand" : "bg-ink/10"}`} />)}
       </div>
 
-      {/* STEP 0 — identity */}
+      {/* STEP 0 — profile photo + name + bio */}
       {step === 0 && (
         <>
-          <h1 className="text-2xl font-bold tracking-tight">Set up your profile</h1>
-          <p className="mt-2 text-sm text-ink2">Your neighbors see your name and photo when you post or report.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Create your profile</h1>
+          <p className="mt-2 text-sm text-ink2">Add a photo and name so neighbors recognize you{handle ? <> as <span className="font-medium text-ink">@{handle}</span></> : null}.</p>
           <div className="mt-6 flex flex-col items-center">
-            <button onClick={() => fileRef.current?.click()} className="relative grid h-24 w-24 place-items-center overflow-hidden rounded-full border-2 border-dashed border-ink/20 bg-shell">
+            <button onClick={() => fileRef.current?.click()} className="relative grid h-28 w-28 place-items-center overflow-hidden rounded-full border-2 border-dashed border-ink/20 bg-shell active:scale-95">
               {photo ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={photo} alt="profile" className="h-full w-full object-cover" />
               ) : (
-                <Avatar name={name} size={96} />
+                <span className="grid place-items-center text-ink3"><Camera size={30} /></span>
               )}
-              <span className="absolute bottom-0 w-full bg-brand/90 py-0.5 text-[10px] font-semibold text-white">{photo ? "Change" : "Add photo"}</span>
+              <span className="absolute bottom-0 flex w-full items-center justify-center gap-1 bg-brand/90 py-1 text-[10px] font-semibold text-white"><Camera size={11} /> {photo ? "Change" : "Add photo"}</span>
             </button>
             <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickPhoto} />
           </div>
-          <label className="mt-6 block">
+          <label className="mt-7 block">
             <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink2">Full name <span className="text-red-400">*</span></span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Maria López" autoCapitalize="words" className="w-full rounded-xl border border-ink/10 bg-shell px-4 py-3 text-base outline-none placeholder:text-ink3 focus:border-brand/60" />
           </label>
-          <div className="mt-4">
-            <UsernameField value={handle} onChange={setHandle} onState={setHandleState} name={name} email={email} ownId={userId} />
-            <p className="mt-1.5 text-[11px] text-ink3">Your unique @username — how neighbors find, follow, and message you.</p>
-          </div>
+          {needsUsername && (
+            <div className="mt-4">
+              <UsernameField value={handle} onChange={setHandle} onState={setHandleState} name={name} email={email} ownId={userId} />
+              <p className="mt-1.5 text-[11px] text-ink3">Your unique @username — how neighbors find, follow, and message you.</p>
+            </div>
+          )}
+          <label className="mt-4 block">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink2">Bio <span className="font-normal text-ink3">(optional)</span></span>
+            <textarea value={bio} onChange={(e) => setBio(e.target.value.slice(0, 150))} rows={2} placeholder="Neighbor keeping an eye out. Little Havana." className="w-full resize-none rounded-xl border border-ink/10 bg-shell px-4 py-3 text-base outline-none placeholder:text-ink3 focus:border-brand/60" />
+            <span className="mt-1 block text-right text-[11px] text-ink3">{bio.length}/150</span>
+          </label>
           {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
           <button
             onClick={() => {
               if (!name.trim()) return setError("Please enter your name.");
-              if (!handleOk) return setError(handleState === "taken" ? "That username is taken — pick another or tap a suggestion." : "Choose an available username to continue.");
+              if (!handleOk) return setError(handleState === "taken" ? "That username is taken — pick another." : "Choose an available username.");
               setError(""); setStep(1);
             }}
-            className="mt-6 w-full rounded-xl bg-brand py-3.5 text-sm font-semibold text-white active:scale-[0.99]"
+            className="mt-5 w-full rounded-xl bg-brand py-3.5 text-sm font-semibold text-white active:scale-[0.99]"
           >
             Continue →
           </button>

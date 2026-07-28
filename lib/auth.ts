@@ -28,7 +28,7 @@ export interface Profile {
   contacts: TrustedContact[];
   alerts: AlertPrefs;
 }
-export interface Account { id: string; name: string; email: string; profile: Profile | null }
+export interface Account { id: string; name: string; email: string; profile: Profile | null; draftHandle?: string }
 
 // The user's public @handle everywhere in the app — their chosen username,
 // falling back to the email prefix for accounts created before handles.
@@ -43,10 +43,10 @@ export const defaultAlerts = (): AlertPrefs => ({
 });
 
 // ── Supabase path ────────────────────────────────────────────
-async function sbProfile(id: string): Promise<{ profile: Profile | null; name: string; email: string }> {
+async function sbProfile(id: string): Promise<{ profile: Profile | null; name: string; email: string; handle?: string }> {
   const { data } = await supabase!.from("profiles").select("*").eq("id", id).maybeSingle();
   if (!data) return { profile: null, name: "Neighbor", email: "" };
-  return { profile: data.onboarded ? rowToProfile(data) : null, name: data.name || "Neighbor", email: data.email || "" };
+  return { profile: data.onboarded ? rowToProfile(data) : null, name: data.name || "Neighbor", email: data.email || "", handle: data.handle || undefined };
 }
 
 // ── localStorage path ────────────────────────────────────────
@@ -85,66 +85,82 @@ function genCode(): string {
 function readPending(key: string): any | null {
   try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
 }
-
-// ── public API ───────────────────────────────────────────────
-// Step 1 of signup: validate, stash the pending account, send the code.
-// `alreadyVerified` is returned when the backend has email confirmation
-// disabled (it hands back a live session immediately) — the UI then skips
-// the code screen instead of stranding the user on it.
-export async function startSignup(name: string, email: string, password: string): Promise<{ demoCode?: string; alreadyVerified?: boolean }> {
-  const key = email.trim().toLowerCase();
-  if (!key || !password) throw new Error("Email and password are required.");
-  if (password.length < 8) throw new Error("Password must be at least 8 characters.");
-
-  if (supabaseEnabled) {
-    const { data, error } = await supabase!.auth.signUp({ email: key, password, options: { data: { name: name.trim() || "Neighbor" } } });
-    if (error) throw new Error(error.message);
-    if (data.session) return { alreadyVerified: true };
-    return {}; // confirmation is on — Supabase emails the 6-digit code
-  }
-
-  const accounts = readAccounts();
-  if (accounts[key]) throw new Error("An account with that email already exists. Try logging in.");
-  const salt = randomSalt();
-  const code = genCode();
-  localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({
-    name: name.trim() || "Neighbor", email: key, salt, hash: await hashPassword(password, salt), code, exp: Date.now() + CODE_TTL_MS,
-  }));
-  return { demoCode: code };
-}
-
-// Step 2 of signup: verify the emailed code, then the account goes live.
 // Supabase OTPs are 6–10 digits (this project's are 8); accept any in range.
 const OTP_RE = /^\d{6,10}$/;
 
-export async function verifySignup(email: string, code: string): Promise<Account> {
+// ── public API — email-first signup (Instagram / TikTok style) ───────
+// The account is created by verifying the emailed code; the username +
+// password are set AFTER verification, then legal, then the profile.
+//
+// Step 1: enter email → Supabase emails an OTP (no password yet).
+export async function startEmailSignup(email: string): Promise<{ demoCode?: string }> {
+  const key = email.trim().toLowerCase();
+  if (!key || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(key)) throw new Error("Enter a valid email address.");
+
+  if (supabaseEnabled) {
+    // shouldCreateUser: true → registers the email on first verify
+    const { error } = await supabase!.auth.signInWithOtp({ email: key, options: { shouldCreateUser: true } });
+    if (error) throw new Error(error.message);
+    return {};
+  }
+
+  const accounts = readAccounts();
+  if (accounts[key]?.profile) throw new Error("An account with that email already exists. Try logging in.");
+  const code = genCode();
+  localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({ email: key, code, exp: Date.now() + CODE_TTL_MS, verified: false }));
+  return { demoCode: code };
+}
+
+// Step 2: verify the emailed code → this creates the account + session.
+export async function verifyEmailSignup(email: string, code: string): Promise<void> {
   const key = email.trim().toLowerCase();
   const token = code.trim();
   if (!OTP_RE.test(token)) throw new Error("Enter the code we emailed you.");
 
   if (supabaseEnabled) {
-    const { data, error } = await supabase!.auth.verifyOtp({ email: key, token, type: "signup" });
+    const { error } = await supabase!.auth.verifyOtp({ email: key, token, type: "email" });
     if (error) throw new Error("That code didn't match. Check the email and try again.");
-    const id = data.user?.id || "";
-    return { id, name: data.user?.user_metadata?.name || "Neighbor", email: key, profile: null };
+    return;
   }
 
   const pending = readPending(PENDING_SIGNUP_KEY);
   if (!pending || pending.email !== key) throw new Error("Start over — we couldn't find that signup.");
   if (Date.now() > pending.exp) throw new Error("That code expired. Resend a new one.");
   if (pending.code !== token) throw new Error("That code didn't match. Try again.");
-  const accounts = readAccounts();
-  accounts[key] = { name: pending.name, email: key, salt: pending.salt, hash: pending.hash, profile: null, createdAt: new Date().toISOString() };
-  writeAccounts(accounts);
-  localStorage.removeItem(PENDING_SIGNUP_KEY);
-  localStorage.setItem(SESSION_KEY, key);
-  return { id: key, name: accounts[key].name, email: key, profile: null };
+  localStorage.setItem(PENDING_SIGNUP_KEY, JSON.stringify({ ...pending, verified: true }));
 }
 
+// Step 3: set the username + password (email already verified/authenticated).
+export async function setSignupCredentials(email: string, username: string, password: string, confirm: string): Promise<void> {
+  const key = email.trim().toLowerCase();
+  const handle = username.trim().toLowerCase();
+  if (!handle) throw new Error("Choose a username.");
+  if (password.length < 8) throw new Error("Password must be at least 8 characters.");
+  if (password !== confirm) throw new Error("Passwords don't match.");
+
+  if (supabaseEnabled) {
+    const { data: u } = await supabase!.auth.getUser();
+    if (!u.user?.id) throw new Error("Verify your email first.");
+    const { error } = await supabase!.auth.updateUser({ password, data: { handle } });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  const pending = readPending(PENDING_SIGNUP_KEY);
+  if (!pending || pending.email !== key || !pending.verified) throw new Error("Verify your email first.");
+  const accounts = readAccounts();
+  const salt = randomSalt();
+  accounts[key] = { name: "", email: key, handle, salt, hash: await hashPassword(password, salt), profile: null, createdAt: new Date().toISOString() };
+  writeAccounts(accounts);
+  localStorage.setItem(SESSION_KEY, key);
+  localStorage.removeItem(PENDING_SIGNUP_KEY);
+}
+
+// Resend the signup OTP.
 export async function resendSignupCode(email: string): Promise<{ demoCode?: string }> {
   const key = email.trim().toLowerCase();
   if (supabaseEnabled) {
-    const { error } = await supabase!.auth.resend({ type: "signup", email: key });
+    const { error } = await supabase!.auth.signInWithOtp({ email: key, options: { shouldCreateUser: true } });
     if (error) throw new Error(error.message);
     return {};
   }
@@ -292,15 +308,18 @@ export async function getCurrentAccount(): Promise<Account | null> {
     const { data } = await supabase!.auth.getUser();
     if (!data.user) return null;
     if (await isBanned(data.user.id)) { await supabase!.auth.signOut(); return null; }
-    const { profile, name, email } = await sbProfile(data.user.id);
-    return { id: data.user.id, name, email: email || data.user.email || "", profile };
+    const { profile, name, email, handle } = await sbProfile(data.user.id);
+    // the username chosen at signup lives in user_metadata until the
+    // profile row is written at the end of onboarding
+    const draftHandle = handle || (data.user.user_metadata?.handle as string | undefined);
+    return { id: data.user.id, name, email: email || data.user.email || "", profile, draftHandle };
   }
   if (typeof window === "undefined") return null;
   const key = localStorage.getItem(SESSION_KEY);
   if (!key) return null;
   const acc = readAccounts()[key];
   if (!acc) return null;
-  return { id: key, name: acc.name, email: key, profile: acc.profile };
+  return { id: key, name: acc.name, email: key, profile: acc.profile, draftHandle: acc.handle };
 }
 
 export async function saveProfile(profile: Profile, opts?: { id: string; name: string; email: string }): Promise<void> {
@@ -319,6 +338,8 @@ export async function saveProfile(profile: Profile, opts?: { id: string; name: s
   const accounts = readAccounts();
   if (!accounts[key]) throw new Error("Account missing.");
   accounts[key].profile = profile;
+  if (opts?.name) accounts[key].name = opts.name;
+  if (profile.handle) accounts[key].handle = profile.handle;
   writeAccounts(accounts);
 }
 
