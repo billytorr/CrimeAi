@@ -82,6 +82,7 @@ const es: Dict = {
   "Walk with me": "Acompáñame", "Call 911": "Llamar al 911", "Emergency": "Emergencia",
   "Notify my circle": "Avisar a mi círculo",
   // language setting copy
+  "See translation": "Ver traducción", "See original": "Ver original", "Translating": "Traduciendo", "Translated": "Traducido",
   "Please wait": "Espera",
   "App language": "Idioma de la app",
   "Choose the language for the whole app. It follows your device by default.":
@@ -120,6 +121,7 @@ const pt: Dict = {
   "SOS": "SOS", "Safety": "Segurança", "I'm not safe": "Não estou seguro",
   "Walk with me": "Caminhe comigo", "Call 911": "Ligar 911", "Emergency": "Emergência",
   "Notify my circle": "Avisar meu círculo",
+  "See translation": "Ver tradução", "See original": "Ver original", "Translating": "Traduzindo", "Translated": "Traduzido",
   "Please wait": "Aguarde",
   "App language": "Idioma do app",
   "Choose the language for the whole app. It follows your device by default.":
@@ -158,6 +160,7 @@ const ht: Dict = {
   "SOS": "SOS", "Safety": "Sekirite", "I'm not safe": "Mwen pa an sekirite",
   "Walk with me": "Mache avè m", "Call 911": "Rele 911", "Emergency": "Ijans",
   "Notify my circle": "Avèti sèk mwen",
+  "See translation": "Wè tradiksyon", "See original": "Wè orijinal", "Translating": "Ap tradui", "Translated": "Tradui",
   "Please wait": "Tann",
   "App language": "Lang aplikasyon an",
   "Choose the language for the whole app. It follows your device by default.":
@@ -170,3 +173,32 @@ export function translate(lang: Lang, key: string): string {
   if (lang === "en") return key;
   return DICTS[lang]?.[key] ?? key;
 }
+
+// ── Post language detection (for the per-post "See translation" option) ─
+// Lightweight stopword + diacritic heuristic — enough to tell whether a
+// post is in a DIFFERENT language than the reader's, which is all we need
+// to decide whether to offer a translation (like Instagram/TikTok).
+const STOP: Record<Lang, string[]> = {
+  en: ["the", "and", "to", "of", "in", "is", "that", "for", "with", "you", "on", "are", "this", "it", "at", "was", "have", "not", "your", "we"],
+  es: ["el", "la", "los", "las", "de", "que", "en", "un", "una", "por", "con", "para", "está", "más", "como", "pero", "este", "muy", "su", "hay"],
+  pt: ["o", "os", "as", "de", "que", "em", "um", "uma", "não", "com", "para", "você", "mais", "como", "mas", "este", "muito", "seu", "na", "está"],
+  ht: ["nan", "yo", "mwen", "ou", "li", "sa", "gen", "pa", "se", "kay", "moun", "lakay", "ap", "ki", "nou", "te", "pou", "fè", "yon", "avèk"],
+};
+
+export function detectTextLang(text: string): Lang | null {
+  const words = (text || "").toLowerCase().replace(/[^\p{L}\s]/gu, " ").split(/\s+/).filter(Boolean);
+  if (words.length < 3) return null; // too short to tell
+  const set = new Set(words);
+  const scores: Record<Lang, number> = { en: 0, es: 0, pt: 0, ht: 0 };
+  (Object.keys(STOP) as Lang[]).forEach((l) => { for (const w of STOP[l]) if (set.has(w)) scores[l]++; });
+  if (/[ñ¿¡]/.test(text)) scores.es += 2;
+  if (/[ãõ]/i.test(text)) scores.pt += 2;
+  if (/\b(w|m|n|k)['’]/i.test(text) || /\bap\b/i.test(text)) scores.ht += 1;
+  let best: Lang = "en", bestScore = 0;
+  (Object.keys(scores) as Lang[]).forEach((l) => { if (scores[l] > bestScore) { bestScore = scores[l]; best = l; } });
+  return bestScore >= 1 ? best : null;
+}
+
+export const LANG_NAME: Record<Lang, string> = {
+  en: "English", es: "Spanish", ht: "Haitian Creole", pt: "Portuguese",
+};

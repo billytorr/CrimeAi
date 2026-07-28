@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { reportPost, blockUser, getBlockedHandles, REPORT_REASONS } from "@/lib/moderation";
 import { registerVideo, reportRatio, isMuted, setMuted, onMuteChange } from "@/lib/feedVideo";
+import { useLang } from "@/components/LanguageProvider";
+import { detectTextLang } from "@/lib/i18n";
+import { apiUrl } from "@/lib/api";
 import type { Account } from "@/lib/auth";
 import {
   toggleLike, toggleSave, toggleFollow, toggleRepost, getComments, addComment, timeAgoShort, gradientFor, getProfileDirectory,
@@ -302,13 +305,55 @@ function FeedVideo({ src, className, mutePos }: { src: string; className: string
   );
 }
 
+// Post text with an Instagram/TikTok-style "See translation" toggle. The
+// button only appears when the post's detected language differs from the
+// reader's app language; tapping it translates via /api/translate and
+// toggles back to the original.
+function PostText({ text, className, light }: { text: string; className?: string; light?: boolean }) {
+  const { lang, t } = useLang();
+  const detected = useMemo(() => detectTextLang(text), [text]);
+  const canTranslate = !!detected && detected !== lang;
+  const [translated, setTranslated] = useState<string | null>(null);
+  const [showing, setShowing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function toggle() {
+    if (showing) { setShowing(false); return; }
+    if (translated) { setShowing(true); return; }
+    setBusy(true); setFailed(false);
+    try {
+      const r = await fetch(apiUrl("/api/translate"), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, target: lang, source: detected }),
+      });
+      const d = await r.json();
+      if (r.ok && d.translated) { setTranslated(d.translated); setShowing(true); }
+      else setFailed(true);
+    } catch { setFailed(true); }
+    setBusy(false);
+  }
+
+  const btnColor = light ? "text-white/75" : "text-ink3";
+  return (
+    <>
+      <p className={className}>{showing && translated ? translated : text}</p>
+      {canTranslate && !failed && (
+        <button onClick={toggle} className={`mt-1 text-xs font-semibold ${btnColor}`}>
+          {busy ? `${t("Translating")}…` : showing ? t("See original") : t("See translation")}
+        </button>
+      )}
+    </>
+  );
+}
+
 function StandardCard(v: V) {
   const { post } = v;
   const hasMedia = post.media || post.scene;
   return (
     <article className="px-5 py-4">
       <Head post={post} me={v.me} followed={v.followed} onFollow={v.onFollow} onMessage={v.onMessage} onMenu={v.onMenu} pro={v.pro} />
-      {post.text && <p className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-ink">{post.text}</p>}
+      {post.text && <PostText text={post.text} className="mt-2 whitespace-pre-wrap text-[15px] leading-relaxed text-ink" />}
       {post.thread && post.thread.length > 0 && <div className="mt-2 space-y-2 border-l-2 border-violet-500/40 pl-3">{post.thread.map((t, i) => <p key={i} className="text-[14px] leading-relaxed text-ink2">{t}</p>)}</div>}
       {hasMedia && <div className="mt-2.5"><Media post={post} /></div>}
       {post.tags && post.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{post.tags.map((t) => <span key={t} className="text-xs text-blu">#{t}</span>)}</div>}
@@ -342,7 +387,7 @@ function ReelCard(v: V) {
             {!post.mine && <button onClick={v.onFollow} className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${v.followed ? "border border-white/30 text-white/80" : "bg-white text-black"}`}>{v.followed ? "Following" : "Follow"}</button>}
             {!post.mine && <button onClick={v.onMenu} aria-label="Post options" className="px-0.5 text-white/80"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>}
           </div>
-          <p className="mt-2 max-w-[78%] text-sm leading-snug text-white/95">{post.text}</p>
+          <div className="mt-2 max-w-[80%]"><PostText text={post.text} className="text-sm leading-snug text-white/95" light /></div>
           {post.tags && <div className="mt-1 flex flex-wrap gap-1.5">{post.tags.map((t) => <span key={t} className="text-xs text-brand">#{t}</span>)}</div>}
         </div>
         <div className="absolute bottom-4 right-3 flex flex-col items-center gap-4 text-white">
@@ -374,7 +419,7 @@ function NewsCard(v: V) {
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[11px] text-blu"><span className="rounded bg-blu/15 px-1.5 py-0.5 font-semibold">NEWS</span><span className="text-ink2">{post.source} · {timeAgoShort(post.createdAt)}</span></div>
-          <p className="mt-1 line-clamp-3 text-sm font-medium leading-snug text-ink">{post.text}</p>
+          <PostText text={post.text} className="mt-1 text-sm font-medium leading-snug text-ink" />
           <div className="mt-1.5 flex items-center gap-4 text-xs text-ink2">
             <button onClick={v.onLike} className={`flex items-center gap-1 ${v.liked ? "text-red-400" : ""}`}><Heart size={16} filled={v.liked} /> {v.likeCount}</button>
             <button onClick={v.onComment} className="flex items-center gap-1"><CommentIcon size={16} /> {v.commentCount}</button>
