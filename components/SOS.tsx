@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Profile } from "@/lib/auth";
 import { Alert, Walk, Phone } from "@/components/Icons";
+import { useT } from "@/components/LanguageProvider";
 
 // Floating red SOS button (used on Map / Ask / Inbox).
 // Draggable: press and move to park it anywhere on screen so it never
@@ -95,6 +96,7 @@ export function SosPill({ onClick }: { onClick: () => void }) {
 
 // Controlled emergency sheets (rendered once by AppShell).
 export default function SosSheets({ open, onClose, profile }: { open: boolean; onClose: () => void; profile: Profile }) {
+  const tr = useT();
   const [mode, setMode] = useState<null | "safe" | "walk">(null);
   if (!open) return null;
 
@@ -104,17 +106,17 @@ export default function SosSheets({ open, onClose, profile }: { open: boolean; o
   if (mode === "walk") return <WalkWithMe profile={profile} onClose={close} onBack={() => setMode(null)} />;
 
   return (
-    <Sheet title="Safety" onClose={close}>
+    <Sheet title={tr("Safety")} onClose={close}>
       <div className="space-y-3">
         <button onClick={() => setMode("safe")} className="flex w-full items-center gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-left active:scale-[0.99]">
           <span className="text-red-300"><Alert size={26} /></span>
-          <div><div className="font-semibold text-red-200">I&apos;m not safe</div><div className="text-xs text-red-300/80">Share my location + context with my circle</div></div>
+          <div><div className="font-semibold text-red-200">{tr("I'm not safe")}</div><div className="text-xs text-red-300/80">{tr("Share my location + context with my circle")}</div></div>
         </button>
         <button onClick={() => setMode("walk")} className="flex w-full items-center gap-3 rounded-2xl border border-brand/30 bg-brand/10 p-4 text-left active:scale-[0.99]">
           <span className="text-brand"><Walk size={26} /></span>
-          <div><div className="font-semibold text-brand">Walk with me</div><div className="text-xs text-brand/80">Live location share until I&apos;m home safe</div></div>
+          <div><div className="font-semibold text-brand">{tr("Walk with me")}</div><div className="text-xs text-brand/80">{tr("Live location share until I'm home safe")}</div></div>
         </button>
-        <a href="tel:911" className="flex w-full items-center justify-center gap-2 rounded-2xl bg-signal-red p-4 font-semibold text-ink active:scale-[0.99]"><Phone size={18} /> Call 911</a>
+        <a href="tel:911" className="flex w-full items-center justify-center gap-2 rounded-2xl bg-signal-red p-4 font-semibold text-ink active:scale-[0.99]"><Phone size={18} /> {tr("Call 911")}</a>
       </div>
     </Sheet>
   );

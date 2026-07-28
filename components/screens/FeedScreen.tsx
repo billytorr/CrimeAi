@@ -7,12 +7,14 @@ import { milesBetween } from "@/lib/data";
 import FeedList from "@/components/FeedList";
 import { SosPill } from "@/components/SOS";
 import { Plus, Search } from "@/components/Icons";
+import { useT } from "@/components/LanguageProvider";
 
 type FeedTab = "foryou" | "local" | "news" | "trending";
 const TABS: [FeedTab, string][] = [["foryou", "For You"], ["local", "Local"], ["news", "News"], ["trending", "Trending"]];
 
 export default function FeedScreen({ account, onCompose, onSos, onSearch, refreshKey }: { account: Account; onCompose: () => void; onSos: () => void; onSearch: () => void; refreshKey: number }) {
   const p = account.profile!;
+  const tr = useT();
   const [tab, setTab] = useState<FeedTab>("foryou");
   const [all, setAll] = useState<Post[]>([]);
   const [inter, setInter] = useState<Interactions>({ likes: new Set(), saves: new Set(), follows: new Set(), requested: new Set(), reposts: new Set() });
@@ -42,7 +44,7 @@ export default function FeedScreen({ account, onCompose, onSos, onSearch, refres
     <div className="flex h-full flex-col">
       <div className="safe-top z-10 border-b border-ink/10 bg-shell/80 px-5 pb-0 pt-4 backdrop-blur-xl">
         <div className="flex items-center justify-between">
-          <h1 className="bg-gradient-to-r from-ink to-brand bg-clip-text text-xl font-extrabold tracking-tight text-transparent">Feed</h1>
+          <h1 className="bg-gradient-to-r from-ink to-brand bg-clip-text text-xl font-extrabold tracking-tight text-transparent">{tr("Feed")}</h1>
           <div className="flex items-center gap-2">
             {account.profile?.sosEnabled !== false && <SosPill onClick={onSos} />}
             <button onClick={onSearch} className="grid h-9 w-9 place-items-center rounded-full bg-ink/8 text-ink active:scale-95" aria-label="Search"><Search size={19} /></button>
@@ -52,7 +54,7 @@ export default function FeedScreen({ account, onCompose, onSos, onSearch, refres
         <div className="mt-2 flex gap-5 text-sm">
           {TABS.map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} className={`relative pb-2.5 font-semibold transition ${tab === id ? "text-ink" : "text-ink3"}`}>
-              {label}{tab === id && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-brand" />}
+              {tr(label)}{tab === id && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-brand" />}
             </button>
           ))}
         </div>

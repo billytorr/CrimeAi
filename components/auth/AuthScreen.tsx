@@ -7,12 +7,14 @@ import LegalGate from "@/components/LegalGate";
 import UsernameField, { type UsernameState } from "@/components/UsernameField";
 import { flushAcceptance } from "@/lib/legal";
 import { getCurrentAccount } from "@/lib/auth";
+import { useT } from "@/components/LanguageProvider";
 
 // Signup is Instagram/TikTok-style: email → code → username+password →
 // legal → (profile is built in Onboarding). reset stays two steps.
 type Mode = "signup" | "verify" | "credentials" | "login" | "forgot" | "reset" | "reset-pw";
 
 export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
+  const tr = useT();
   const [mode, setMode] = useState<Mode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -136,16 +138,16 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
       <div className="flex flex-col items-center text-center">
         <Logo size={56} />
         <h1 className="mt-5 text-2xl font-bold tracking-tight">CrimeAI</h1>
-        <p className="mt-1 text-sm text-ink2">{sub[mode]}</p>
+        <p className="mt-1 text-sm text-ink2">{tr(sub[mode])}</p>
       </div>
 
       {(mode === "signup" || mode === "login") && (
         <div className="mt-8 flex rounded-xl border border-ink/10 bg-ink/5 p-1 text-sm">
           <button onClick={() => switchMode("signup")} className={`flex-1 rounded-lg py-2 font-medium transition ${mode === "signup" ? "bg-brand text-white" : "text-ink2"}`}>
-            Create account
+            {tr("Create account")}
           </button>
           <button onClick={() => switchMode("login")} className={`flex-1 rounded-lg py-2 font-medium transition ${mode === "login" ? "bg-brand text-white" : "text-ink2"}`}>
-            Log in
+            {tr("Log in")}
           </button>
         </div>
       )}
@@ -306,9 +308,10 @@ function AppleMark() {
 }
 
 function PrimaryButton({ busy, onClick, children }: { busy: boolean; onClick: () => void; children: React.ReactNode }) {
+  const tr = useT();
   return (
     <button onClick={onClick} disabled={busy} className="mt-1 w-full rounded-xl bg-brand py-3.5 text-sm font-semibold text-white transition active:scale-[0.99] disabled:opacity-60">
-      {busy ? "Please wait…" : children}
+      {busy ? `${tr("Please wait")}…` : typeof children === "string" ? tr(children) : children}
     </button>
   );
 }
@@ -317,9 +320,10 @@ function PrimaryButton({ busy, onClick, children }: { busy: boolean; onClick: ()
 // (A shorter code still works — submit isn't gated on an exact length.)
 const OTP_MAX = 8;
 function CodeField({ value, onChange, onEnter }: { value: string; onChange: (v: string) => void; onEnter?: () => void }) {
+  const tr = useT();
   return (
     <label className="block">
-      <span className="mb-1 block text-center text-xs font-medium uppercase tracking-wide text-ink2">Verification code</span>
+      <span className="mb-1 block text-center text-xs font-medium uppercase tracking-wide text-ink2">{tr("Verification code")}</span>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, OTP_MAX))}
@@ -356,9 +360,10 @@ function Field({
   type?: string;
   onEnter?: () => void;
 }) {
+  const tr = useT();
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink2">{label}</span>
+      <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink2">{tr(label)}</span>
       <input
         type={type}
         value={value}

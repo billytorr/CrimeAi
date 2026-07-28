@@ -1,5 +1,7 @@
 "use client";
 
+import { useT } from "@/components/LanguageProvider";
+
 export type Tab = "ask" | "feed" | "map" | "inbox" | "you";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -11,6 +13,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function BottomNav({ active, onChange, inboxDot }: { active: Tab; onChange: (t: Tab) => void; inboxDot?: boolean }) {
+  const tr = useT();
   return (
     <nav className="safe-bottom z-[1100] flex border-t border-ink/10 bg-shell/95 backdrop-blur">
       {TABS.map((t) => {
@@ -21,7 +24,7 @@ export default function BottomNav({ active, onChange, inboxDot }: { active: Tab;
               {t.icon}
               {t.id === "inbox" && inboxDot && <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-signal-red" />}
             </span>
-            {t.label}
+            {tr(t.label)}
           </button>
         );
       })}

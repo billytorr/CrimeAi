@@ -13,6 +13,8 @@ import { supabase, supabaseEnabled } from "@/lib/supabase";
 import { accountHandle } from "@/lib/auth";
 import { apiUrl } from "@/lib/api";
 import { CATEGORIES } from "@/lib/categories";
+import { useLang, useT } from "@/components/LanguageProvider";
+import { LANGS } from "@/lib/i18n";
 
 // alert-preference chips render from the shared crime taxonomy
 const CAT_ICONS: Record<string, typeof Alert> = {
@@ -28,6 +30,7 @@ export default function SettingsScreen({
   onProfile: (p: Profile) => void; onLogout: () => void; onChangeAddress: () => void; onClose: () => void;
 }) {
   const displayName = name;
+  const tr = useT();
   const [phone, setPhone] = useState(profile.phone || "");
   const [contacts, setContacts] = useState<TrustedContact[]>(profile.contacts.length ? profile.contacts : [{ name: "", phone: "" }]);
   const [savedMsg, setSavedMsg] = useState("");
@@ -50,7 +53,7 @@ export default function SettingsScreen({
     <div className="absolute inset-0 z-[900] flex flex-col bg-shell fade-in">
       <div className="safe-top flex items-center gap-3 border-b border-ink/10 px-5 pb-3 pt-4">
         <button onClick={onClose} className="-ml-1 text-ink2"><Chevron size={22} style={{ transform: "rotate(180deg)" }} /></button>
-        <h1 className="text-lg font-bold">Settings</h1>
+        <h1 className="text-lg font-bold">{tr("Settings")}</h1>
         {savedMsg && <span className="ml-auto text-xs text-brand">{savedMsg}</span>}
       </div>
 
@@ -104,6 +107,11 @@ export default function SettingsScreen({
         {/* appearance */}
         <Section title="Appearance">
           <ThemePicker />
+        </Section>
+
+        {/* language */}
+        <Section title="Language">
+          <LanguagePicker />
         </Section>
 
         {/* location */}
@@ -351,10 +359,37 @@ function ThemePicker() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function LanguagePicker() {
+  const { lang, setLang, t } = useLang();
   return (
     <div>
-      <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink2">{title}</h2>
+      <div className="space-y-1.5">
+        {LANGS.map((l) => {
+          const on = lang === l.code;
+          return (
+            <button key={l.code} onClick={() => setLang(l.code)}
+              className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-3 text-left transition ${on ? "border-brand/50 bg-brand/10" : "border-ink/10 bg-shell"}`}>
+              <span>
+                <span className="text-sm font-semibold text-ink">{l.label}</span>
+                {l.code !== "en" && <span className="ml-2 text-xs text-ink3">{t(l.english)}</span>}
+              </span>
+              {on && <span className="grid h-5 w-5 place-items-center rounded-full bg-brand text-white">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="m5 13 4 4L19 7" /></svg>
+              </span>}
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-2.5 text-[11px] leading-relaxed text-ink3">{t("Choose the language for the whole app. It follows your device by default.")}</p>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const tr = useT();
+  return (
+    <div>
+      <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink2">{tr(title)}</h2>
       <div className="rounded-2xl border border-ink/10 bg-card/70 p-4">{children}</div>
     </div>
   );
