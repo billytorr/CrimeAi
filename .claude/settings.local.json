@@ -41,7 +41,9 @@
       "Bash(git commit -q -m 'Phase 1: tier data model + EntitlementService + test harness *)",
       "Bash(git push *)",
       "WebFetch(domain:developer.authorize.net)",
-      "Bash(/opt/homebrew/opt/libpq/bin/psql \"postgresql://postgres.bxxxgeehipamftusegmx:CrimeSeed2026@aws-0-us-east-1.pooler.supabase.com:5432/postgres\" -v ON_ERROR_STOP=1 -f /Users/blackseedlabs/Desktop/Crime_AI/supabase/authnet.sql)"
+      "Bash(/opt/homebrew/opt/libpq/bin/psql \"postgresql://postgres.bxxxgeehipamftusegmx:CrimeSeed2026@aws-0-us-east-1.pooler.supabase.com:5432/postgres\" -v ON_ERROR_STOP=1 -f /Users/blackseedlabs/Desktop/Crime_AI/supabase/authnet.sql)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(git commit -q -m 'Add sandbox-only self-test route for live checkout verification *)"
     ]
   }
 }
