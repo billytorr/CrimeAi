@@ -26,7 +26,19 @@
       "Bash(gh repo *)",
       "WebSearch",
       "Bash(npx tsc *)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('package.json'\\)\\); print\\('scripts:', json.dumps\\(d.get\\('scripts',{}\\),indent=0\\)\\); print\\('deps:', ' '.join\\(sorted\\(d.get\\('dependencies',{}\\)\\)\\)\\); print\\('devDeps:', ' '.join\\(sorted\\(d.get\\('devDependencies',{}\\)\\)\\)\\)\")",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('command-center/package.json'\\)\\); print\\('deps:', ' '.join\\(sorted\\(d.get\\('dependencies',{}\\)\\)\\)\\); print\\('devDeps:', ' '.join\\(sorted\\(d.get\\('devDependencies',{}\\)\\)\\)\\)\")",
+      "Bash(npm i *)",
+      "Bash(/opt/homebrew/opt/libpq/bin/psql \"postgresql://postgres.bxxxgeehipamftusegmx:CrimeSeed2026@aws-0-us-east-1.pooler.supabase.com:5432/postgres\" -v ON_ERROR_STOP=1 -f /Users/blackseedlabs/Desktop/Crime_AI/supabase/tiers.sql)",
+      "Bash(/opt/homebrew/opt/libpq/bin/psql \"postgresql://postgres.bxxxgeehipamftusegmx:CrimeSeed2026@aws-0-us-east-1.pooler.supabase.com:5432/postgres\" -c \"select id, amount_cents, label from tier_prices; select plan_id, capability, value from tier_limits where capability in \\('address_search','ai_analytical','trusted_circle'\\) order by capability, plan_id;\")",
+      "Bash(echo \"tsc exit: $?\")",
+      "Bash(npx vitest *)",
+      "Bash(cat)",
+      "Bash(bash /tmp/race_proof.sh)",
+      "Bash(VITE_CONFIG_NATIVE_IGNORE_WARNING=true npx vitest run)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'Phase 1: tier data model + EntitlementService + test harness *)"
     ]
   }
 }
