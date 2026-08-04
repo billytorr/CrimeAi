@@ -91,6 +91,12 @@ export async function GET(req: Request) {
     });
     if (error) throw new Error(error.message);
 
+    // diagnostic: immediately read back the nonce we just wrote. If a plain
+    // SELECT can't see our own just-committed write, reads are hitting a
+    // replica while writes hit primary (explains stale config reads).
+    const { data: rb } = await db.from("checkout_nonces").select("nonce").eq("nonce", nonce).maybeSingle();
+    const selfReadback = rb?.nonce === nonce ? "found" : "NOT_FOUND(replica?)";
+
     const token = signCheckoutToken({ userId, plan: "pro", priceId: arm.id, nonce, exp: Date.now() + TTL_MS });
     const base = process.env.NEXT_PUBLIC_PAY_BASE || "https://pay.publicsafetycrimecenter.com";
     return NextResponse.json({
@@ -99,6 +105,7 @@ export async function GET(req: Request) {
       userId,
       priceId: arm.id,
       amountCents: arm.amountCents,
+      selfReadback,
       checkoutUrl: `${base}/crimeai/pricing/checkout?t=${encodeURIComponent(token)}`,
       note: "Sandbox test card 4111111111111111, any future expiry, any CVV.",
     });
