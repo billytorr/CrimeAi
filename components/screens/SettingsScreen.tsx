@@ -190,20 +190,42 @@ export default function SettingsScreen({
 // crimecenter.com) — deliberately outside Apple/Google in-app purchases.
 function ProtectorPanel({ profile, userId, email }: { profile: Profile; userId: string; email: string }) {
   const [features, setFeatures] = useState<string[]>([]);
-  const [price, setPrice] = useState("$9.11");
+  const [price, setPrice] = useState("");
+  const [busy, setBusy] = useState(false);
   const isPro = profile.plan === "pro";
 
   useEffect(() => {
     if (!supabaseEnabled) return;
-    supabase!.from("plans").select("price_cents, features").eq("id", "pro").maybeSingle().then(({ data }) => {
-      if (data) {
-        setPrice(`$${(data.price_cents / 100).toFixed(2)}`);
-        setFeatures(Array.isArray(data.features) ? data.features : []);
-      }
+    // Live price from the tier system (the same table checkout charges from);
+    // benefit bullets remain display copy on the legacy plans table.
+    supabase!.from("tier_prices").select("amount_cents").eq("plan_id", "pro").eq("active", true).order("amount_cents").then(({ data }) => {
+      if (data?.length) setPrice(`${data.length > 1 ? "from " : ""}$${(data[0].amount_cents / 100).toFixed(2)}`);
+    });
+    supabase!.from("plans").select("features").eq("id", "pro").maybeSingle().then(({ data }) => {
+      if (data) setFeatures(Array.isArray(data.features) ? data.features : []);
     });
   }, []);
 
-  const checkoutUrl = `https://pay.publicsafetycrimecenter.com/crimeai/checkout?uid=${userId}&email=${encodeURIComponent(email)}`;
+  // Signed checkout handoff: the server mints a short-lived token (checked
+  // against the logged-in session) and returns the checkout URL. Nothing
+  // identifying goes in a URL we build client-side.
+  async function openCheckout() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { data } = await supabase!.auth.getSession();
+      const jwt = data.session?.access_token;
+      if (!jwt) { alert("Please log in again to upgrade."); return; }
+      const r = await fetch(apiUrl("/api/pay/authnet/checkout-token"), {
+        method: "POST", headers: { Authorization: `Bearer ${jwt}` },
+      });
+      const d = await r.json();
+      if (r.ok && d.checkoutUrl) window.open(d.checkoutUrl, "_blank");
+      else alert(d.error || "Couldn't start checkout. Try again in a moment.");
+    } catch {
+      alert("Couldn't start checkout. Check your connection and try again.");
+    } finally { setBusy(false); }
+  }
 
   if (isPro) {
     return (
@@ -234,7 +256,7 @@ function ProtectorPanel({ profile, userId, email }: { profile: Profile; userId: 
     <div>
       <div className="flex items-center gap-2">
         <ProBadge size={18} />
-        <span className="text-sm font-semibold">Become a Protector — {price}/mo</span>
+        <span className="text-sm font-semibold">Become a Protector{price ? ` — ${price}/mo` : ""}</span>
       </div>
       <ul className="mt-2.5 space-y-1.5">
         {(features.length ? features : ["Red Protector badge on your profile and posts", "Priority visibility for your reports", "Extended alert radius"]).map((f, i) => (
@@ -243,9 +265,9 @@ function ProtectorPanel({ profile, userId, email }: { profile: Profile; userId: 
           </li>
         ))}
       </ul>
-      <a href={checkoutUrl} target="_blank" rel="noreferrer" className="mt-3 block w-full rounded-xl bg-brand py-3 text-center text-sm font-bold text-white active:scale-[0.99]">
-        Upgrade to Protector →
-      </a>
+      <button onClick={openCheckout} disabled={busy} className="mt-3 block w-full rounded-xl bg-brand py-3 text-center text-sm font-bold text-white active:scale-[0.99] disabled:opacity-60">
+        {busy ? "Opening secure checkout…" : "Upgrade to Protector →"}
+      </button>
       <p className="mt-2 text-[11px] text-ink3">Secure checkout on publicsafetycrimecenter.com. Cancel anytime.</p>
     </div>
   );
