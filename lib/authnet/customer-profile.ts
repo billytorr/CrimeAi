@@ -3,6 +3,7 @@
 // flows work — WITHOUT the raw card ever touching our servers (Rule 8).
 // We keep only the masked last4 + brand for display.
 import { anetPost } from "./client";
+import { anetEnv } from "./env";
 
 export interface StoredCard {
   customerProfileId: string;
@@ -17,16 +18,21 @@ export async function createCustomerProfileFromOpaque(
   email: string,
   opaque: { dataDescriptor: string; dataValue: string },
 ): Promise<StoredCard> {
+  // sandbox can't run a real liveMode validation transaction; use testMode
+  // there and liveMode in production (a $0 auth+void that confirms the card).
+  const validationMode = anetEnv() === "production" ? "liveMode" : "testMode";
   const create = await anetPost("createCustomerProfileRequest", {
     profile: {
       merchantCustomerId: userId.slice(0, 20),
       email,
       paymentProfiles: [{ payment: { opaqueData: opaque } }],
     },
-    validationMode: "liveMode",
+    validationMode,
   });
   if (!create.ok) {
-    throw new Error(`Authorize.Net profile error: ${create.code || ""} ${create.text || ""}`.trim());
+    const all = create.raw?.messages?.message;
+    const detail = Array.isArray(all) ? all.map((m: any) => `${m.code}:${m.text}`).join(" | ") : `${create.code || ""} ${create.text || ""}`;
+    throw new Error(`Authorize.Net profile error [${validationMode}]: ${detail}`.trim());
   }
   const customerProfileId = create.raw.customerProfileId;
   const customerPaymentProfileId = create.raw.customerPaymentProfileIdList?.[0];
