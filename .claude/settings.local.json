@@ -56,7 +56,8 @@
       "Read(//private/tmp/**)",
       "Bash(git commit *)",
       "Bash(echo \"tsc=$?\")",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f\\\\\"  {p['id']}: \\\\${p['amountCents']/100:.2f} active={p['active']} '{p['label']}'\\\\\"\\) for p in d['prices']]\")"
     ]
   }
 }
