@@ -2,18 +2,24 @@ import { NextResponse } from "next/server";
 import { serverDb } from "@/lib/payments/serverdb";
 import { loadTierConfig } from "@/lib/entitlements/config";
 import { verifyCheckoutToken } from "@/lib/authnet/checkout-token";
-import { readMaskedCard } from "@/lib/authnet/customer-profile";
-import { createMonthlySubscriptionFromOpaque } from "@/lib/authnet/arb";
+import { createCustomerProfileFromOpaque } from "@/lib/authnet/customer-profile";
+import { createMonthlySubscription } from "@/lib/authnet/arb";
 
 // POST /api/pay/authnet/subscribe  { token, opaque, email, name }
 // Runs on the checkout (pay) domain. Verifies the signed token, redeems its
-// single-use nonce, and creates the recurring ARB subscription DIRECTLY from
-// the Accept.js opaque nonce (card data never reaches us — SAQ A). ARB creates
-// the payment profile atomically, so there's no create-then-charge race. We
-// record the subscription in OUR database (the source of truth). Settlement is
-// confirmed later by webhook + reconciliation — this route never treats its
-// own success as final proof of payment.
+// single-use nonce, stores the card as a Customer Profile from the Accept.js
+// opaque nonce (card data never reaches us — SAQ A), then creates the recurring
+// ARB subscription against that profile, and records it in OUR database (the
+// source of truth). Settlement is confirmed later by webhook + reconciliation —
+// this route never treats its own success as final proof of payment.
+//
+// NOTE (Authorize.Net): an Accept.js opaque nonce CANNOT fund ARB directly
+// (E00114 "Invalid OTS Token") — it must first become a Customer Profile. A
+// freshly created profile can lag before ARB can charge it (E00040); handled by
+// the retry in createMonthlySubscription. This lag is a sandbox-testMode
+// artifact expected to be absent under production liveMode.
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST", "Access-Control-Allow-Headers": "content-type" };
 export async function OPTIONS() { return new NextResponse(null, { status: 204, headers: CORS }); }
 
@@ -37,21 +43,16 @@ export async function POST(req: Request) {
     const price = cfg.prices.find((p) => p.id === v.claims.priceId && p.active);
     if (!price) return NextResponse.json({ error: "Price no longer available" }, { status: 409, headers: CORS });
 
-    // 1) create the recurring subscription directly from the opaque nonce.
-    //    ARB provisions the payment profile atomically (race-free).
-    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-    const sub = await createMonthlySubscriptionFromOpaque({
+    // 1) store the card off-site as a Customer Profile (masked last4 only). The
+    //    billing name is stored on the payment profile so ARB can charge it.
+    const card = await createCustomerProfileFromOpaque(v.claims.userId, String(email || ""), opaque, String(name || ""));
+    // 2) create the recurring subscription against the stored profile
+    //    (retries E00040 while a fresh profile propagates to ARB).
+    const sub = await createMonthlySubscription({
       amountCents: price.amountCents,
-      opaque,
-      firstName: parts[0],
-      lastName: parts.slice(1).join(" "),
+      customerProfileId: card.customerProfileId,
+      customerPaymentProfileId: card.customerPaymentProfileId,
     });
-
-    // 2) best-effort: read the masked card ARB stored, for display only.
-    let last4 = "", brand = "";
-    if (sub.customerProfileId && sub.customerPaymentProfileId) {
-      ({ last4, brand } = await readMaskedCard(sub.customerProfileId, sub.customerPaymentProfileId));
-    }
 
     // 3) record in OUR db (source of truth). Webhook/reconciliation confirm
     //    settlement and keep status honest going forward.
@@ -66,9 +67,9 @@ export async function POST(req: Request) {
       current_period_end: periodEnd.toISOString(),
       grace_until: null,
       anet_subscription_id: sub.subscriptionId,
-      anet_customer_profile_id: sub.customerProfileId || null,
-      card_last4: last4 || null,
-      card_brand: brand || null,
+      anet_customer_profile_id: card.customerProfileId,
+      card_last4: card.last4 || null,
+      card_brand: card.brand || null,
       updated_at: now.toISOString(),
     }, { onConflict: "user_id" });
     if (error) throw new Error(error.message);

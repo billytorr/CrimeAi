@@ -37,14 +37,6 @@ async function firstStoredCard(customerProfileId: string): Promise<StoredCard> {
   return { customerProfileId, customerPaymentProfileId: String(customerPaymentProfileId), last4, brand };
 }
 
-// Read the masked card (last4 + brand) for display. Never returns the PAN.
-export async function readMaskedCard(customerProfileId: string, customerPaymentProfileId: string): Promise<{ last4: string; brand: string }> {
-  try {
-    const get = await anetPost("getCustomerPaymentProfileRequest", { customerProfileId, customerPaymentProfileId });
-    return cardBits(get.raw?.paymentProfile?.payment?.creditCard);
-  } catch { return { last4: "", brand: "" }; }
-}
-
 // Delete a stored profile (sandbox cleanup / GDPR-style removal).
 export async function deleteCustomerProfile(customerProfileId: string): Promise<boolean> {
   const res = await anetPost("deleteCustomerProfileRequest", { customerProfileId });

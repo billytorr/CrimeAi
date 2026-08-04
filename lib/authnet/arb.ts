@@ -12,52 +12,12 @@ function todayISO(): string {
 
 export interface CreatedSubscription {
   subscriptionId: string;
-  // ARB creates a CIM profile for an opaque-funded subscription and returns its
-  // ids — we keep them for future card-management, but they're not on any
-  // charge path (Rule 9: our DB is the source of truth).
-  customerProfileId?: string;
-  customerPaymentProfileId?: string;
 }
 
-// Create the recurring subscription DIRECTLY from an Accept.js opaque nonce.
-// This is race-free: ARB creates the payment profile atomically as part of the
-// subscription, so there's no separate create-then-charge propagation gap
-// (which caused E00040). billTo IS allowed (and required) with opaque data.
-export async function createMonthlySubscriptionFromOpaque(opts: {
-  amountCents: number;
-  opaque: { dataDescriptor: string; dataValue: string };
-  firstName?: string;
-  lastName?: string;
-  subscriptionName?: string;
-}): Promise<CreatedSubscription> {
-  const amount = (opts.amountCents / 100).toFixed(2);
-  const firstName = (opts.firstName || "CrimeAI").slice(0, 50);
-  const lastName = (opts.lastName || "Member").slice(0, 50);
-  const res = await anetPost("ARBCreateSubscriptionRequest", {
-    subscription: {
-      name: (opts.subscriptionName || statementDescriptor()).slice(0, 50),
-      paymentSchedule: {
-        interval: { length: 1, unit: "months" },
-        startDate: todayISO(),
-        totalOccurrences: 9999,
-      },
-      amount,
-      // schema order: payment precedes billTo
-      payment: { opaqueData: opts.opaque },
-      billTo: { firstName, lastName },
-    },
-  });
-  if (!res.ok || !res.raw.subscriptionId) {
-    const all = res.raw?.messages?.message;
-    const detail = Array.isArray(all) ? all.map((m: any) => `${m.code}:${m.text}`).join(" | ") : `${res.code || ""} ${res.text || ""}`;
-    throw new Error(`Authorize.Net ARB error: ${detail}`.trim());
-  }
-  return {
-    subscriptionId: String(res.raw.subscriptionId),
-    customerProfileId: res.raw.profile?.customerProfileId ? String(res.raw.profile.customerProfileId) : undefined,
-    customerPaymentProfileId: res.raw.profile?.customerPaymentProfileId ? String(res.raw.profile.customerPaymentProfileId) : undefined,
-  };
-}
+// NOTE: an Accept.js opaque nonce CANNOT fund ARBCreateSubscription directly —
+// Authorize.Net returns E00114 "Invalid OTS Token" (verified against the live
+// sandbox, twice). The nonce must first be turned into a Customer Profile
+// (createCustomerProfileFromOpaque); ARB then charges that stored profile.
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -66,7 +26,12 @@ export async function createMonthlySubscription(opts: {
   customerProfileId: string;
   customerPaymentProfileId: string;
   subscriptionName?: string;
+  // E00040-retry tuning (defaults chosen for production; tests override to run fast)
+  retryAttempts?: number;
+  retryDelayMs?: number;
 }): Promise<CreatedSubscription> {
+  const retryAttempts = opts.retryAttempts ?? 8;
+  const retryDelayMs = opts.retryDelayMs ?? 1500;
   const amount = (opts.amountCents / 100).toFixed(2);
   // NOTE: when charging a stored customer/payment profile, ARB does NOT accept
   // a billTo in the request (E00093). The billing name lives ON the payment
@@ -89,10 +54,12 @@ export async function createMonthlySubscription(opts: {
 
   // A just-created customer/payment profile isn't immediately visible to ARB
   // (E00040 "record cannot be found"). This is a create-then-subscribe race in
-  // the same request; retry a few times with backoff until the profile lands.
+  // the same request; retry with backoff until the profile lands. The lag is a
+  // sandbox-testMode artifact expected to be absent under production liveMode
+  // (which validates the card with a real auth, materializing the profile).
   let res = await anetPost("ARBCreateSubscriptionRequest", body);
-  for (let attempt = 0; attempt < 4 && !res.ok && anetCode(res) === "E00040"; attempt++) {
-    await sleep(1200);
+  for (let attempt = 0; attempt < retryAttempts && !res.ok && anetCode(res) === "E00040"; attempt++) {
+    await sleep(retryDelayMs);
     res = await anetPost("ARBCreateSubscriptionRequest", body);
   }
 
