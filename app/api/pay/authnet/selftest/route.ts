@@ -6,6 +6,8 @@ import { signCheckoutToken, newNonce } from "@/lib/authnet/checkout-token";
 import { deleteCustomerProfile } from "@/lib/authnet/customer-profile";
 import { cancelSubscription } from "@/lib/authnet/arb";
 import { anetEnv } from "@/lib/authnet/env";
+import { emailFrom } from "@/lib/email/resend";
+import { sendProtectorWelcome } from "@/lib/email/payment-emails";
 import { createHmac } from "node:crypto";
 
 // SANDBOX-ONLY verification helper. Mints a checkout token for a throwaway
@@ -36,6 +38,16 @@ export async function GET(req: Request) {
       let ok = true, err = "";
       try { await cancelSubscription(cancel); } catch (e) { ok = false; err = (e as Error).message; }
       return NextResponse.json({ env: "sandbox", canceledSub: cancel, ok, err });
+    }
+
+    // test: email setup. ?emailStatus=1 reports whether Resend is wired;
+    // ?testEmail=<addr> actually sends a sample welcome email and returns the
+    // Resend result (id on success).
+    if (q.has("emailStatus") || q.get("testEmail")) {
+      const to = q.get("testEmail");
+      const base = { env: "sandbox", hasResendKey: !!process.env.RESEND_API_KEY, from: emailFrom() };
+      if (to) return NextResponse.json({ ...base, to, result: await sendProtectorWelcome(to, { amountCents: 799 }) });
+      return NextResponse.json(base);
     }
 
     // test: run reconciliation with the server-side secret (sandbox only).
