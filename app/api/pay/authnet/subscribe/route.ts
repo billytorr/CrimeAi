@@ -4,6 +4,7 @@ import { loadTierConfig } from "@/lib/entitlements/config";
 import { verifyCheckoutToken } from "@/lib/authnet/checkout-token";
 import { createCustomerProfileFromOpaque } from "@/lib/authnet/customer-profile";
 import { createMonthlySubscription } from "@/lib/authnet/arb";
+import { sendProtectorWelcome } from "@/lib/email/payment-emails";
 
 // POST /api/pay/authnet/subscribe  { token, opaque, email, name }
 // Runs on the checkout (pay) domain. Verifies the signed token, redeems its
@@ -70,9 +71,14 @@ export async function POST(req: Request) {
       anet_customer_profile_id: card.customerProfileId,
       card_last4: card.last4 || null,
       card_brand: card.brand || null,
+      receipt_email: String(email || "") || null,
       updated_at: now.toISOString(),
     }, { onConflict: "user_id" });
     if (error) throw new Error(error.message);
+
+    // Welcome email (dormant-safe: no-ops until RESEND_API_KEY is set). Never
+    // let email failure break checkout.
+    if (email) { try { await sendProtectorWelcome(String(email), { amountCents: price.amountCents }); } catch { /* non-fatal */ } }
 
     const appBase = process.env.NEXT_PUBLIC_APP_BASE || "https://app.publicsafetycrimecenter.com";
     return NextResponse.json({ ok: true, returnTo: `${appBase}/?upgraded=1` }, { headers: CORS });

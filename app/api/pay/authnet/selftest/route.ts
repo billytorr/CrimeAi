@@ -6,6 +6,7 @@ import { signCheckoutToken, newNonce } from "@/lib/authnet/checkout-token";
 import { deleteCustomerProfile } from "@/lib/authnet/customer-profile";
 import { cancelSubscription } from "@/lib/authnet/arb";
 import { anetEnv } from "@/lib/authnet/env";
+import { createHmac } from "node:crypto";
 
 // SANDBOX-ONLY verification helper. Mints a checkout token for a throwaway
 // test user so the full Accept.js -> Customer Profile -> ARB round-trip can be
@@ -35,6 +36,27 @@ export async function GET(req: Request) {
       let ok = true, err = "";
       try { await cancelSubscription(cancel); } catch (e) { ok = false; err = (e as Error).message; }
       return NextResponse.json({ env: "sandbox", canceledSub: cancel, ok, err });
+    }
+
+    // test: fire a correctly-SIGNED synthetic webhook to prove verify+dispatch.
+    // ?fireWebhook=<eventType>&sub=<subscriptionId>[&nid=<notificationId>]
+    const fire = q.get("fireWebhook");
+    if (fire) {
+      const key = process.env.AUTHNET_SIGNATURE_KEY;
+      if (!key) return NextResponse.json({ error: "AUTHNET_SIGNATURE_KEY not set in this env" }, { status: 400 });
+      const subId = q.get("sub") || "";
+      const nid = q.get("nid") || `test-${subId}-${fire}`;
+      const evt = {
+        notificationId: nid, eventType: fire, eventDate: "2026-08-04T00:00:00.0000000Z", webhookId: "selftest",
+        payload: { entityName: fire.includes("payment") ? "transaction" : "subscription", id: subId, status: "test" },
+      };
+      const raw = JSON.stringify(evt);
+      const sig = "sha512=" + createHmac("sha512", key).update(raw, "utf8").digest("hex").toUpperCase();
+      const origin = new URL(req.url).origin;
+      const res = await fetch(`${origin}/api/pay/authnet/webhook`, {
+        method: "POST", headers: { "Content-Type": "application/json", "X-ANET-Signature": sig }, body: raw,
+      });
+      return NextResponse.json({ env: "sandbox", fired: fire, sub: subId, notificationId: nid, webhookStatus: res.status, webhookBody: await res.json().catch(() => null) });
     }
 
     // default: mint a checkout token. ?u=<uuid> targets a specific seeded user.
