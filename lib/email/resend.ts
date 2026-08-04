@@ -9,7 +9,9 @@
 export interface SendResult { sent: boolean; id?: string; skipped?: string; error?: string }
 
 export function emailFrom(): string {
-  return process.env.PAYMENTS_EMAIL_FROM || "CrimeAI <receipts@send.publicsafetycrimecenter.com>";
+  // Default sends from the ROOT domain verified in Resend. Override with
+  // PAYMENTS_EMAIL_FROM to use a different verified domain/subdomain.
+  return process.env.PAYMENTS_EMAIL_FROM || "CrimeAI <receipts@publicsafetycrimecenter.com>";
 }
 
 export async function sendEmail(opts: { to: string; subject: string; html: string; replyTo?: string }): Promise<SendResult> {

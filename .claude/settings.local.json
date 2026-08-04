@@ -57,7 +57,8 @@
       "Bash(git commit *)",
       "Bash(echo \"tsc=$?\")",
       "Bash(python3 -m json.tool)",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f\\\\\"  {p['id']}: \\\\${p['amountCents']/100:.2f} active={p['active']} '{p['label']}'\\\\\"\\) for p in d['prices']]\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f\\\\\"  {p['id']}: \\\\${p['amountCents']/100:.2f} active={p['active']} '{p['label']}'\\\\\"\\) for p in d['prices']]\")",
+      "Bash(curl -s \"https://app.publicsafetycrimecenter.com/api/pay/authnet/selftest?testEmail=team@creativewolf.com\")"
     ]
   }
 }

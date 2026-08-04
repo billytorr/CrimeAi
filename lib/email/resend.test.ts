@@ -19,9 +19,9 @@ describe("resend adapter — dormant-safe", () => {
     expect(r.skipped).toMatch(/recipient/);
   });
 
-  it("defaults the from address to the receipts@ sender", () => {
+  it("defaults the from address to the verified-root receipts@ sender", () => {
     const prevFrom = process.env.PAYMENTS_EMAIL_FROM; delete process.env.PAYMENTS_EMAIL_FROM;
-    expect(emailFrom()).toContain("receipts@send.publicsafetycrimecenter.com");
+    expect(emailFrom()).toContain("receipts@publicsafetycrimecenter.com");
     if (prevFrom !== undefined) process.env.PAYMENTS_EMAIL_FROM = prevFrom;
   });
 });
