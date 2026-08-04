@@ -38,6 +38,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ env: "sandbox", canceledSub: cancel, ok, err });
     }
 
+    // test: run reconciliation with the server-side secret (sandbox only).
+    if (q.get("reconcile")) {
+      const secret = process.env.RECONCILE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+      const origin = new URL(req.url).origin;
+      const res = await fetch(`${origin}/api/pay/authnet/reconcile?key=${encodeURIComponent(secret)}`, { cache: "no-store" });
+      return NextResponse.json({ env: "sandbox", reconcileStatus: res.status, result: await res.json().catch(() => null) });
+    }
+
     // test: fire a correctly-SIGNED synthetic webhook to prove verify+dispatch.
     // ?fireWebhook=<eventType>&sub=<subscriptionId>[&nid=<notificationId>]
     const fire = q.get("fireWebhook");

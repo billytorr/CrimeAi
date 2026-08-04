@@ -33,12 +33,12 @@ create or replace function public.claim_webhook_event(
   p_notification_id text, p_event_type text, p_subscription_id text, p_payload jsonb
 ) returns boolean
 language plpgsql security definer set search_path = public as $$
-declare inserted boolean;
+declare n integer;
 begin
   insert into public.payment_webhook_events (notification_id, event_type, subscription_id, payload)
   values (p_notification_id, p_event_type, p_subscription_id, p_payload)
   on conflict (notification_id) do nothing;
-  get diagnostics inserted = row_count;
-  return inserted = 1;
+  get diagnostics n = row_count;
+  return n = 1;
 end;
 $$;
