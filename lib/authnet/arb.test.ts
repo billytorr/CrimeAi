@@ -4,7 +4,7 @@ const post = vi.fn();
 vi.mock("./client", () => ({ anetPost: (...a: any[]) => post(...a) }));
 vi.mock("./env", () => ({ statementDescriptor: () => "PSCC-CRIMEAI PRO PLAN" }));
 
-import { createMonthlySubscription } from "./arb";
+import { createMonthlySubscription, createMonthlySubscriptionFromOpaque } from "./arb";
 
 const ok = (subscriptionId: string) => ({ ok: true, resultCode: "Ok", raw: { subscriptionId } });
 const err = (code: string, text = "x") => ({ ok: false, resultCode: "Error", raw: { messages: { message: [{ code, text }] } } });
@@ -41,5 +41,31 @@ describe("createMonthlySubscription", () => {
     await expect(createMonthlySubscription({ amountCents: 499, customerProfileId: "p", customerPaymentProfileId: "pp" }))
       .rejects.toThrow(/E00040/);
     expect(post.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+const opaque = { dataDescriptor: "COMMON.ACCEPT.INAPP.PAYMENT", dataValue: "nonce" };
+
+describe("createMonthlySubscriptionFromOpaque (direct, race-free)", () => {
+  it("funds the subscription from the opaque nonce WITH billTo, and returns the ARB-created profile ids", async () => {
+    post.mockResolvedValueOnce({ ok: true, resultCode: "Ok", raw: { subscriptionId: "555", profile: { customerProfileId: "cp1", customerPaymentProfileId: "pp1" } } });
+    const r = await createMonthlySubscriptionFromOpaque({ amountCents: 499, opaque, firstName: "Maria", lastName: "Lopez" });
+    expect(r).toEqual({ subscriptionId: "555", customerProfileId: "cp1", customerPaymentProfileId: "pp1" });
+    const sub = post.mock.calls[0][1].subscription;
+    expect(sub.payment).toEqual({ opaqueData: opaque });
+    expect(sub.billTo).toEqual({ firstName: "Maria", lastName: "Lopez" });
+    expect(sub.amount).toBe("4.99");
+  });
+
+  it("surfaces the ARB error (e.g. a decline) instead of writing a subscription", async () => {
+    post.mockResolvedValueOnce(err("E00027", "This transaction has been declined."));
+    await expect(createMonthlySubscriptionFromOpaque({ amountCents: 499, opaque })).rejects.toThrow(/declined/);
+  });
+
+  it("still returns the subscription id even if ARB omits the profile block", async () => {
+    post.mockResolvedValueOnce({ ok: true, resultCode: "Ok", raw: { subscriptionId: "9" } });
+    const r = await createMonthlySubscriptionFromOpaque({ amountCents: 799, opaque });
+    expect(r.subscriptionId).toBe("9");
+    expect(r.customerProfileId).toBeUndefined();
   });
 });
