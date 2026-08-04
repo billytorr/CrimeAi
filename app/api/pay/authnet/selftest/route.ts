@@ -4,6 +4,7 @@ import { loadTierConfig } from "@/lib/entitlements/config";
 import { assignPriceArm } from "@/lib/authnet/pricing";
 import { signCheckoutToken, newNonce } from "@/lib/authnet/checkout-token";
 import { deleteCustomerProfile } from "@/lib/authnet/customer-profile";
+import { cancelSubscription } from "@/lib/authnet/arb";
 import { anetEnv } from "@/lib/authnet/env";
 
 // SANDBOX-ONLY verification helper. Mints a checkout token for a throwaway
@@ -21,11 +22,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   try {
+    const q = new URL(req.url).searchParams;
     // sandbox cleanup: ?reset=<customerProfileId> deletes a stored CIM profile
-    const reset = new URL(req.url).searchParams.get("reset");
+    const reset = q.get("reset");
     if (reset) {
       const ok = await deleteCustomerProfile(reset);
       return NextResponse.json({ env: "sandbox", deletedProfile: reset, ok });
+    }
+    // sandbox cleanup: ?cancelSub=<subscriptionId> cancels an ARB subscription
+    const cancel = q.get("cancelSub");
+    if (cancel) {
+      let ok = true, err = "";
+      try { await cancelSubscription(cancel); } catch (e) { ok = false; err = (e as Error).message; }
+      return NextResponse.json({ env: "sandbox", canceledSub: cancel, ok, err });
     }
 
     const cfg = await loadTierConfig();
