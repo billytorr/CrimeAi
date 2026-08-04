@@ -70,7 +70,7 @@ function Checkout() {
         try {
           const r = await fetch(apiUrl("/api/pay/authnet/subscribe"), {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token, opaque: resp.opaqueData, email }),
+            body: JSON.stringify({ token, opaque: resp.opaqueData, email, name: card.name }),
           });
           const d = await r.json();
           if (!r.ok) throw new Error(d.error || "Could not complete checkout.");

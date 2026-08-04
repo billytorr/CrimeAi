@@ -18,9 +18,14 @@ export async function createMonthlySubscription(opts: {
   amountCents: number;
   customerProfileId: string;
   customerPaymentProfileId: string;
+  firstName?: string;
+  lastName?: string;
   subscriptionName?: string;
 }): Promise<CreatedSubscription> {
   const amount = (opts.amountCents / 100).toFixed(2);
+  // ARB requires a billTo first/last name even when charging a stored profile.
+  const firstName = (opts.firstName || "CrimeAI").slice(0, 50);
+  const lastName = (opts.lastName || "Member").slice(0, 50);
   const res = await anetPost("ARBCreateSubscriptionRequest", {
     subscription: {
       name: (opts.subscriptionName || statementDescriptor()).slice(0, 50),
@@ -30,6 +35,8 @@ export async function createMonthlySubscription(opts: {
         totalOccurrences: 9999, // "until canceled"
       },
       amount,
+      // billTo must precede profile in the ARB schema sequence.
+      billTo: { firstName, lastName },
       profile: {
         customerProfileId: opts.customerProfileId,
         customerPaymentProfileId: opts.customerPaymentProfileId,

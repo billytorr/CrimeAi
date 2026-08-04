@@ -70,20 +70,10 @@ export async function createCustomerProfileFromOpaque(
   }
 
   const customerProfileId = create.raw.customerProfileId;
-  const customerPaymentProfileId = create.raw.customerPaymentProfileIdList?.[0];
-  if (!customerProfileId || !customerPaymentProfileId) {
-    throw new Error("Authorize.Net did not return profile ids");
-  }
+  if (!customerProfileId) throw new Error("Authorize.Net did not return a customer profile id");
 
-  // read back the masked card for display (never the full PAN)
-  let last4 = "", brand = "";
-  try {
-    const get = await anetPost("getCustomerPaymentProfileRequest", {
-      customerProfileId,
-      customerPaymentProfileId,
-    });
-    ({ last4, brand } = cardBits(get.raw?.paymentProfile?.payment?.creditCard));
-  } catch { /* display only — non-fatal */ }
-
-  return { customerProfileId, customerPaymentProfileId, last4, brand };
+  // Resolve the payment-profile id + masked card by reading the profile back.
+  // More robust than parsing customerPaymentProfileIdList and identical to the
+  // returning-subscriber path, so both behave the same downstream.
+  return firstStoredCard(String(customerProfileId));
 }
