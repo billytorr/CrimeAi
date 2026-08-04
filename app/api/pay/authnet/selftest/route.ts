@@ -72,8 +72,10 @@ export async function GET(req: Request) {
     const cfg = await loadTierConfig();
     // Reuse a seeded demo persona (real auth.users row → satisfies the FK).
     // Disposable: its tier_subscriptions + nonce rows can be wiped after the
-    // sandbox verification without touching any real customer.
-    const userId = "a0000000-0000-4000-8000-000000000001";
+    // sandbox verification without touching any real customer. ?u=<uuid> lets a
+    // test target a specific seeded user (e.g. a fresh, unique-prefixed one).
+    const uParam = q.get("u");
+    const userId = (uParam && /^[0-9a-f-]{36}$/i.test(uParam)) ? uParam : "a0000000-0000-4000-8000-000000000001";
     const arm = assignPriceArm(userId, cfg.prices);
     const nonce = newNonce();
 
