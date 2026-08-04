@@ -37,12 +37,25 @@ async function firstStoredCard(customerProfileId: string): Promise<StoredCard> {
   return { customerProfileId, customerPaymentProfileId: String(customerPaymentProfileId), last4, brand };
 }
 
+// Delete a stored profile (sandbox cleanup / GDPR-style removal).
+export async function deleteCustomerProfile(customerProfileId: string): Promise<boolean> {
+  const res = await anetPost("deleteCustomerProfileRequest", { customerProfileId });
+  return res.ok;
+}
+
 // opaque = { dataDescriptor: "COMMON.ACCEPT.INAPP.PAYMENT", dataValue }
 export async function createCustomerProfileFromOpaque(
   userId: string,
   email: string,
   opaque: { dataDescriptor: string; dataValue: string },
+  name?: string,
 ): Promise<StoredCard> {
+  // ARB charges the stored profile and requires a billing name ON the payment
+  // profile (it rejects billTo in the subscription request itself). Store it
+  // here at creation time.
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  const billTo = { firstName: (parts[0] || "CrimeAI").slice(0, 50), lastName: (parts.slice(1).join(" ") || "Member").slice(0, 50) };
+
   // sandbox can't run a real liveMode validation transaction; use testMode
   // there and liveMode in production (a $0 auth+void that confirms the card).
   const validationMode = anetEnv() === "production" ? "liveMode" : "testMode";
@@ -50,7 +63,7 @@ export async function createCustomerProfileFromOpaque(
     profile: {
       merchantCustomerId: userId.slice(0, 20),
       email,
-      paymentProfiles: [{ payment: { opaqueData: opaque } }],
+      paymentProfiles: [{ billTo, payment: { opaqueData: opaque } }],
     },
     validationMode,
   });

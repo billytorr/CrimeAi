@@ -3,6 +3,7 @@ import { serverDb } from "@/lib/payments/serverdb";
 import { loadTierConfig } from "@/lib/entitlements/config";
 import { assignPriceArm } from "@/lib/authnet/pricing";
 import { signCheckoutToken, newNonce } from "@/lib/authnet/checkout-token";
+import { deleteCustomerProfile } from "@/lib/authnet/customer-profile";
 import { anetEnv } from "@/lib/authnet/env";
 
 // SANDBOX-ONLY verification helper. Mints a checkout token for a throwaway
@@ -15,11 +16,18 @@ import { anetEnv } from "@/lib/authnet/env";
 export const dynamic = "force-dynamic";
 const TTL_MS = 10 * 60 * 1000;
 
-export async function GET() {
+export async function GET(req: Request) {
   if (anetEnv() !== "sandbox") {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   try {
+    // sandbox cleanup: ?reset=<customerProfileId> deletes a stored CIM profile
+    const reset = new URL(req.url).searchParams.get("reset");
+    if (reset) {
+      const ok = await deleteCustomerProfile(reset);
+      return NextResponse.json({ env: "sandbox", deletedProfile: reset, ok });
+    }
+
     const cfg = await loadTierConfig();
     // Reuse a seeded demo persona (real auth.users row → satisfies the FK).
     // Disposable: its tier_subscriptions + nonce rows can be wiped after the

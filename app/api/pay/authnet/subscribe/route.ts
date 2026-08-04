@@ -36,16 +36,14 @@ export async function POST(req: Request) {
     const price = cfg.prices.find((p) => p.id === v.claims.priceId && p.active);
     if (!price) return NextResponse.json({ error: "Price no longer available" }, { status: 409, headers: CORS });
 
-    // 1) store the card off-site as a Customer Profile (masked last4 only)
-    const card = await createCustomerProfileFromOpaque(v.claims.userId, String(email || ""), opaque);
-    // 2) create the recurring subscription
-    const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    // 1) store the card off-site as a Customer Profile (masked last4 only).
+    //    The billing name is stored on the payment profile so ARB can charge it.
+    const card = await createCustomerProfileFromOpaque(v.claims.userId, String(email || ""), opaque, String(name || ""));
+    // 2) create the recurring subscription against the stored profile
     const sub = await createMonthlySubscription({
       amountCents: price.amountCents,
       customerProfileId: card.customerProfileId,
       customerPaymentProfileId: card.customerPaymentProfileId,
-      firstName: parts[0],
-      lastName: parts.slice(1).join(" "),
     });
 
     // 3) record in OUR db (source of truth). Webhook/reconciliation confirm
