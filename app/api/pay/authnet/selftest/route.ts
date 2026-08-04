@@ -21,8 +21,10 @@ export async function GET() {
   }
   try {
     const cfg = await loadTierConfig();
-    // deterministic synthetic id so repeat runs upsert the same test row
-    const userId = "selftest-sandbox-user";
+    // Reuse a seeded demo persona (real auth.users row → satisfies the FK).
+    // Disposable: its tier_subscriptions + nonce rows can be wiped after the
+    // sandbox verification without touching any real customer.
+    const userId = "a0000000-0000-4000-8000-000000000001";
     const arm = assignPriceArm(userId, cfg.prices);
     const nonce = newNonce();
 

@@ -46,7 +46,15 @@
       "Bash(git commit -q -m 'Add sandbox-only self-test route for live checkout verification *)",
       "Bash(curl -s \"https://app.publicsafetycrimecenter.com/api/pay/authnet/_selftest\")",
       "Bash(git mv *)",
-      "Bash(git commit -q -m 'Fix: rename _selftest -> selftest \\(Next.js ignores _-prefixed folders\\) *)"
+      "Bash(git commit -q -m 'Fix: rename _selftest -> selftest \\(Next.js ignores _-prefixed folders\\) *)",
+      "Bash(curl -s \"https://app.publicsafetycrimecenter.com/api/pay/authnet/selftest\")",
+      "Bash(curl -s \"https://app.publicsafetycrimecenter.com/api/pay/authnet/validate?t=bad\")",
+      "Bash(vercel --version)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://app.publicsafetycrimecenter.com/api/pay/authnet/selftest\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://app.publicsafetycrimecenter.com/api/pay/authnet/_selftest\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://app.publicsafetycrimecenter.com/crimeai/pricing/checkout\")",
+      "Read(//private/tmp/**)",
+      "Bash(git commit *)"
     ]
   }
 }
