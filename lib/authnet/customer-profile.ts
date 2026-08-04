@@ -3,7 +3,6 @@
 // flows work — WITHOUT the raw card ever touching our servers (Rule 8).
 // We keep only the masked last4 + brand for display.
 import { anetPost } from "./client";
-import { anetEnv } from "./env";
 
 export interface StoredCard {
   customerProfileId: string;
@@ -56,9 +55,11 @@ export async function createCustomerProfileFromOpaque(
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
   const billTo = { firstName: (parts[0] || "CrimeAI").slice(0, 50), lastName: (parts.slice(1).join(" ") || "Member").slice(0, 50) };
 
-  // sandbox can't run a real liveMode validation transaction; use testMode
-  // there and liveMode in production (a $0 auth+void that confirms the card).
-  const validationMode = anetEnv() === "production" ? "liveMode" : "testMode";
+  // validationMode "none": do NOT run a card-validation authorization. Any
+  // other mode issues a ~$1.00 auth-and-void that triggers a receipt email and
+  // confuses customers — and it's redundant, because ARB validates the card on
+  // its first real charge (and a bad card then surfaces via dunning/webhooks).
+  const validationMode = "none";
   const create = await anetPost("createCustomerProfileRequest", {
     profile: {
       merchantCustomerId: userId.slice(0, 20),
