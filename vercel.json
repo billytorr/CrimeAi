@@ -1,5 +1,6 @@
 {
   "crons": [
-    { "path": "/api/ingest/sync", "schedule": "0 9 * * *" }
+    { "path": "/api/ingest/sync", "schedule": "0 9 * * *" },
+    { "path": "/api/pay/authnet/reconcile", "schedule": "0 8 * * *" }
   ]
 }
