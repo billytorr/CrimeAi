@@ -4,7 +4,8 @@ import { loadTierConfig } from "@/lib/entitlements/config";
 import { assignPriceArm } from "@/lib/authnet/pricing";
 import { signCheckoutToken, newNonce } from "@/lib/authnet/checkout-token";
 import { deleteCustomerProfile } from "@/lib/authnet/customer-profile";
-import { cancelSubscription } from "@/lib/authnet/arb";
+import { cancelSubscription, getSubscriptionStatus } from "@/lib/authnet/arb";
+import { anetPost } from "@/lib/authnet/client";
 import { anetEnv } from "@/lib/authnet/env";
 
 // SANDBOX-ONLY verification helper. Mints a checkout token for a throwaway
@@ -35,6 +36,25 @@ export async function GET(req: Request) {
       let ok = true, err = "";
       try { await cancelSubscription(cancel); } catch (e) { ok = false; err = (e as Error).message; }
       return NextResponse.json({ env: "sandbox", canceledSub: cancel, ok, err });
+    }
+    // diagnostic: ?txns=<customerProfileId> lists that profile's transactions
+    // (amount + type + status) so we can see exactly what charged and why.
+    const txns = q.get("txns");
+    if (txns) {
+      const res = await anetPost("getTransactionListForCustomerRequest", { customerProfileId: txns });
+      const t = res.raw?.transactions?.transaction;
+      const list = (Array.isArray(t) ? t : t ? [t] : []).map((x: any) => ({
+        transId: x.transId, amount: x.amount, status: x.transactionStatus,
+        submitTimeUTC: x.submitTimeUTC, hasReturnedItems: x.hasReturnedItems,
+        subscriptionId: x.subscription?.id, payNum: x.subscription?.payNum,
+      }));
+      return NextResponse.json({ env: "sandbox", profile: txns, count: list.length, transactions: list, resultCode: res.resultCode, message: res.text });
+    }
+    // diagnostic: ?subStatus=<subscriptionId> reports the ARB subscription status
+    const subStatus = q.get("subStatus");
+    if (subStatus) {
+      const status = await getSubscriptionStatus(subStatus);
+      return NextResponse.json({ env: "sandbox", subscriptionId: subStatus, status });
     }
 
     const cfg = await loadTierConfig();
