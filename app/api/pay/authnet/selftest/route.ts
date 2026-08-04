@@ -61,6 +61,13 @@ export async function GET(req: Request) {
       const c = await loadTierConfig(true);
       return NextResponse.json({ env: "sandbox", prices: c.prices });
     }
+    // diagnostic: ?cfg3=1 reads tier_prices with a DISTINCT query shape (busts
+    // any identical-GET cache) to see the true current DB state.
+    if (q.get("cfg3")) {
+      const rdb = serverDb(true);
+      const a = await rdb.from("tier_prices").select("id,active,label,amount_cents").eq("plan_id", "pro").order("amount_cents", { ascending: true });
+      return NextResponse.json({ env: "sandbox", rows: a.data, error: a.error?.message || null });
+    }
     // action: ?setSingle799=1 — make $7.99 the sole active price, THROUGH the
     // app's own serverDb (the read path the app actually uses), then confirm.
     if (q.get("setSingle799")) {
