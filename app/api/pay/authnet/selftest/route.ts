@@ -56,6 +56,18 @@ export async function GET(req: Request) {
       const status = await getSubscriptionStatus(subStatus);
       return NextResponse.json({ env: "sandbox", subscriptionId: subStatus, status });
     }
+    // diagnostic: ?unsettled=1 lists all unsettled (auth-only / pending) txns
+    const unsettled = q.get("unsettled");
+    if (unsettled) {
+      const res = await anetPost("getUnsettledTransactionListRequest", {});
+      const t = res.raw?.transactions?.transaction;
+      const list = (Array.isArray(t) ? t : t ? [t] : []).map((x: any) => ({
+        transId: x.transId, amount: x.amount, status: x.transactionStatus,
+        submitTimeUTC: x.submitTimeUTC, account: x.accountNumber,
+        firstName: x.firstName, lastName: x.lastName,
+      }));
+      return NextResponse.json({ env: "sandbox", count: list.length, transactions: list, message: res.text });
+    }
 
     const cfg = await loadTierConfig();
     // Reuse a seeded demo persona (real auth.users row → satisfies the FK).
