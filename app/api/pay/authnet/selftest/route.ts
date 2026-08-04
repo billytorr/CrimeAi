@@ -56,6 +56,11 @@ export async function GET(req: Request) {
       const status = await getSubscriptionStatus(subStatus);
       return NextResponse.json({ env: "sandbox", subscriptionId: subStatus, status });
     }
+    // diagnostic: ?cfg=1 force-reloads tier config from DB (bypasses 60s cache)
+    if (q.get("cfg")) {
+      const c = await loadTierConfig(true);
+      return NextResponse.json({ env: "sandbox", prices: c.prices });
+    }
     // diagnostic: ?unsettled=1 lists all unsettled (auth-only / pending) txns
     const unsettled = q.get("unsettled");
     if (unsettled) {
