@@ -61,6 +61,16 @@ export async function GET(req: Request) {
       const c = await loadTierConfig(true);
       return NextResponse.json({ env: "sandbox", prices: c.prices });
     }
+    // action: ?setSingle799=1 — make $7.99 the sole active price, THROUGH the
+    // app's own serverDb (the read path the app actually uses), then confirm.
+    if (q.get("setSingle799")) {
+      const wdb = serverDb(true);
+      const r1 = await wdb.from("tier_prices").update({ active: false }).eq("id", "pro_499");
+      const r2 = await wdb.from("tier_prices").update({ active: true, label: "Protector — $7.99/mo" }).eq("id", "pro_799");
+      await wdb.from("tier_prices").delete().eq("id", "pro_sentinel");
+      const c = await loadTierConfig(true);
+      return NextResponse.json({ env: "sandbox", applied: true, err1: r1.error?.message || null, err2: r2.error?.message || null, prices: c.prices });
+    }
     // diagnostic: ?unsettled=1 lists all unsettled (auth-only / pending) txns
     const unsettled = q.get("unsettled");
     if (unsettled) {
