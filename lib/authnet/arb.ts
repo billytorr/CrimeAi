@@ -37,7 +37,9 @@ export async function createMonthlySubscription(opts: {
     },
   });
   if (!res.ok || !res.raw.subscriptionId) {
-    throw new Error(`Authorize.Net ARB error: ${res.code || ""} ${res.text || ""}`.trim());
+    const all = res.raw?.messages?.message;
+    const detail = Array.isArray(all) ? all.map((m: any) => `${m.code}:${m.text}`).join(" | ") : `${res.code || ""} ${res.text || ""}`;
+    throw new Error(`Authorize.Net ARB error: ${detail} (profile=${opts.customerProfileId} payment=${opts.customerPaymentProfileId})`.trim());
   }
   return { subscriptionId: String(res.raw.subscriptionId) };
 }

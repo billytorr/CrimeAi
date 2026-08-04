@@ -54,7 +54,8 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://app.publicsafetycrimecenter.com/api/pay/authnet/_selftest\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"https://app.publicsafetycrimecenter.com/crimeai/pricing/checkout\")",
       "Read(//private/tmp/**)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(echo \"tsc=$?\")"
     ]
   }
 }
