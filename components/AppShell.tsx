@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api";
+import { apiUrl, authHeaders } from "@/lib/api";
 import { useEffect, useState } from "react";
 import type { Account, Profile } from "@/lib/auth";
 import type { AreaStats } from "@/lib/types";
@@ -40,14 +40,16 @@ export default function AppShell({
   useEffect(() => { track("tab_view", { tab }); }, [tab]);
 
   useEffect(() => {
-    fetch(apiUrl("/api/crimeai/lookup"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address: profile.address, radiusMiles: profile.alerts.radiusMiles, days: 30 }),
-    })
-      .then((r) => r.json())
-      .then((d) => d.stats && setStats(d.stats))
-      .catch(() => {});
+    authHeaders().then((h) =>
+      fetch(apiUrl("/api/crimeai/lookup"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...h },
+        body: JSON.stringify({ address: profile.address, radiusMiles: profile.alerts.radiusMiles, days: 30 }),
+      })
+        .then((r) => r.json())
+        .then((d) => d.stats && setStats(d.stats))
+        .catch(() => {})
+    );
   }, [profile.address, profile.alerts.radiusMiles]);
 
   const acct = { ...account, name, profile };

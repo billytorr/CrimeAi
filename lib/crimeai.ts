@@ -119,7 +119,9 @@ export async function askCrimeAI(question: string, context: string): Promise<Ask
 }
 
 // A grounded, template-based answer built straight from the context block.
-function fallbackAnswer(question: string, context: string): string {
+// Exported: the ask route serves this (no LLM spend) to callers past their
+// AI limit — free behavior is a real grounded answer, never nothing.
+export function fallbackAnswer(question: string, context: string): string {
   const get = (label: string) => context.match(new RegExp(`${label}: (.+)`))?.[1]?.trim() ?? "";
   const safety = get("Safety score");
   const total = get("Total incidents");

@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api";
+import { apiUrl, authHeaders } from "@/lib/api";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Profile } from "@/lib/auth";
@@ -102,9 +102,9 @@ export default function MapScreen({ profile, refreshKey, onReport }: { profile: 
     setSearching(true);
     setSearchErr("");
     try {
-      const res = await fetch(apiUrl("/api/crimeai/lookup"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address: q }) });
+      const res = await fetch(apiUrl("/api/crimeai/lookup"), { method: "POST", headers: { "Content-Type": "application/json", ...(await authHeaders()) }, body: JSON.stringify({ address: q, feature: "search" }) });
       const d = await res.json();
-      if (!res.ok) setSearchErr(d.error || "Couldn't find that area.");
+      if (!res.ok) setSearchErr(d.upgrade ? "Address search is a Protector feature — upgrade in Settings." : d.error || "Couldn't find that area.");
       else setCenter({ lat: d.location.lat, lon: d.location.lon, neighborhood: d.location.neighborhood });
     } catch {
       setSearchErr("Search failed. Try again.");
@@ -120,7 +120,9 @@ export default function MapScreen({ profile, refreshKey, onReport }: { profile: 
   useEffect(() => {
     const params = new URLSearchParams({ lat: String(center.lat), lon: String(center.lon), radius: String(radius), days: String(days) });
     if (active.length) params.set("categories", active.join(","));
-    fetch(apiUrl(`/api/incidents?${params}`)).then((r) => r.json()).then((d) => d.incidents && setApiIncidents(d.incidents)).catch(() => {});
+    authHeaders().then((h) =>
+      fetch(apiUrl(`/api/incidents?${params}`), { headers: h }).then((r) => r.json()).then((d) => d.incidents && setApiIncidents(d.incidents)).catch(() => {})
+    );
   }, [center.lat, center.lon, radius, days, active]);
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api";
+import { apiUrl, authHeaders } from "@/lib/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getAnnouncements, type Announcement } from "@/lib/analytics";
 import { accountHandle, type Account } from "@/lib/auth";
@@ -39,7 +39,9 @@ export default function InboxScreen({ account, refreshKey }: { account: Account;
 
   useEffect(() => {
     const params = new URLSearchParams({ lat: String(p.location.lat), lon: String(p.location.lon), radius: String(p.alerts.radiusMiles), days: "7" });
-    fetch(apiUrl(`/api/incidents?${params}`)).then((r) => r.json()).then((d) => d.incidents && setIncidents(d.incidents)).catch(() => {});
+    authHeaders().then((h) =>
+      fetch(apiUrl(`/api/incidents?${params}`), { headers: h }).then((r) => r.json()).then((d) => d.incidents && setIncidents(d.incidents)).catch(() => {})
+    );
   }, [p.location, p.alerts.radiusMiles]);
 
   useEffect(() => {

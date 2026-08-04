@@ -1,6 +1,6 @@
 "use client";
 
-import { apiUrl } from "@/lib/api";
+import { apiUrl, authHeaders } from "@/lib/api";
 import { useEffect, useRef, useState } from "react";
 import type { Profile } from "@/lib/auth";
 import type { AreaStats } from "@/lib/types";
@@ -44,7 +44,7 @@ export default function AskScreen({ name, profile, stats }: { name: string; prof
     try {
       const res = await fetch(apiUrl("/api/crimeai/ask"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify({
           question,
           lat: loc.lat,
@@ -56,7 +56,12 @@ export default function AskScreen({ name, profile, stats }: { name: string; prof
         }),
       });
       const data = await res.json();
-      setMessages((m) => [...m, { role: "assistant", text: data.answer || data.error || "Sorry, I couldn't answer that.", engine: data.engine }]);
+      let text = data.answer || data.error || "Sorry, I couldn't answer that.";
+      // over the monthly AI allowance: grounded answer + honest upsell
+      if (data.ai?.limited) {
+        text += "\n\n— You've used this month's free AI analysis, so this answer comes straight from the live data. Protectors get a much larger monthly AI allowance (Settings → Become a Protector).";
+      }
+      setMessages((m) => [...m, { role: "assistant", text, engine: data.engine }]);
     } catch {
       setMessages((m) => [...m, { role: "assistant", text: "Network error — please try again." }]);
     } finally {

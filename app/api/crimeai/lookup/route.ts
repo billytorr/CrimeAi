@@ -2,16 +2,46 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolveAddress } from "@/lib/geocode";
 import { computeStats, incidentsNear } from "@/lib/data";
 import { liveIncidentsNear } from "@/lib/ingest/live";
+import { resolveUserId, planLimitFor, clampDays, trimStatsForDepth } from "@/lib/entitlements/request";
+import { enforceConsume, isEnforcementEnabled } from "@/lib/entitlements/enforce";
 
 // POST /api/crimeai/lookup
-// { address, radiusMiles?, days? } -> resolved location + area stats + recent incidents
+// { address, radiusMiles?, days?, feature? } -> resolved location + area stats + recent incidents
+//
+// Entitlements: calls flagged `feature: "search"` (the Map's address-search
+// box) consume the metered `address_search` allowance when enforcement is on.
+// Location-bootstrap calls (onboarding home address, session start) are NOT
+// metered — gating those would break signup. `days` is clamped to the plan's
+// map history; stats trimmed to the plan's Safety Score depth.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { address, radiusMiles = 1, days = 30 } = body || {};
+    const { address, radiusMiles = 1, days: reqDays = 30, feature } = body || {};
     if (!address || typeof address !== "string") {
       return NextResponse.json({ error: "address is required" }, { status: 400 });
     }
+
+    const userId = await resolveUserId(req);
+    if (feature === "search") {
+      if (userId) {
+        const meter = await enforceConsume(userId, "address_search");
+        if (!meter.allowed) {
+          return NextResponse.json(
+            { error: "Address search is a Protector feature.", upgrade: true, remaining: 0 },
+            { status: 403 },
+          );
+        }
+      } else if (await isEnforcementEnabled()) {
+        return NextResponse.json({ error: "Sign in to search addresses." }, { status: 401 });
+      }
+    }
+
+    const [maxDays, depth] = await Promise.all([
+      planLimitFor(userId, "map_history_days"),
+      planLimitFor(userId, "safety_score_depth"),
+    ]);
+    const days = clampDays(reqDays, maxDays);
+
     const loc = await resolveAddress(address);
     if (!loc) {
       return NextResponse.json(
@@ -23,7 +53,7 @@ export async function POST(req: NextRequest) {
     const stats = computeStats({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live });
     const recent = incidentsNear({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live })
       .slice(0, 25);
-    return NextResponse.json({ location: loc, stats, recent, radiusMiles, days });
+    return NextResponse.json({ location: loc, stats: trimStatsForDepth(stats, depth), recent, radiusMiles, days });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
