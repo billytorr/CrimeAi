@@ -7,6 +7,7 @@ import EditProfile from "@/components/EditProfile";
 import type { AreaStats } from "@/lib/types";
 import { myPosts, savedPosts, repostedPosts, getInteractions, getUserStats, type Post, type Interactions } from "@/lib/social";
 import SafetyScore from "@/components/SafetyScore";
+import GuardianPanel from "@/components/GuardianPanel";
 import { CategoryBreakdown, TimeOfDay } from "@/components/Breakdown";
 import CoverageMatrix from "@/components/CoverageMatrix";
 import Avatar from "@/components/Avatar";
@@ -145,6 +146,9 @@ export default function MeScreen({
 
             {safetyTab === "score" && (
               <div className="space-y-4 px-5 py-4">
+                {/* Phase 10 (additive): Guardian Score + Block Strength cards
+                    render above the existing Safety Score. Tab set unchanged. */}
+                <GuardianPanel lat={profile.location.lat} lon={profile.location.lon} />
                 {stats
                   ? <SafetyScore stats={stats} neighborhood={profile.location.neighborhood} />
                   : <p className="py-10 text-center text-sm text-ink3">Loading your safety score…</p>}
