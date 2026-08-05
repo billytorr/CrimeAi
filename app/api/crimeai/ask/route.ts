@@ -51,8 +51,17 @@ export async function POST(req: NextRequest) {
     }
 
     const live = await liveIncidentsNear(loc.lat, loc.lon, radiusMiles);
-    const stats = computeStats({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live });
+    const legacyStats = computeStats({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live });
     const recent = incidentsNear({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live });
+
+    // CUTOVER: CrimeAI reasons from the same NSS the user sees.
+    const { withNSS, poolFor, nssIncidents } = await import("@/lib/scoring/overlay-helpers");
+    const stats = await withNSS(legacyStats, {
+      lat: loc.lat, lon: loc.lon, radiusMiles,
+      incidents: await nssIncidents(loc.lat, loc.lon, radiusMiles, live),
+      pool: poolFor(live, loc.lat, loc.lon),
+    });
+
     const context = buildContext(loc, stats, recent, radiusMiles, days);
 
     // COST GATE: only signed-in users within their metered allowance reach the

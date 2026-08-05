@@ -50,9 +50,19 @@ export async function POST(req: NextRequest) {
       );
     }
     const live = await liveIncidentsNear(loc.lat, loc.lon, radiusMiles);
-    const stats = computeStats({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live });
+    const legacyStats = computeStats({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live });
     const recent = incidentsNear({ lat: loc.lat, lon: loc.lon, radiusMiles, days, live })
       .slice(0, 25);
+
+    // CUTOVER: the Safety Score shown to users is the new NSS (fail-soft to
+    // the legacy value). Scored over the NSS horizon, not the display window.
+    const { withNSS, poolFor, nssIncidents } = await import("@/lib/scoring/overlay-helpers");
+    const stats = await withNSS(legacyStats, {
+      lat: loc.lat, lon: loc.lon, radiusMiles,
+      incidents: await nssIncidents(loc.lat, loc.lon, radiusMiles, live),
+      pool: poolFor(live, loc.lat, loc.lon),
+    });
+
     return NextResponse.json({ location: loc, stats: trimStatsForDepth(stats, depth), recent, radiusMiles, days });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

@@ -50,7 +50,20 @@ export interface AreaStats {
   last7: number;
   prev7: number;
   trendPct: number; // change last7 vs prev7
-  safetyScore: number; // 0-100 (higher = safer)
+  safetyScore: number; // 0-100 (higher = safer) — the LIVE score (NSS once computed)
+  // NSS detail, present when the scoring engine produced the value above.
+  // `display` is what the UI prints (a number, or a range when confidence is
+  // low). `legacySafetyScore` keeps the pre-NSS formula's value for
+  // comparison — nothing was removed, it simply no longer drives the UI.
+  nss?: {
+    display: string;
+    isRange: boolean;
+    low: number;
+    high: number;
+    confidence: number;
+    version: string;
+  };
+  legacySafetyScore?: number;
   cityComparisonPct: number; // +/- vs city avg rate
   topCategory: string;
 }
