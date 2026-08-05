@@ -73,7 +73,9 @@
       "Bash(git stash *)",
       "Bash(python3 -c ' *)",
       "Bash(curl -s -m 30 'https://api.census.gov/data/2023/acs/acs5?get=B01003_001E&for=zip%20code%20tabulation%20area:33139,33140,33141,33130,33131,33132,33127,33137,33133,33134,33146,33125,33142,33136,33138,33178,33012,33156,33176,33160,33149')",
-      "Bash(curl -sv -m 30 'https://api.census.gov/data/2022/acs/acs5?get=B01003_001E&for=zip%20code%20tabulation%20area:33139,33140,33141,33130,33131,33132,33127,33137,33133,33134,33146,33125,33142,33136,33138,33178,33012,33156,33176,33160,33149')"
+      "Bash(curl -sv -m 30 'https://api.census.gov/data/2022/acs/acs5?get=B01003_001E&for=zip%20code%20tabulation%20area:33139,33140,33141,33130,33131,33132,33127,33137,33133,33134,33146,33125,33142,33136,33138,33178,33012,33156,33176,33160,33149')",
+      "Bash(curl -s -m 290 -X POST \"https://app.publicsafetycrimecenter.com/api/ingest/sync\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('scoring:', json.dumps\\(d.get\\('scoring'\\)\\)\\)\")"
     ]
   }
 }
