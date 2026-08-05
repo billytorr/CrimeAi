@@ -24,7 +24,17 @@ async function run(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: CORS });
   try {
     const results = await syncAllSources();
-    return NextResponse.json({ ok: true, results }, { headers: CORS });
+    // Event-triggered scoring recompute (gamification Phase 4): fresh incidents
+    // should re-score their areas. Fail-soft — a scoring error must never fail
+    // the ingest sync itself. Additive; sync behavior otherwise unchanged.
+    let scoring: unknown = null;
+    try {
+      const { recomputeAndPersistNSS } = await import("@/lib/scoring/service");
+      scoring = await recomputeAndPersistNSS();
+    } catch (e) {
+      scoring = { error: (e as Error).message };
+    }
+    return NextResponse.json({ ok: true, results, scoring }, { headers: CORS });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500, headers: CORS });
   }

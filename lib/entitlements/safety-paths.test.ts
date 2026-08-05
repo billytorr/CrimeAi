@@ -29,6 +29,15 @@ const FORBIDDEN = [
   /\bsubscription\b/i,
   /\bconsume_usage\b/,
   /can\(\s*(user|account|profile)/i, // an entitlement-style can() gate
+  // Gamification build, Rule 1: safety paths must also be free of every
+  // scoring concept — a scoring bug must be structurally incapable of
+  // touching an emergency path.
+  /from\s+["']@\/lib\/scoring/,
+  /GuardianScore|BlockStrength|ScoringService/,
+  /\bguardian[_ ]?score\b/i,
+  /\bblock[_ ]?strength\b/i,
+  /\bidentity[_ ]?level\b/i,
+  /\bwatch[_ ]?points\b/i,
 ];
 
 describe("Rule 1 — safety paths have zero entitlement dependency", () => {
