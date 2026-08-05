@@ -17,9 +17,8 @@ import { NEIGHBORHOODS, incidentsNear, computeStats, insideMiamiCoverage } from 
 import { liveIncidentsNear } from "@/lib/ingest/live";
 import { loadScoringConfig } from "./config";
 import { computeNSS, type NssIncidentInput, type NssResult } from "./nss";
+import { populationForArea, censusRelease } from "./census";
 import type { Incident } from "@/lib/types";
-
-const AREA_RADIUS_MILES = 1; // matches the legacy score's default radius for comparability
 
 export interface AreaDef { areaKey: string; areaKind: "neighborhood"; lat: number; lon: number }
 
@@ -41,11 +40,61 @@ function poolKind(live: Incident[], lat: number, lon: number): "live" | "seed" |
   return insideMiamiCoverage(lat, lon) ? "seed" : "synth";
 }
 
+export interface CompanionMetrics {
+  trend: { last30: number; prior90PerMonth: number; pct: number; direction: "up" | "down" | "flat" };
+  hourHistogram: number[];              // 24 buckets, incident counts
+  cityComparisonPct: number;            // hazard vs metro median, %
+  dominantClasses: { class: string; share: number }[]; // top 3 by hazard share
+  population: { value: number | null; source: string };
+}
+
 export interface AreaComputation {
   area: AreaDef;
   result: NssResult;
+  companion: CompanionMetrics;
   legacyScore: number;      // old computeStats safetyScore on the same spot (30d window)
   pool: "live" | "seed" | "synth";
+}
+
+// Companion DISPLAY metrics (spec Layer 1: "not score inputs") — computed
+// alongside the score, never fed back into it.
+function companionMetrics(
+  incidents: NssIncidentInput[],
+  hazard: number,
+  byClass: Record<string, number>,
+  metroHazards: number[],
+  population: number | null,
+  now: number,
+): CompanionMetrics {
+  const DAY = 86_400_000;
+  let last30 = 0, prior90 = 0;
+  const hourHistogram = new Array(24).fill(0);
+  for (const i of incidents) {
+    const t = +new Date(i.occurredAt);
+    const age = now - t;
+    if (age <= 30 * DAY) last30++;
+    else if (age <= 120 * DAY) prior90++;
+    hourHistogram[new Date(t).getHours()]++;
+  }
+  const prior90PerMonth = prior90 / 3;
+  const pct = prior90PerMonth === 0 ? (last30 > 0 ? 100 : 0) : Math.round(((last30 - prior90PerMonth) / prior90PerMonth) * 100);
+
+  const sortedMetro = [...metroHazards].sort((a, b) => a - b);
+  const median = sortedMetro.length ? sortedMetro[Math.floor(sortedMetro.length / 2)] : 0;
+  const cityComparisonPct = median > 0 ? Math.round(((hazard - median) / median) * 100) : 0;
+
+  const totalClassSignal = Object.values(byClass).reduce((a, b) => a + b, 0);
+  const dominantClasses = Object.entries(byClass)
+    .sort((a, b) => b[1] - a[1]).slice(0, 3)
+    .map(([cls, v]) => ({ class: cls, share: totalClassSignal > 0 ? Math.round((v / totalClassSignal) * 100) / 100 : 0 }));
+
+  return {
+    trend: { last30, prior90PerMonth: Math.round(prior90PerMonth * 10) / 10, pct, direction: pct > 10 ? "up" : pct < -10 ? "down" : "flat" },
+    hourHistogram,
+    cityComparisonPct,
+    dominantClasses,
+    population: { value: population, source: population != null ? censusRelease() : "no census mapping — metro-median estimate used, confidence reduced" },
+  };
 }
 
 // Compute all areas in memory (pure aside from incident fetches). Exported
@@ -54,34 +103,54 @@ export interface AreaComputation {
 export async function computeAllNSS(now: number = Date.now()): Promise<AreaComputation[]> {
   const cfg = (await loadScoringConfig()).nss;
   const areas = listAreas();
+  const radius = cfg.areaRadiusMiles;
 
-  const rows: { area: AreaDef; incidents: NssIncidentInput[]; pool: "live" | "seed" | "synth"; legacyScore: number }[] = [];
+  const rows: { area: AreaDef; incidents: NssIncidentInput[]; pool: "live" | "seed" | "synth"; legacyScore: number; population: number | null }[] = [];
   for (const area of areas) {
-    const live = await liveIncidentsNear(area.lat, area.lon, AREA_RADIUS_MILES);
-    const incs = incidentsNear({ lat: area.lat, lon: area.lon, radiusMiles: AREA_RADIUS_MILES, days: cfg.horizonDays, live });
-    const legacy = computeStats({ lat: area.lat, lon: area.lon, radiusMiles: AREA_RADIUS_MILES, days: 30, live }).safetyScore;
-    rows.push({ area, incidents: incs.map(toNssInput), pool: poolKind(live, area.lat, area.lon), legacyScore: legacy });
+    const live = await liveIncidentsNear(area.lat, area.lon, radius);
+    const incs = incidentsNear({ lat: area.lat, lon: area.lon, radiusMiles: radius, days: cfg.horizonDays, live });
+    const legacy = computeStats({ lat: area.lat, lon: area.lon, radiusMiles: radius, days: 30, live }).safetyScore;
+    rows.push({
+      area, incidents: incs.map(toNssInput), pool: poolKind(live, area.lat, area.lon),
+      legacyScore: legacy, population: populationForArea(area.areaKey).population,
+    });
   }
+
+  // Areas without census coverage get the metro-MEDIAN population as an
+  // ESTIMATED divisor: hazard units stay comparable across the percentile
+  // distribution (mixing per-capita and per-area hazards would rank unmapped
+  // areas artificially dangerous), while confidence keeps the fallback
+  // penalty (populationEstimated flag).
+  const known = rows.map((r) => r.population).filter((p): p is number => p != null).sort((a, b) => a - b);
+  const medianPop = known.length ? known[Math.floor(known.length / 2)] : null;
 
   // pass 1: hazards for the metro distribution; pass 2: full result w/ percentile
   const { computeHazard } = await import("./nss");
-  const areaSqMiles = Math.PI * AREA_RADIUS_MILES * AREA_RADIUS_MILES;
-  const hazards = rows.map((r) =>
-    computeHazard(r.incidents, { lat: r.area.lat, lon: r.area.lon, areaSqMiles }, cfg, now).hazard,
-  );
+  const areaSqMiles = Math.PI * radius * radius;
+  const ctxOf = (r: (typeof rows)[number]) => ({
+    lat: r.area.lat, lon: r.area.lon, areaSqMiles,
+    population: r.population ?? medianPop,
+    populationEstimated: r.population == null && medianPop != null,
+  });
+  const hazards = rows.map((r) => computeHazard(r.incidents, ctxOf(r), cfg, now).hazard);
 
-  return rows.map((r, idx) => ({
-    area: r.area,
-    pool: r.pool,
-    legacyScore: r.legacyScore,
-    result: computeNSS(
+  return rows.map((r, idx) => {
+    const metro = hazards.filter((_, i) => i !== idx); // rank against the OTHER areas
+    const result = computeNSS(
       r.incidents,
-      { lat: r.area.lat, lon: r.area.lon, areaSqMiles, coverageFactor: cfg.coverageFactors[r.pool] ?? 0.5 },
-      hazards.filter((_, i) => i !== idx), // rank against the OTHER areas
+      { ...ctxOf(r), coverageFactor: cfg.coverageFactors[r.pool] ?? 0.5 },
+      metro,
       cfg,
       now,
-    ),
-  }));
+    );
+    return {
+      area: r.area,
+      pool: r.pool,
+      legacyScore: r.legacyScore,
+      result,
+      companion: companionMetrics(r.incidents, result.hazard, result.explanation.byClass, hazards, r.population, now),
+    };
+  });
 }
 
 // Recompute + persist. Used by the scheduled cron and the post-ingest hook.
@@ -101,6 +170,7 @@ export async function recomputeAndPersistNSS(now: number = Date.now()): Promise<
       hazard: c.result.hazard,
       confidence: c.result.confidence,
       explanation: c.result.explanation,
+      companion: c.companion,
       version: c.result.explanation.version,
       computed_at: new Date(now).toISOString(),
     };
@@ -127,6 +197,7 @@ export function divergenceTable(computations: AreaComputation[]) {
       display: c.result.score != null ? String(c.result.score) : `${c.result.scoreLow}–${c.result.scoreHigh} (range)`,
       delta: nss - c.legacyScore,
       confidence: c.result.confidence,
+      pop: c.companion.population.value ?? "—",
     };
   });
 }
