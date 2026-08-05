@@ -67,7 +67,7 @@ All 7 rule-test files run together: **92 passed**.
 
 ## 4. Hardcoded constants
 
-Grep for scoring weights/half-lives outside config and fixtures: **the only matches are type declarations and config *references*** (`cfg.decay.halflifeDays`), not literals. All scoring constants live in `scoring_config` (**39 rows**: 12 `nss.*`, 17 `gs.*`, 6 `bs.*`) and are editable without a deploy.
+Grep for scoring weights/half-lives outside config and fixtures: **the only matches are type declarations and config *references*** (`cfg.decay.halflifeDays`), not literals. All scoring constants live in `scoring_config` (**35 rows**: 12 `nss.*`, 17 `gs.*`, 6 `bs.*`) and are editable without a deploy.
 
 Two documented exceptions, both intentional and commented:
 - `TREND_MIN_PRIOR_INCIDENTS = 10` (`lib/scoring/service.ts`) — display guard, not a score input
