@@ -23,12 +23,20 @@ const METRO_TTL_MS = 10 * 60_000;
 export function _resetMetroCache() { metroCache = null; }
 
 // The metro hazard distribution the percentile ranks against.
+//
+// CRITICAL: an empty distribution must THROW, never be used. percentileRank
+// returns 0.5 on an empty set, which would silently publish "50" as every
+// area's Safety Score — a confident, wrong, public-safety number. Throwing
+// makes the caller fail soft to the legacy score instead. Empty results are
+// also never cached, so a transient DB blip can't poison 10 minutes of scores.
 async function metroHazards(): Promise<number[]> {
   if (metroCache && Date.now() - metroCache.at < METRO_TTL_MS) return metroCache.hazards;
   const { serverDb } = await import("@/lib/payments/serverdb");
   const db = serverDb(false); // area_scores is world-readable
-  const { data } = await db.from("area_scores").select("hazard").eq("area_kind", "neighborhood");
+  const { data, error } = await db.from("area_scores").select("hazard").eq("area_kind", "neighborhood");
+  if (error) throw new Error(`metro distribution unavailable: ${error.message}`);
   const hazards = (data || []).map((r: any) => Number(r.hazard)).filter((h: number) => Number.isFinite(h));
+  if (hazards.length < 2) throw new Error("metro distribution too small to rank against");
   metroCache = { at: Date.now(), hazards };
   return hazards;
 }
