@@ -64,7 +64,11 @@
       "Bash(npx next *)",
       "Bash(grep -nB2 -A6 \"billy@blackseed\" supabase/admin.sql)",
       "Bash(echo \"tsc exit=$?\")",
-      "Bash(echo \"cc tsc exit=$?\")"
+      "Bash(echo \"cc tsc exit=$?\")",
+      "Bash(git checkout *)",
+      "Bash(RUN_DIVERGENCE=1 npx vitest run lib/scoring/divergence.report.test.ts)",
+      "Bash(awk -F= '/^[A-Z]/ {print $1\" len=\"length\\($2\\)}' .env.local)",
+      "Bash(node -e ' *)"
     ]
   }
 }
