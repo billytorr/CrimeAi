@@ -61,7 +61,8 @@
       "Bash(curl -s \"https://app.publicsafetycrimecenter.com/api/pay/authnet/selftest?testEmail=team@creativewolf.com\")",
       "Bash(python3 -c \"import sys,json;print\\('engine:',json.load\\(sys.stdin\\).get\\('engine'\\)\\)\")",
       "Bash(grep -nA 3 \"tier_prices\\\\|usage_counters\")",
-      "Bash(npx next *)"
+      "Bash(npx next *)",
+      "Bash(grep -nB2 -A6 \"billy@blackseed\" supabase/admin.sql)"
     ]
   }
 }
