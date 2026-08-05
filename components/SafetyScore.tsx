@@ -1,11 +1,13 @@
 "use client";
 
 import type { AreaStats } from "@/lib/types";
+import { bandFor } from "@/lib/scoring/bands";
 
 export default function SafetyScore({ stats, neighborhood }: { stats: AreaStats; neighborhood: string }) {
   const score = stats.safetyScore;
-  const band = score >= 75 ? "Calm" : score >= 55 ? "Moderate" : score >= 40 ? "Elevated" : "High activity";
-  const color = score >= 75 ? "#1b7f3a" : score >= 55 ? "#86b300" : score >= 40 ? "#d98a00" : "#c0392b";
+  // Bands are quartiles of the metro distribution (lib/scoring/bands.ts) —
+  // the score is a percentile, so the old absolute thresholds mislabelled it.
+  const { label: band, color } = bandFor(score);
   const circumference = 2 * Math.PI * 52;
   const dash = (score / 100) * circumference;
   // When the scoring engine's confidence is low it publishes a RANGE, never a
@@ -52,11 +54,17 @@ export default function SafetyScore({ stats, neighborhood }: { stats: AreaStats;
             value={`${stats.cityComparisonPct >= 0 ? "+" : ""}${stats.cityComparisonPct}%`}
             tone={stats.cityComparisonPct > 0 ? "bad" : "good"}
           />
-          <Row
-            label="7-day trend"
-            value={`${stats.trendPct >= 0 ? "+" : ""}${stats.trendPct}%`}
-            tone={stats.trendPct > 0 ? "bad" : "good"}
-          />
+          {/* A percentage needs a real baseline — with too little history we
+              say so instead of printing an absurd number. */}
+          {stats.last7 + stats.prev7 >= 10 ? (
+            <Row
+              label="7-day trend"
+              value={`${stats.trendPct >= 0 ? "+" : ""}${stats.trendPct}%`}
+              tone={stats.trendPct > 0 ? "bad" : "good"}
+            />
+          ) : (
+            <Row label="7-day trend" value="not enough history" />
+          )}
           <Row label="Night share" value={`${stats.nightSharePct}%`} />
         </div>
       </div>

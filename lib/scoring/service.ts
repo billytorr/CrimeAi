@@ -20,6 +20,10 @@ import { computeNSS, type NssIncidentInput, type NssResult } from "./nss";
 import { populationForArea, censusRelease } from "./census";
 import type { Incident } from "@/lib/types";
 
+// Minimum incidents in the PRIOR window before a trend percentage is
+// meaningful. Below this we report direction "insufficient_data" and no pct.
+const TREND_MIN_PRIOR_INCIDENTS = 10;
+
 export interface AreaDef { areaKey: string; areaKind: "neighborhood"; lat: number; lon: number }
 
 export function listAreas(): AreaDef[] {
@@ -41,7 +45,9 @@ function poolKind(live: Incident[], lat: number, lon: number): "live" | "seed" |
 }
 
 export interface CompanionMetrics {
-  trend: { last30: number; prior90PerMonth: number; pct: number; direction: "up" | "down" | "flat" };
+  // `pct` is null when the prior window is too thin to divide by — a small
+  // baseline produces absurd percentages (+8300%) that read as fact.
+  trend: { last30: number; prior90PerMonth: number; pct: number | null; direction: "up" | "down" | "flat" | "insufficient_data" };
   hourHistogram: number[];              // 24 buckets, incident counts
   cityComparisonPct: number;            // hazard vs metro median, %
   dominantClasses: { class: string; share: number }[]; // top 3 by hazard share
@@ -76,8 +82,14 @@ function companionMetrics(
     else if (age <= 120 * DAY) prior90++;
     hourHistogram[new Date(t).getHours()]++;
   }
+  // A percentage change needs a real baseline. With only a handful of prior
+  // incidents the ratio explodes (0.7/month vs 56 → "+8300%"), which reads as
+  // a factual spike when it is really "we barely have history here".
   const prior90PerMonth = prior90 / 3;
-  const pct = prior90PerMonth === 0 ? (last30 > 0 ? 100 : 0) : Math.round(((last30 - prior90PerMonth) / prior90PerMonth) * 100);
+  const enoughBaseline = prior90 >= TREND_MIN_PRIOR_INCIDENTS;
+  const pct = enoughBaseline ? Math.round(((last30 - prior90PerMonth) / prior90PerMonth) * 100) : null;
+  const direction: CompanionMetrics["trend"]["direction"] =
+    pct == null ? "insufficient_data" : pct > 10 ? "up" : pct < -10 ? "down" : "flat";
 
   const sortedMetro = [...metroHazards].sort((a, b) => a - b);
   const median = sortedMetro.length ? sortedMetro[Math.floor(sortedMetro.length / 2)] : 0;
@@ -89,7 +101,7 @@ function companionMetrics(
     .map(([cls, v]) => ({ class: cls, share: totalClassSignal > 0 ? Math.round((v / totalClassSignal) * 100) / 100 : 0 }));
 
   return {
-    trend: { last30, prior90PerMonth: Math.round(prior90PerMonth * 10) / 10, pct, direction: pct > 10 ? "up" : pct < -10 ? "down" : "flat" },
+    trend: { last30, prior90PerMonth: Math.round(prior90PerMonth * 10) / 10, pct, direction },
     hourHistogram,
     cityComparisonPct,
     dominantClasses,
