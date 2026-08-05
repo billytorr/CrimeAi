@@ -44,16 +44,25 @@ export async function POST(req: Request) {
     const price = cfg.prices.find((p) => p.id === v.claims.priceId && p.active);
     if (!price) return NextResponse.json({ error: "Price no longer available" }, { status: 409, headers: CORS });
 
-    // 1) store the card off-site as a Customer Profile (masked last4 only). The
-    //    billing name is stored on the payment profile so ARB can charge it.
-    const card = await createCustomerProfileFromOpaque(v.claims.userId, String(email || ""), opaque, String(name || ""));
-    // 2) create the recurring subscription against the stored profile
-    //    (retries E00040 while a fresh profile propagates to ARB).
-    const sub = await createMonthlySubscription({
-      amountCents: price.amountCents,
-      customerProfileId: card.customerProfileId,
-      customerPaymentProfileId: card.customerPaymentProfileId,
-    });
+    let card, sub;
+    try {
+      // 1) store the card off-site as a Customer Profile (masked last4 only).
+      //    The billing name is stored on the payment profile so ARB can charge it.
+      card = await createCustomerProfileFromOpaque(v.claims.userId, String(email || ""), opaque, String(name || ""));
+      // 2) create the recurring subscription against the stored profile
+      //    (retries E00040 while a fresh profile propagates to ARB).
+      sub = await createMonthlySubscription({
+        amountCents: price.amountCents,
+        customerProfileId: card.customerProfileId,
+        customerPaymentProfileId: card.customerPaymentProfileId,
+      });
+    } catch (gatewayErr) {
+      // No subscription was created, so nothing can be replayed — un-redeem
+      // the nonce so the SAME checkout link can simply be retried (otherwise
+      // a transient gateway failure burns the link and strands the customer).
+      await db.from("checkout_nonces").update({ used_at: null }).eq("nonce", v.claims.nonce);
+      return NextResponse.json({ error: (gatewayErr as Error).message, retryable: true }, { status: 502, headers: CORS });
+    }
 
     // 3) record in OUR db (source of truth). Webhook/reconciliation confirm
     //    settlement and keep status honest going forward.

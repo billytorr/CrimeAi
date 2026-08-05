@@ -73,7 +73,11 @@ function Checkout() {
             body: JSON.stringify({ token, opaque: resp.opaqueData, email, name: card.name }),
           });
           const d = await r.json();
-          if (!r.ok) throw new Error(d.error || "Could not complete checkout.");
+          if (!r.ok) {
+            throw new Error(d.retryable
+              ? "The payment network is taking longer than usual. Your card was NOT charged — wait ~30 seconds and tap Subscribe again."
+              : d.error || "Could not complete checkout.");
+          }
           setDone(true);
           if (d.returnTo) setTimeout(() => { window.location.href = d.returnTo; }, 2200);
         } catch (e) {

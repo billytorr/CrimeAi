@@ -30,8 +30,10 @@ export async function createMonthlySubscription(opts: {
   retryAttempts?: number;
   retryDelayMs?: number;
 }): Promise<CreatedSubscription> {
-  const retryAttempts = opts.retryAttempts ?? 8;
-  const retryDelayMs = opts.retryDelayMs ?? 1500;
+  // Sandbox propagation lag is VARIABLE (observed instant to >100s); use as
+  // much of the route's 30s budget as we safely can (~20s of retrying).
+  const retryAttempts = opts.retryAttempts ?? 10;
+  const retryDelayMs = opts.retryDelayMs ?? 2000;
   const amount = (opts.amountCents / 100).toFixed(2);
   // NOTE: when charging a stored customer/payment profile, ARB does NOT accept
   // a billTo in the request (E00093). The billing name lives ON the payment
