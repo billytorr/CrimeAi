@@ -37,7 +37,16 @@ export async function GET(req: NextRequest) {
       guardian = { error: (e as Error).message };
     }
 
-    if (!wantDivergence) return NextResponse.json({ ok: true, ...summary, guardian });
+    // Block Strength (Phase 9) — participation only, never crime data.
+    let blockStrength: unknown = null;
+    try {
+      const { recomputeBlockStrength } = await import("@/lib/scoring/block-service");
+      blockStrength = await recomputeBlockStrength();
+    } catch (e) {
+      blockStrength = { error: (e as Error).message };
+    }
+
+    if (!wantDivergence) return NextResponse.json({ ok: true, ...summary, guardian, blockStrength });
     const computations = await computeAllNSS();
     return NextResponse.json({ ok: true, ...summary, guardian, divergence: divergenceTable(computations) });
   } catch (e) {

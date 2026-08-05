@@ -5,7 +5,7 @@ import { reportPost, blockUser, getBlockedHandles, REPORT_REASONS } from "@/lib/
 import { registerVideo, reportRatio, isMuted, setMuted, onMuteChange } from "@/lib/feedVideo";
 import { useLang } from "@/components/LanguageProvider";
 import { detectTextLang } from "@/lib/i18n";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, authHeaders } from "@/lib/api";
 import type { Account } from "@/lib/auth";
 import {
   toggleLike, toggleSave, toggleFollow, toggleRepost, getComments, addComment, timeAgoShort, gradientFor, getProfileDirectory,
@@ -170,6 +170,35 @@ type V = {
   likeCount: number; commentCount: number; repostCount: number;
   onLike: () => void; onSave: () => void; onFollow: () => void; onComment: () => void; onShare: () => void; onMessage: () => void; onOpenProfile: () => void; onRepost: () => void; onMenu: () => void; pro: boolean;
 };
+
+// "I saw this too" — community corroboration (Phase 9). Advances the
+// report's verification pipeline and earns the corroborator PENDING points
+// that settle once the report is confirmed. Purely additive to the card.
+function Corroborate({ reportId }: { reportId: string }) {
+  const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [msg, setMsg] = useState("");
+  async function confirm() {
+    if (state !== "idle") return;
+    setState("busy");
+    try {
+      const h = await authHeaders();
+      const r = await fetch(apiUrl("/api/reports/corroborate"), {
+        method: "POST", headers: { "Content-Type": "application/json", ...h },
+        body: JSON.stringify({ reportId }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) { setState("done"); return; }
+      setState("error"); setMsg(d.error || "Couldn't confirm right now.");
+    } catch { setState("error"); setMsg("Network error."); }
+  }
+  if (state === "done") return <span className="text-xs font-medium text-green-500">✓ You confirmed this</span>;
+  return (
+    <button onClick={confirm} disabled={state === "busy"}
+      className="rounded-full border border-ink/15 px-2.5 py-1 text-xs font-medium text-ink2 active:scale-95 disabled:opacity-50">
+      {state === "busy" ? "Confirming…" : state === "error" ? msg : "I saw this too"}
+    </button>
+  );
+}
 
 function Badge({ post }: { post: Post }) {
   if (post.kind === "report" && post.category) return <span className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: `${catColor(post.category)}22`, color: catColor(post.category) }}><Report size={11} />REPORT</span>;
@@ -356,7 +385,12 @@ function StandardCard(v: V) {
       {post.thread && post.thread.length > 0 && <div className="mt-2 space-y-2 border-l-2 border-violet-500/40 pl-3">{post.thread.map((t, i) => <p key={i} className="text-[14px] leading-relaxed text-ink2">{t}</p>)}</div>}
       {hasMedia && <div className="mt-2.5"><Media post={post} /></div>}
       {post.tags && post.tags.length > 0 && <div className="mt-2 flex flex-wrap gap-1.5">{post.tags.map((t) => <span key={t} className="text-xs text-blu">#{t}</span>)}</div>}
-      {post.kind === "report" && <div className="mt-2 flex items-center gap-1 text-xs text-brand"><Pin size={12} /> Pinned on the map</div>}
+      {post.kind === "report" && (
+        <div className="mt-2 flex items-center gap-3">
+          <span className="flex items-center gap-1 text-xs text-brand"><Pin size={12} /> Pinned on the map</span>
+          {!post.mine && <Corroborate reportId={post.id} />}
+        </div>
+      )}
       <ActionBar {...v} />
     </article>
   );
