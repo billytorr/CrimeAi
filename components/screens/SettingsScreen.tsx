@@ -11,7 +11,7 @@ import { TrustPanel } from "@/components/CoverageMatrix";
 import { Alert, Car, Eye, Chevron, Logout, Pin, Sun, Moon, ProBadge, Home as HomeIcon, Lock, IdCard, Laptop, Report } from "@/components/Icons";
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 import { accountHandle } from "@/lib/auth";
-import { apiUrl } from "@/lib/api";
+import { apiUrl, authHeaders } from "@/lib/api";
 import { CATEGORIES } from "@/lib/categories";
 import { useLang, useT } from "@/components/LanguageProvider";
 import { LANGS } from "@/lib/i18n";
@@ -34,6 +34,23 @@ export default function SettingsScreen({
   const [phone, setPhone] = useState(profile.phone || "");
   const [contacts, setContacts] = useState<TrustedContact[]>(profile.contacts.length ? profile.contacts : [{ name: "", phone: "" }]);
   const [savedMsg, setSavedMsg] = useState("");
+
+  // Read-only entitlement view for RENDERING limits (server is the authority;
+  // the DB clamps regardless of what this UI shows). null until loaded /
+  // when signed out — in that case nothing is visually gated.
+  const [ent, setEnt] = useState<{ plan: string; enforced: boolean; caps: Record<string, any> } | null>(null);
+  useEffect(() => {
+    authHeaders().then((h) => {
+      if (!h.Authorization) return;
+      fetch(apiUrl("/api/me/entitlements"), { headers: h })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => d && setEnt(d))
+        .catch(() => {});
+    });
+  }, []);
+  const gate = ent?.enforced ? ent : null; // visual gating only when enforcement is on
+  const circleLimit: number | null = typeof gate?.caps?.trusted_circle?.value === "number" ? gate.caps.trusted_circle.value : null;
+  const allowedChannels: string[] | null = Array.isArray(gate?.caps?.channels?.value) ? gate.caps.channels.value : null;
 
   function setAlerts(next: AlertPrefs) {
     const p = { ...profile, alerts: next };
@@ -139,15 +156,23 @@ export default function SettingsScreen({
           </div>
           <div className="mt-4 text-xs font-medium uppercase tracking-wide text-ink2">Notify me via</div>
           <div className="mt-2 space-y-2">
-            <Toggle label="Push notifications" on={profile.alerts.channels.push} onChange={(v) => setAlerts({ ...profile.alerts, channels: { ...profile.alerts.channels, push: v } })} />
-            <Toggle label="Text message (SMS)" on={profile.alerts.channels.sms} onChange={(v) => setAlerts({ ...profile.alerts, channels: { ...profile.alerts.channels, sms: v } })} />
-            <Toggle label="Email" on={profile.alerts.channels.email} onChange={(v) => setAlerts({ ...profile.alerts, channels: { ...profile.alerts.channels, email: v } })} />
+            {([["push", "Push notifications"], ["sms", "Text message (SMS)"], ["email", "Email"]] as const).map(([ch, label]) => {
+              const locked = allowedChannels != null && !allowedChannels.includes(ch);
+              return (
+                <Toggle key={ch} label={label} hint={locked ? "Protector" : undefined} disabled={locked}
+                  on={!locked && (profile.alerts.channels as any)[ch]}
+                  onChange={(v) => setAlerts({ ...profile.alerts, channels: { ...profile.alerts.channels, [ch]: v } })} />
+              );
+            })}
           </div>
         </Section>
 
         {/* trusted circle */}
         <Section title="Trusted circle">
-          <p className="mb-2 text-xs text-ink2">Alerted when you use SOS or Walk-with-me.</p>
+          <p className="mb-2 text-xs text-ink2">
+            Alerted when you use SOS or Walk-with-me.
+            {circleLimit != null && <span className="text-ink3"> · {Math.min(contacts.filter((c) => c.name.trim()).length, circleLimit)} of {circleLimit}</span>}
+          </p>
           <div className="space-y-2">
             {contacts.map((c, i) => (
               <div key={i} className="flex gap-2">
@@ -156,7 +181,16 @@ export default function SettingsScreen({
               </div>
             ))}
           </div>
-          <button onClick={() => setContacts((cs) => [...cs, { name: "", phone: "" }])} className="mt-2 text-sm text-brand">+ Add contact</button>
+          {circleLimit != null && contacts.length >= circleLimit ? (
+            <p className="mt-2 text-xs text-ink3">Circle full — Protectors get a larger trusted circle.</p>
+          ) : (
+            <button onClick={() => setContacts((cs) => [...cs, { name: "", phone: "" }])} className="mt-2 text-sm text-brand">+ Add contact</button>
+          )}
+        </Section>
+
+        {/* saved places */}
+        <Section title="Saved places">
+          <SavedPlaces limitHint={typeof gate?.caps?.saved_locations?.value === "number" ? gate.caps.saved_locations.value : null} />
         </Section>
 
         <button onClick={saveAccount} className="w-full rounded-xl bg-brand py-3 text-sm font-semibold text-white">Save changes</button>
@@ -269,6 +303,79 @@ function ProtectorPanel({ profile, userId, email }: { profile: Profile; userId: 
         {busy ? "Opening secure checkout…" : "Upgrade to Protector →"}
       </button>
       <p className="mt-2 text-[11px] text-ink3">Secure checkout on publicsafetycrimecenter.com. Cancel anytime.</p>
+    </div>
+  );
+}
+
+// Saved places (home, work, school…) — backed by /api/locations, where the
+// plan's limit is enforced atomically server-side. UI shows the limit only.
+function SavedPlaces({ limitHint }: { limitHint: number | null }) {
+  const [locs, setLocs] = useState<{ id: string; label: string; address: string }[]>([]);
+  const [limit, setLimit] = useState<number | null>(limitHint);
+  const [label, setLabel] = useState("");
+  const [address, setAddress] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function refresh() {
+    const h = await authHeaders();
+    if (!h.Authorization) return;
+    const r = await fetch(apiUrl("/api/locations"), { headers: h }).catch(() => null);
+    if (!r?.ok) return;
+    const d = await r.json();
+    setLocs(d.locations || []);
+    if (d.limit != null) setLimit(d.limit);
+  }
+  useEffect(() => { refresh(); }, []);
+
+  async function add() {
+    if (!address.trim() || busy) return;
+    setBusy(true); setMsg("");
+    try {
+      const h = await authHeaders();
+      const r = await fetch(apiUrl("/api/locations"), {
+        method: "POST", headers: { "Content-Type": "application/json", ...h },
+        body: JSON.stringify({ label: label.trim(), address: address.trim() }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMsg(d.upgrade ? "Saved-places limit reached — Protectors get more." : d.error || "Couldn't save."); return; }
+      setLabel(""); setAddress("");
+      await refresh();
+    } catch { setMsg("Couldn't save. Try again."); } finally { setBusy(false); }
+  }
+  async function remove(id: string) {
+    const h = await authHeaders();
+    await fetch(apiUrl(`/api/locations?id=${encodeURIComponent(id)}`), { method: "DELETE", headers: h }).catch(() => {});
+    setLocs((l) => l.filter((x) => x.id !== id));
+  }
+
+  const atLimit = limit != null && locs.length >= limit;
+  return (
+    <div>
+      <p className="mb-2 text-xs text-ink2">
+        Quick-check safety around the places you care about.
+        {limit != null && <span className="text-ink3"> · {locs.length} of {limit}</span>}
+      </p>
+      {locs.length > 0 && (
+        <div className="mb-2 space-y-2">
+          {locs.map((l) => (
+            <div key={l.id} className="flex items-center justify-between rounded-xl border border-ink/10 bg-shell px-3 py-2.5">
+              <span className="min-w-0 flex-1 truncate text-sm text-ink">{l.label ? `${l.label} — ` : ""}{l.address}</span>
+              <button onClick={() => remove(l.id)} className="ml-2 text-xs font-semibold text-ink3">Remove</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {atLimit ? (
+        <p className="text-xs text-ink3">Limit reached — Protectors can save more places.</p>
+      ) : (
+        <div className="flex gap-2">
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (Home)" className="w-1/3 rounded-xl border border-ink/10 bg-shell px-3 py-2.5 text-sm outline-none placeholder:text-ink3 focus:border-brand/60" />
+          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address or neighborhood" className="flex-1 rounded-xl border border-ink/10 bg-shell px-3 py-2.5 text-sm outline-none placeholder:text-ink3 focus:border-brand/60" />
+          <button onClick={add} disabled={busy || !address.trim()} className="rounded-xl bg-brand px-3 text-sm font-semibold text-white disabled:opacity-50">Add</button>
+        </div>
+      )}
+      {msg && <p className="mt-2 text-xs text-ink3">{msg}</p>}
     </div>
   );
 }
@@ -417,10 +524,14 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
-function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ label, on, onChange, disabled, hint }: { label: string; on: boolean; onChange: (v: boolean) => void; disabled?: boolean; hint?: string }) {
   return (
-    <button onClick={() => onChange(!on)} className="flex w-full items-center justify-between rounded-xl border border-ink/10 bg-shell px-3 py-2.5">
-      <span className="text-sm text-ink">{label}</span>
+    <button onClick={() => !disabled && onChange(!on)} disabled={disabled}
+      className={`flex w-full items-center justify-between rounded-xl border border-ink/10 bg-shell px-3 py-2.5 ${disabled ? "opacity-60" : ""}`}>
+      <span className="flex items-center gap-2 text-sm text-ink">
+        {label}
+        {hint && <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">{hint}</span>}
+      </span>
       <span className={`relative h-6 w-11 rounded-full transition ${on ? "bg-brand" : "bg-ink/15"}`}>
         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
       </span>
