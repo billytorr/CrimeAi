@@ -8,6 +8,10 @@ export default function SafetyScore({ stats, neighborhood }: { stats: AreaStats;
   const color = score >= 75 ? "#1b7f3a" : score >= 55 ? "#86b300" : score >= 40 ? "#d98a00" : "#c0392b";
   const circumference = 2 * Math.PI * 52;
   const dash = (score / 100) * circumference;
+  // When the scoring engine's confidence is low it publishes a RANGE, never a
+  // confident-looking point value. The ring still reflects the midpoint.
+  const nss = stats.nss;
+  const headline = nss?.isRange ? nss.display : String(score);
 
   return (
     <div className="rounded-2xl border border-ink/10 bg-card/70 p-5">
@@ -34,10 +38,10 @@ export default function SafetyScore({ stats, neighborhood }: { stats: AreaStats;
           </svg>
           <div className="absolute inset-0 grid place-items-center">
             <div className="text-center">
-              <div className="text-3xl font-bold" style={{ color }}>
-                {score}
+              <div className={`font-bold ${nss?.isRange ? "text-xl" : "text-3xl"}`} style={{ color }}>
+                {headline}
               </div>
-              <div className="text-[10px] uppercase tracking-widest text-ink3">of 100</div>
+              <div className="text-[10px] uppercase tracking-widest text-ink3">{nss?.isRange ? "range · of 100" : "of 100"}</div>
             </div>
           </div>
         </div>
@@ -57,9 +61,16 @@ export default function SafetyScore({ stats, neighborhood }: { stats: AreaStats;
         </div>
       </div>
       <p className="mt-3 text-xs text-ink2">
-        Around <span className="text-ink">{neighborhood}</span>. Higher score = fewer, lower-severity incidents
-        per square mile vs the citywide baseline.
+        Around <span className="text-ink">{neighborhood}</span>.{" "}
+        {nss
+          ? <>Higher score = safer than more of the metro area. Severity-weighted, time-decayed and population-adjusted.{nss.isRange && " We show a range where our data is thin rather than a false-precision number."}</>
+          : <>Higher score = fewer, lower-severity incidents per square mile vs the citywide baseline.</>}
       </p>
+      {nss && (
+        <a href="/api/scoring/methodology" target="_blank" rel="noreferrer" className="mt-1.5 inline-block text-[11px] font-medium text-brand">
+          How this score works →
+        </a>
+      )}
     </div>
   );
 }
