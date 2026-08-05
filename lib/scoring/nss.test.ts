@@ -17,6 +17,8 @@ const T: NssConfig = {
   confidence: { pointDisplayMin: 0.6, populationSaturation: 5000, sourceDiversityTarget: 3 },
   horizonDays: 180,
   coverageFactors: { live: 1, seed: 0.9, synth: 0.4 },
+  areaRadiusMiles: 1,
+  rangeWidth: { slope: 25, min: 3 },
   version: "nss-test",
 };
 validateScoringConfig({ nss: T });

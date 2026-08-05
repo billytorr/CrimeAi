@@ -38,6 +38,9 @@ export interface AreaContext {
   lon: number;
   areaSqMiles: number;     // for density normalization (population fallback)
   population?: number | null; // per-capita normalization when available
+  populationEstimated?: boolean; // true when population is a metro-median estimate
+                                 // (keeps hazard units comparable across the metro
+                                 // distribution; confidence stays penalized)
   coverageFactor?: number; // 0-1: do we have feed coverage here (default 1)
 }
 
@@ -53,7 +56,7 @@ export interface NssExplanation {
   byClass: Record<string, number>;
   bySourceKind: Record<string, number>;
   ugc: { rawShare: number; cappedShare: number; scaleApplied: number; singleUserCapsApplied: number };
-  normalization: { mode: "population" | "area"; divisor: number };
+  normalization: { mode: "population" | "area"; divisor: number; estimated?: boolean };
   confidence: { value: number; coverageFactor: number; sourceDiversity: number; populationFactor: number };
   percentile: { rank: number; metroSampleSize: number };
 }
@@ -157,6 +160,7 @@ export function computeHazard(
   const mode: "population" | "area" = area.population && area.population > 0 ? "population" : "area";
   const divisor = mode === "population" ? (area.population as number) : Math.max(0.05, area.areaSqMiles);
   const hazard = total / divisor;
+  const estimated = mode === "population" && area.populationEstimated === true;
 
   contributions.sort((a, b) => b.value - a.value);
   return {
@@ -173,7 +177,7 @@ export function computeHazard(
         scaleApplied: round3(scale),
         singleUserCapsApplied,
       },
-      normalization: { mode, divisor: round3(divisor) },
+      normalization: { mode, divisor: round3(divisor), ...(estimated ? { estimated: true } : {}) },
     },
   };
 }
@@ -187,7 +191,9 @@ export function computeConfidence(
   const sourceDiversity = clamp01(sourceKindsPresent / cfg.confidence.sourceDiversityTarget);
   // saturating curve on population; unknown population = the fallback path,
   // which the spec says must lower confidence
-  const populationFactor = area.population && area.population > 0
+  // Estimated (metro-median) population keeps hazard units comparable but
+  // must NOT raise confidence — the fallback penalty stays.
+  const populationFactor = area.population && area.population > 0 && !area.populationEstimated
     ? clamp01(1 - Math.exp(-area.population / cfg.confidence.populationSaturation))
     : 0.5;
   return {
@@ -210,8 +216,8 @@ export function computeNSS(
   const kindsPresent = Object.keys(explanation.bySourceKind).length;
   const conf = computeConfidence(area, kindsPresent, cfg);
 
-  // Range width grows as confidence falls (±(1−C)×25, min ±3).
-  const half = Math.max(3, Math.round((1 - conf.value) * 25));
+  // Range width grows as confidence falls (config: ±(1−C)×slope, min ±min).
+  const half = Math.max(cfg.rangeWidth.min, Math.round((1 - conf.value) * cfg.rangeWidth.slope));
   const scoreLow = Math.max(0, point - half);
   const scoreHigh = Math.min(100, point + half);
 

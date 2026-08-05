@@ -68,7 +68,12 @@
       "Bash(git checkout *)",
       "Bash(RUN_DIVERGENCE=1 npx vitest run lib/scoring/divergence.report.test.ts)",
       "Bash(awk -F= '/^[A-Z]/ {print $1\" len=\"length\\($2\\)}' .env.local)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s -m 30 'https://api.census.gov/data/2023/acs/acs5?get=B01003_001E&for=zip%20code%20tabulation%20area:33139,33140,33141,33130,33131,33132,33127,33137,33133,33134,33146,33125,33142,33136,33138,33178,33012,33156,33176,33160,33149')",
+      "Bash(curl -sv -m 30 'https://api.census.gov/data/2022/acs/acs5?get=B01003_001E&for=zip%20code%20tabulation%20area:33139,33140,33141,33130,33131,33132,33127,33137,33133,33134,33146,33125,33142,33136,33138,33178,33012,33156,33176,33160,33149')"
     ]
   }
 }

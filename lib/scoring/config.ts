@@ -23,6 +23,8 @@ export interface NssConfig {
   confidence: { pointDisplayMin: number; populationSaturation: number; sourceDiversityTarget: number };
   horizonDays: number;                       // incident lookback fed to the decay
   coverageFactors: Record<string, number>;   // pool kind ("live"|"seed"|"synth") -> coverage 0-1
+  areaRadiusMiles: number;                   // scoring circle radius per area
+  rangeWidth: { slope: number; min: number };// range half-width = max(min, (1−C)×slope)
   version: string;
 }
 
@@ -66,6 +68,8 @@ export const DEFAULTS: ScoringConfig = {
     confidence: { pointDisplayMin: 0.6, populationSaturation: 5000, sourceDiversityTarget: 3 },
     horizonDays: 180,
     coverageFactors: { live: 1.0, seed: 0.9, synth: 0.4 },
+    areaRadiusMiles: 1,
+    rangeWidth: { slope: 25, min: 3 },
     version: "nss-v1",
   },
 };
@@ -98,6 +102,10 @@ export function validateScoringConfig(cfg: ScoringConfig): void {
     if (typeof v !== "number" || v < 0 || v > 1) throw new Error(`scoring config: coverage factor '${k}' outside [0,1]`);
   }
   if (!Object.keys(n.coverageFactors || {}).length) throw new Error("scoring config: missing coverageFactors");
+  if (typeof n.areaRadiusMiles !== "number" || n.areaRadiusMiles <= 0) throw new Error("scoring config: invalid areaRadiusMiles");
+  if (!n.rangeWidth || typeof n.rangeWidth.slope !== "number" || n.rangeWidth.slope < 0 || typeof n.rangeWidth.min !== "number" || n.rangeWidth.min < 0) {
+    throw new Error("scoring config: invalid rangeWidth");
+  }
   if (!n.version || typeof n.version !== "string") throw new Error("scoring config: missing version");
 }
 validateScoringConfig(DEFAULTS); // boot-time self check: defaults must always be valid
@@ -134,6 +142,8 @@ export async function loadScoringConfig(force = false): Promise<ScoringConfig> {
         : DEFAULTS.nss.confidence,
       horizonDays: kv["nss.horizon_days"] ?? DEFAULTS.nss.horizonDays,
       coverageFactors: kv["nss.coverage_factors"] ?? DEFAULTS.nss.coverageFactors,
+      areaRadiusMiles: kv["nss.area_radius_miles"] ?? DEFAULTS.nss.areaRadiusMiles,
+      rangeWidth: kv["nss.range_width"] ?? DEFAULTS.nss.rangeWidth,
       version: kv["nss.version"] ?? DEFAULTS.nss.version,
     },
   };

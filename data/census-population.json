@@ -1,0 +1,24 @@
+{
+  "source": "U.S. Census Bureau, American Community Survey 5-Year Estimates, table B01003 (Total Population), via censusreporter.org API",
+  "release": "ACS 2024 5-year",
+  "fetched": "2026-08-05",
+  "geography": "ZCTA (ZIP Code Tabulation Area)",
+  "note": "Neighborhood populations are ZCTA-based approximations: each neighborhood is assigned the population of its mapped ZCTA(s) (mapping mirrors lib/geocode.ts). A ZCTA is larger than the 1-mile scoring circle, so per-capita hazard is approximate; this limitation is disclosed in the published methodology. Neighborhoods with no ZCTA mapping fall back to area-based density with lowered confidence.",
+  "zcta_population": {
+    "33012": 71017, "33125": 56897, "33127": 26786, "33130": 34964,
+    "33131": 23095, "33132": 20253, "33133": 36789, "33134": 38174,
+    "33136": 16545, "33137": 29414, "33138": 28980, "33139": 33753,
+    "33140": 20342, "33141": 36438, "33142": 58908, "33146": 19052,
+    "33149": 14791, "33156": 33628, "33160": 43718, "33176": 51804,
+    "33178": 67789
+  },
+  "neighborhood_zctas": {
+    "south-beach": ["33139"], "mid-beach": ["33140"], "north-beach": ["33141"],
+    "little-havana": ["33130"], "brickell": ["33131"], "downtown-miami": ["33132"],
+    "wynwood": ["33127"], "edgewater": ["33137"], "coconut-grove": ["33133"],
+    "coral-gables": ["33134", "33146"], "allapattah": ["33125"],
+    "liberty-city": ["33142"], "overtown": ["33136"], "little-haiti": ["33138"],
+    "doral": ["33178"], "hialeah": ["33012"], "pinecrest": ["33156"],
+    "kendall": ["33176"], "aventura": ["33160"], "key-biscayne": ["33149"]
+  }
+}
