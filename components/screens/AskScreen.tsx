@@ -1,6 +1,7 @@
 "use client";
 
 import { apiUrl, authHeaders } from "@/lib/api";
+import { bandFor } from "@/lib/scoring/bands";
 import { useEffect, useRef, useState } from "react";
 import type { Profile } from "@/lib/auth";
 import type { AreaStats } from "@/lib/types";
@@ -162,7 +163,8 @@ export default function AskScreen({ name, profile, stats }: { name: string; prof
 }
 
 function SafetyChip({ score }: { score: number }) {
-  const color = score >= 75 ? "#1b7f3a" : score >= 55 ? "#86b300" : score >= 40 ? "#d98a00" : "#c0392b";
+  // shared band source — no duplicated thresholds (lib/scoring/bands.ts)
+  const { color } = bandFor(score);
   return (
     <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: `${color}22` }}>
       <span className="text-sm font-bold" style={{ color }}>{score}</span>
