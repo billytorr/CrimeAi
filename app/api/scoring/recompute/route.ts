@@ -25,9 +25,21 @@ export async function GET(req: NextRequest) {
   try {
     const wantDivergence = req.nextUrl.searchParams.get("divergence") === "1";
     const summary = await recomputeAndPersistNSS();
-    if (!wantDivergence) return NextResponse.json({ ok: true, ...summary });
+
+    // Guardian pipeline (Phases 7+8): queue new report earnings, settle vested
+    // events, recompute affected scores (fail-soft — never blocks NSS).
+    let guardian: unknown = null;
+    try {
+      const { queueNewReportEvents, settleAndRecompute } = await import("@/lib/scoring/guardian-service");
+      const queued = await queueNewReportEvents();
+      guardian = { queued, ...(await settleAndRecompute()) };
+    } catch (e) {
+      guardian = { error: (e as Error).message };
+    }
+
+    if (!wantDivergence) return NextResponse.json({ ok: true, ...summary, guardian });
     const computations = await computeAllNSS();
-    return NextResponse.json({ ok: true, ...summary, divergence: divergenceTable(computations) });
+    return NextResponse.json({ ok: true, ...summary, guardian, divergence: divergenceTable(computations) });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 500 });
   }
