@@ -58,7 +58,10 @@
       "Bash(echo \"tsc=$?\")",
       "Bash(python3 -m json.tool)",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f\\\\\"  {p['id']}: \\\\${p['amountCents']/100:.2f} active={p['active']} '{p['label']}'\\\\\"\\) for p in d['prices']]\")",
-      "Bash(curl -s \"https://app.publicsafetycrimecenter.com/api/pay/authnet/selftest?testEmail=team@creativewolf.com\")"
+      "Bash(curl -s \"https://app.publicsafetycrimecenter.com/api/pay/authnet/selftest?testEmail=team@creativewolf.com\")",
+      "Bash(python3 -c \"import sys,json;print\\('engine:',json.load\\(sys.stdin\\).get\\('engine'\\)\\)\")",
+      "Bash(grep -nA 3 \"tier_prices\\\\|usage_counters\")",
+      "Bash(npx next *)"
     ]
   }
 }

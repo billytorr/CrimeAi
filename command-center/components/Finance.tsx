@@ -5,8 +5,8 @@
 // entitlement engine read. Changes here are live in the app without a deploy.
 // The legacy `plans` table remains only as display copy (benefit bullets).
 import { useEffect, useMemo, useState } from "react";
-import { supabase, audit, countOf, timeAgo, type Admin } from "@/lib/admin";
-import { Badge, Btn, Input, Panel, StatCard, Td, TextArea, Th } from "@/components/ui";
+import { supabase, audit, countOf, timeAgo, bucketByDay, type Admin } from "@/lib/admin";
+import { Badge, Btn, Input, Panel, Spark, StatCard, Td, TextArea, Th } from "@/components/ui";
 
 const usd = (c: number) => `$${(c / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
 
@@ -43,6 +43,10 @@ export default function Finance({ admin }: { admin: Admin }) {
   const [grantEmail, setGrantEmail] = useState("");
   const [msg, setMsg] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [newPrice, setNewPrice] = useState("");
+  const [canceled30, setCanceled30] = useState(0);
+  const [subSpark, setSubSpark] = useState<{ day: string; n: number }[]>([]);
+  const [usage, setUsage] = useState<{ totals: Record<string, number>; topAi: { name: string; email: string; n: number }[] }>({ totals: {}, topAi: [] });
 
   const say = (k: string, v: string) => setMsg((m) => ({ ...m, [k]: v }));
 
@@ -72,6 +76,33 @@ export default function Finance({ admin }: { admin: Admin }) {
       setProfiles(Object.fromEntries((profs || []).map((p: any) => [p.id, p])));
     }
     setFreeCount(await countOf("profiles", (q) => q));
+
+    // ── analytics: growth, churn, metered usage (AI spend visibility) ──
+    const d14 = new Date(Date.now() - 14 * 86400000).toISOString();
+    const d30 = new Date(Date.now() - 30 * 86400000).toISOString();
+    const d31 = new Date(Date.now() - 31 * 86400000).toISOString();
+    const [{ data: recentSubs }, churnQ, { data: usageRows }] = await Promise.all([
+      supabase.from("tier_subscriptions").select("created_at").gte("created_at", d14),
+      supabase.from("tier_subscriptions").select("user_id", { count: "exact", head: true }).eq("status", "canceled").gte("updated_at", d30),
+      supabase.from("usage_counters").select("user_id, capability, count").gte("period_start", d31).limit(5000),
+    ]);
+    setSubSpark(bucketByDay(recentSubs || [], 14));
+    setCanceled30(churnQ.count || 0);
+
+    const totals: Record<string, number> = {};
+    const perUserAi: Record<string, number> = {};
+    for (const r of usageRows || []) {
+      totals[r.capability] = (totals[r.capability] || 0) + (r.count || 0);
+      if (r.capability === "ai_analytical") perUserAi[r.user_id] = (perUserAi[r.user_id] || 0) + (r.count || 0);
+    }
+    const topIds = Object.entries(perUserAi).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    let topAi: { name: string; email: string; n: number }[] = [];
+    if (topIds.length) {
+      const { data: tp } = await supabase.from("profiles").select("id, name, email").in("id", topIds.map(([id]) => id));
+      const byId = Object.fromEntries((tp || []).map((p: any) => [p.id, p]));
+      topAi = topIds.map(([id, n]) => ({ name: byId[id]?.name || id.slice(0, 8), email: byId[id]?.email || "", n }));
+    }
+    setUsage({ totals, topAi });
   }
   useEffect(() => { load(); }, []);
 
@@ -106,6 +137,24 @@ export default function Finance({ admin }: { admin: Admin }) {
     const { error } = await supabase.from("tier_prices").update({ active: !p.active }).eq("id", p.id);
     if (!error) await audit(admin, "tier_price_active", `${p.id}=${!p.active}`, {});
     say("price", error ? error.message : `${p.id} ${!p.active ? "activated" : "deactivated"}. Multiple active prices = automatic A/B test.`);
+    await load();
+  }
+
+  // Create a new price point (starts INACTIVE so it never leaks to checkout
+  // until deliberately activated; activate two at once for an A/B test).
+  async function addPrice() {
+    const cents = Math.round(parseFloat(newPrice) * 100);
+    if (!Number.isFinite(cents) || cents <= 0) { say("price", "Enter a valid amount, e.g. 9.99"); return; }
+    const id = `pro_${cents}`;
+    if (prices.some((p) => p.id === id)) { say("price", `${id} already exists.`); return; }
+    const { error } = await supabase.from("tier_prices").insert({
+      id, plan_id: "pro", amount_cents: cents, currency: "usd", interval: "month",
+      label: `Protector — ${usd(cents)}/mo`, active: false,
+    });
+    if (error) { say("price", error.message); return; }
+    await audit(admin, "tier_price_new", `${id}=${usd(cents)}`, {});
+    say("price", `${id} created (inactive). Activate it to start selling — existing subscribers are never moved.`);
+    setNewPrice("");
     await load();
   }
 
@@ -177,6 +226,15 @@ export default function Finance({ admin }: { admin: Admin }) {
 
   const statusTone = (s: string) => (s === "active" ? "ok" : s === "past_due" || s === "grace" ? "warn" : "muted") as "ok" | "warn" | "muted";
 
+  // price-arm split among live subscribers (comped = no price arm)
+  const armSplit = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const s of liveSubs) m[s.price_id || "comped"] = (m[s.price_id || "comped"] || 0) + 1;
+    return Object.entries(m).sort((a, b) => b[1] - a[1]);
+  }, [liveSubs]);
+  const conversionPct = freeCount ? Math.round((liveSubs.length / freeCount) * 1000) / 10 : 0;
+  const USAGE_LABELS: Record<string, string> = { ai_analytical: "AI questions", address_search: "Address searches", sms_immediate: "SMS alerts" };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -185,6 +243,47 @@ export default function Finance({ admin }: { admin: Admin }) {
         <StatCard label="Past due (dunning)" value={pastDue} tone={pastDue ? "warn" : undefined} />
         <StatCard label="All accounts" value={freeCount} />
         <StatCard label="Tier enforcement" value={enforcement == null ? "—" : enforcement ? "ON" : "OFF"} tone={enforcement ? "ok" : "warn"} />
+      </div>
+
+      {/* revenue & growth analytics — no deploy, straight off the live tables */}
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Panel title="New Protector subscriptions — last 14 days"><Spark data={subSpark} height={64} /></Panel>
+        <Panel title="Growth & churn">
+          <div className="space-y-2.5 text-sm">
+            <div className="flex items-center justify-between"><span className="text-ink2">Conversion (Protectors / accounts)</span><span className="font-semibold">{conversionPct}%</span></div>
+            <div className="flex items-center justify-between"><span className="text-ink2">Canceled — last 30 days</span><span className={`font-semibold ${canceled30 ? "text-warn" : ""}`}>{canceled30}</span></div>
+            <div className="flex items-center justify-between"><span className="text-ink2">In dunning (past due)</span><span className={`font-semibold ${pastDue ? "text-warn" : ""}`}>{pastDue}</span></div>
+            <div className="pt-1">
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink3">Price-arm split (live members)</div>
+              <div className="flex flex-wrap gap-1.5">
+                {armSplit.length ? armSplit.map(([arm, n]) => (
+                  <Badge key={arm} tone={arm === "comped" ? "blue" : "ok"}>{arm === "comped" ? "comped" : usd(priceById[arm]?.amount_cents || 0)} × {n}</Badge>
+                )) : <span className="text-xs text-ink3">no live members yet</span>}
+              </div>
+            </div>
+          </div>
+        </Panel>
+        <Panel title="Metered usage — rolling 31 days">
+          <div className="space-y-2.5 text-sm">
+            {Object.keys(USAGE_LABELS).map((cap) => (
+              <div key={cap} className="flex items-center justify-between">
+                <span className="text-ink2">{USAGE_LABELS[cap]}{cap !== "address_search" && <span className="ml-1.5 text-[10px] uppercase text-ink3">costs money</span>}</span>
+                <span className="font-semibold">{usage.totals[cap] || 0}</span>
+              </div>
+            ))}
+            {usage.topAi.length > 0 && (
+              <div className="pt-1">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink3">Top AI users</div>
+                {usage.topAi.map((u) => (
+                  <div key={u.email || u.name} className="flex items-center justify-between text-xs">
+                    <span className="truncate text-ink2">{u.name}</span><span className="ml-2 font-mono text-ink3">{u.n}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="pt-1 text-[11px] leading-relaxed text-ink3">AI + SMS are the two per-unit cost paths — watch these to watch spend. Limits are set below.</p>
+          </div>
+        </Panel>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -217,9 +316,15 @@ export default function Finance({ admin }: { admin: Admin }) {
               </div>
             ))}
           </div>
+          <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+            <span className="text-xs text-ink3">New price $</span>
+            <Input className="max-w-[90px]" placeholder="9.99" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
+            <Btn small tone="brand" onClick={addPrice}>Add price point</Btn>
+          </div>
           <p className="mt-3 text-xs leading-relaxed text-ink2">
             Changes apply to <em>new</em> checkouts instantly (no deploy). Existing subscribers keep the price they signed up at,
             for the life of their subscription. Multiple active prices split new signups automatically (A/B test).
+            New price points start inactive.
           </p>
           {msg.price && <p className="mt-2 text-xs text-ok">{msg.price}</p>}
         </Panel>
