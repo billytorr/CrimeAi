@@ -166,7 +166,7 @@ export async function savedPosts(userId: string): Promise<Post[]> {
 // Real follower/following counts straight from the follows table — every
 // account (community personas included) is a real user, so nothing here
 // is a mock number. Returns null in offline demo mode.
-export interface UserStats { followers: number; following: number; isPrivate: boolean; userId?: string; bio?: string; name?: string; photo?: string; plan?: string }
+export interface UserStats { followers: number; following: number; isPrivate: boolean; userId?: string; bio?: string; name?: string; photo?: string; plan?: string; showProBadge?: boolean }
 export async function getUserStats(handle: string): Promise<UserStats | null> {
   if (!supabaseEnabled) return null;
   const { count: followers } = await supabase!
@@ -174,14 +174,14 @@ export async function getUserStats(handle: string): Promise<UserStats | null> {
   // A user's id comes from profiles.handle; older accounts without a
   // handle fall back to matching the email prefix.
   const { data: profs } = await supabase!
-    .from("profiles").select("id, is_private, bio, name, photo_url, plan").or(`handle.eq.${handle},email.like.${handle}@%`).limit(1);
+    .from("profiles").select("id, is_private, bio, name, photo_url, plan, show_pro_badge").or(`handle.eq.${handle},email.like.${handle}@%`).limit(1);
   let following = 0;
   if (profs && profs.length) {
     const { count } = await supabase!
       .from("follows").select("*", { count: "exact", head: true }).eq("follower_id", profs[0].id).eq("status", "approved");
     following = count || 0;
   }
-  return { followers: followers || 0, following, isPrivate: !!profs?.[0]?.is_private, userId: profs?.[0]?.id, bio: profs?.[0]?.bio || "", name: profs?.[0]?.name || "", photo: profs?.[0]?.photo_url || "", plan: profs?.[0]?.plan || "free" };
+  return { followers: followers || 0, following, isPrivate: !!profs?.[0]?.is_private, userId: profs?.[0]?.id, bio: profs?.[0]?.bio || "", name: profs?.[0]?.name || "", photo: profs?.[0]?.photo_url || "", plan: profs?.[0]?.plan || "free", showProBadge: profs?.[0]?.show_pro_badge !== false };
 }
 
 // Handles of every Protector (paid) user — powers the red badge on

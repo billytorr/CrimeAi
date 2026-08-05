@@ -41,7 +41,11 @@ export default function UserProfile({ handle, account, onClose }: { handle: stri
   const neighborhood = persona?.neighborhood || (isMe ? account.profile?.location.neighborhood : first?.neighborhood) || "Miami";
   const bio = persona?.bio || (isMe ? account.profile?.bio || "Your CrimeAI profile — your posts and reports appear here." : stats?.bio || "Neighbor on CrimeAI.");
   const photo = isMe ? account.profile?.photo : stats?.photo || undefined;
-  const isPro = isMe ? account.profile?.plan === "pro" : stats?.plan === "pro";
+  // Protector badge: ACTIVE paying subscribers only (profiles.plan is a live
+  // projection of tier_subscriptions), and only if the owner displays it.
+  const isPro = isMe
+    ? account.profile?.plan === "pro" && account.profile?.showProBadge !== false
+    : stats?.plan === "pro" && stats?.showProBadge !== false;
 
   // Instagram follow semantics: public → Following, private → Requested
   // until the owner approves.

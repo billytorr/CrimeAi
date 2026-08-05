@@ -11,7 +11,7 @@ import { apiUrl } from "@/lib/api";
 import type { Account } from "@/lib/auth";
 import { useOpenProfile } from "@/lib/profileContext";
 import Avatar from "@/components/Avatar";
-import { Search, Close, ProBadge, Pin, Report as ReportIcon, Chevron } from "@/components/Icons";
+import { Search, Close, Pin, Report as ReportIcon, Chevron } from "@/components/Icons";
 import { CATEGORIES, catColor, catShort } from "@/lib/categories";
 import { timeAgoShort } from "@/lib/social";
 
@@ -129,7 +129,7 @@ export default function SearchScreen({ account, onClose }: { account: Account; o
                     <button key={p.id} onClick={() => { onClose(); openProfile(p.handle); }} className="flex w-full items-center gap-3 rounded-xl px-1 py-2 text-left active:bg-ink/5">
                       <Avatar photo={p.photo} name={p.name} color="#1b7f3a" size={44} />
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1 text-sm font-semibold">{p.name}{p.pro && <ProBadge size={13} />}</div>
+                        <div className="flex items-center gap-1 text-sm font-semibold">{p.name}</div>
                         <div className="truncate text-xs text-ink3">@{p.handle}{p.neighborhood && ` · ${p.neighborhood}`}</div>
                         {p.bio && <div className="truncate text-xs text-ink2">{p.bio}</div>}
                       </div>

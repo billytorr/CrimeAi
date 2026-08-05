@@ -91,7 +91,7 @@ export default function SettingsScreen({
 
         {/* Protector Plan */}
         <Section title="Protector Plan">
-          <ProtectorPanel profile={profile} userId={userId} email={email} />
+          <ProtectorPanel profile={profile} userId={userId} email={email} onProfile={onProfile} />
         </Section>
 
         {/* emergency SOS */}
@@ -222,7 +222,7 @@ export default function SettingsScreen({
 
 // Free → Protector upgrade. Checkout runs on the WEB (pay.publicsafety
 // crimecenter.com) — deliberately outside Apple/Google in-app purchases.
-function ProtectorPanel({ profile, userId, email }: { profile: Profile; userId: string; email: string }) {
+function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profile; userId: string; email: string; onProfile: (p: Profile) => void }) {
   const [features, setFeatures] = useState<string[]>([]);
   const [price, setPrice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -267,7 +267,15 @@ function ProtectorPanel({ profile, userId, email }: { profile: Profile; userId: 
         <ProBadge size={22} />
         <div className="flex-1">
           <p className="text-sm font-semibold">You&apos;re a Protector</p>
-          <p className="mt-0.5 text-xs text-ink2">Your red badge is live on your profile and every post. Thank you for keeping the block safe.</p>
+          <p className="mt-0.5 text-xs text-ink2">Your red shield shows beside your name on your profile. Thank you for keeping the block safe.</p>
+          <div className="mt-3">
+            <Toggle
+              label="Show my Protector badge"
+              on={profile.showProBadge !== false}
+              onChange={(v) => { const np = { ...profile, showProBadge: v }; onProfile(np); saveProfile(np).catch(() => {}); }}
+            />
+            <p className="mt-1.5 text-[11px] text-ink3">Off hides the shield from your profile (for you and visitors). Your plan and benefits are unchanged.</p>
+          </div>
           <button
             onClick={async () => {
               try {

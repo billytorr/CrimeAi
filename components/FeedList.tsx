@@ -14,7 +14,7 @@ import {
 import Avatar from "@/components/Avatar";
 import MessageThread from "@/components/MessageThread";
 import { useOpenProfile } from "@/lib/profileContext";
-import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, ProBadge, SoundOn, SoundOff } from "@/components/Icons";
+import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, SoundOn, SoundOff } from "@/components/Icons";
 
 import { catColor } from "@/lib/categories";
 
@@ -186,7 +186,6 @@ function Head({ post, me, followed, onFollow, onMessage, onMenu, pro }: { post: 
       <div className="min-w-0 flex-1">
         <button onClick={() => open(post.handle, post.id)} className="flex items-center gap-1 text-sm">
           <span className="truncate font-semibold text-ink">{post.author}</span>
-          {pro && <ProBadge size={13} />}
           {post.verified && <span className="text-brand"><Verified size={13} /></span>}
           <Badge post={post} />
         </button>
@@ -381,7 +380,7 @@ function ReelCard(v: V) {
         <div className="absolute inset-x-0 bottom-0 p-5">
           <div className="flex items-center gap-2">
             <button onClick={() => v.onOpenProfile()} className="active:scale-95"><Avatar photo={v.me?.photo} name={v.me?.name || post.author} color={post.color} size={32} /></button>
-            <button onClick={() => v.onOpenProfile()} className="flex items-center gap-1 text-sm font-semibold text-white">{post.author}{v.pro && <ProBadge size={13} />}{post.verified && <Verified size={13} />}</button>
+            <button onClick={() => v.onOpenProfile()} className="flex items-center gap-1 text-sm font-semibold text-white">{post.author}{post.verified && <Verified size={13} />}</button>
             <span className="text-[11px] text-white/70">· {timeAgoShort(post.createdAt)}</span>
             {!post.mine && <button onClick={v.onMessage} aria-label="Message" className="ml-1 grid h-7 w-7 place-items-center rounded-full border border-white/40 text-white active:scale-95"><Mail size={13} /></button>}
             {!post.mine && <button onClick={v.onFollow} className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${v.followed ? "border border-white/30 text-white/80" : "bg-white text-black"}`}>{v.followed ? "Following" : "Follow"}</button>}

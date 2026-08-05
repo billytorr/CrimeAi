@@ -260,11 +260,14 @@ export const Repost = (p: P) => (
     <path d="M21 13v1a4 4 0 0 1-4 4H3" />
   </S>
 );
-// Protector Plan badge — RED verification, distinct from the blue
-// community-verified check. Paid supporters wear this next to their name.
-export const ProBadge = (p: P) => (
-  <S {...p} filled>
-    <path d="m12 2 2.4 1.8 3 .2.2 3L19.4 9.6 21 12l-1.6 2.4.2 3-3 .2L14.4 19.4 12 21l-2.4-1.6-3 .2-.2-3L4.6 14.4 3 12l1.6-2.4-.2-3 3-.2L9.6 4.6 12 3Z" style={{ fill: "#e31e28" }} stroke="none" />
-    <path d="m9 12 2 2 4-4" stroke="#fff" strokeWidth={2.2} />
-  </S>
+// Protector Plan badge — the red shield with a slate border (Billy's
+// artwork). Worn beside the name of ACTIVE paying subscribers only, on
+// profile pages only, and each Protector can hide theirs in Settings.
+export const ProBadge = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-label="Protector" style={{ flexShrink: 0 }}>
+    <path
+      d="M12 1.6 C14.8 3 18.2 3.9 21 4.3 V11 C21 16.6 17.4 20.6 12 22.6 C6.6 20.6 3 16.6 3 11 V4.3 C5.8 3.9 9.2 3 12 1.6 Z"
+      fill="#e01b24" stroke="#6e7681" strokeWidth="1.6" strokeLinejoin="round"
+    />
+  </svg>
 );
