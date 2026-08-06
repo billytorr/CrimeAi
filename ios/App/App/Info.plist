@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CAPACITOR_DEBUG</key>
+	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>CrimeAI</string>
+	<string>CrimeAI</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -24,6 +24,18 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>CrimeAI uses your camera to capture photos and videos of safety incidents you choose to report or share.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string></string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CrimeAI uses your location to show nearby incidents on the map and send safety alerts for your area.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CrimeAI uses your microphone to record audio with your incident videos and live streams.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>CrimeAI can save captured photos and videos to your library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CrimeAI lets you choose photos and videos from your library to attach to posts and reports.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -47,15 +59,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>CrimeAI uses your camera to capture photos and videos of safety incidents you choose to report or share.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>CrimeAI uses your microphone to record audio with your incident videos and live streams.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>CrimeAI uses your location to show nearby incidents on the map and send safety alerts for your area.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>CrimeAI lets you choose photos and videos from your library to attach to posts and reports.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>CrimeAI can save captured photos and videos to your library.</string>
 </dict>
 </plist>
