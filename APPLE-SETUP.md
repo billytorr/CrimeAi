@@ -79,6 +79,30 @@ Set it up when you want automated deploys; store the three values
 
 ---
 
+## 5. Activate the notification triggers — ❗ 2 minutes, do this first
+
+The database now fires a real-time HTTP call whenever something notifiable
+happens (comment, like, DM, nearby report, follow, corroboration, news).
+It is currently **silent** because the endpoint and secret are unset.
+
+**a) Pick a secret and add it in Vercel:**
+| Variable | Value |
+|---|---|
+| `PUSH_EVENT_SECRET` | any long random string you choose |
+
+**b) Tell the database where to send events** — run this once against your
+Supabase project (SQL editor), pasting the *same* secret:
+
+```sql
+insert into public.app_settings (key, value) values
+  ('push_endpoint', 'https://app.publicsafetycrimecenter.com/api/push/event'),
+  ('push_secret',   'PASTE_THE_SAME_SECRET_HERE')
+on conflict (key) do update set value = excluded.value;
+```
+
+Until APNs/FCM keys exist the events will resolve recipients and log, but
+send nothing — which is exactly the intended dormant state.
+
 ## What is built and waiting
 
 | Piece | State |
