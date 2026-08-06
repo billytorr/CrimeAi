@@ -49,16 +49,33 @@ Push goes live the moment those exist — no deploy of mine required beyond a re
 
 ---
 
-## 3. FCM (push, Android) — ❌ you need to create this
+## 3. FCM (push, Android) — ⚠️ app side DONE, one step left
 
-**You, in Firebase:**
-1. Create a project (or reuse one) → add an **Android app** with package
-   `com.pscc.crimeai`
-2. Download `google-services.json` → place at `android/app/google-services.json`
-3. Project Settings → **Service accounts** → **Generate new private key** (JSON)
+**Done:**
+- Firebase project `crimeai-app`, Android app package `com.pscc.crimeai` ✅
+- `android/app/google-services.json` in place, package verified matching ✅
+- Gradle wiring ✅ — **no manual editing was needed.** Capacitor already ships
+  `classpath 'com.google.gms:google-services:4.4.4'` in `android/build.gradle`
+  and a conditional `apply plugin: 'com.google.gms.google-services'` in
+  `android/app/build.gradle` that switches itself on the moment
+  `google-services.json` exists. **Ignore the Gradle snippets the Firebase
+  console shows** — it defaults to the Kotlin-DSL (`build.gradle.kts`) tab and
+  this project uses Groovy `build.gradle`; pasting them would break the build.
+- `@capacitor/push-notifications` registered in the native Android + iOS
+  projects (`npx cap update`) ✅
 
-**Then in Vercel:** `FCM_SERVICE_ACCOUNT_JSON` = the entire service-account JSON,
-as one line.
+**Left for you — Firebase Console → ⚙️ Project settings → Service accounts:**
+1. **Generate new private key** → a JSON file downloads
+2. **Vercel → Environment Variables:** `FCM_SERVICE_ACCOUNT_JSON` = the entire
+   JSON file contents, pasted as one value (keep the `\n` inside `private_key`
+   exactly as they are — do not "fix" them)
+3. Redeploy
+
+That service-account key is what lets the *server* send. `google-services.json`
+only lets the *app* receive — the two are different halves.
+
+⚠️ The service-account JSON is a **secret** — never commit it, never paste it in
+chat. `google-services.json` is client config and is safe in the repo.
 
 ---
 
