@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Sign in with Apple: required by App Store review when other social
+	     logins are offered (the app offers Google). Without this capability
+	     the Apple button falls back to the web flow. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+	<!-- Push notifications. "development" is correct for Xcode/TestFlight
+	     debug builds; Xcode rewrites this to "production" for App Store
+	     archives. Must match device_tokens.environment on the server. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>
