@@ -31,14 +31,27 @@ function serviceAccount(): ServiceAccount | null {
 
 let tokenCache: { at: number; token: string } | null = null;
 const TOKEN_TTL_MS = 50 * 60_000;
-export function _resetFcmToken() { tokenCache = null; }
+
+// Why the last OAuth exchange failed. accessToken() returns null on any
+// failure, which is right for the send path (fail soft, never throw at a
+// user's write) but useless when you are trying to work out *which* part of
+// the service-account JSON is wrong. The diagnostic endpoint reads this.
+let lastAuthError: string | null = null;
+export function lastFcmAuthError(): string | null { return lastAuthError; }
+
+export function _resetFcmToken() { tokenCache = null; lastAuthError = null; }
 
 const b64url = (i: Buffer | string) => Buffer.from(i).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 async function accessToken(): Promise<string | null> {
   if (tokenCache && Date.now() - tokenCache.at < TOKEN_TTL_MS) return tokenCache.token;
   const sa = serviceAccount();
-  if (!sa) return null;
+  if (!sa) {
+    lastAuthError = process.env.FCM_SERVICE_ACCOUNT_JSON
+      ? "FCM_SERVICE_ACCOUNT_JSON is not valid JSON, or is missing client_email / private_key / project_id"
+      : "FCM_SERVICE_ACCOUNT_JSON is not set";
+    return null;
+  }
 
   const iat = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
@@ -48,9 +61,16 @@ async function accessToken(): Promise<string | null> {
     aud: "https://oauth2.googleapis.com/token",
     iat, exp: iat + 3600,
   }));
-  const signer = createSign("RSA-SHA256");
-  signer.update(`${header}.${claims}`);
-  const jwt = `${header}.${claims}.${b64url(signer.sign(sa.private_key))}`;
+  let jwt: string;
+  try {
+    const signer = createSign("RSA-SHA256");
+    signer.update(`${header}.${claims}`);
+    jwt = `${header}.${claims}.${b64url(signer.sign(sa.private_key))}`;
+  } catch (e) {
+    // Almost always a mangled private_key — newlines flattened on paste.
+    lastAuthError = `private_key will not sign: ${(e as Error).message}`;
+    return null;
+  }
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -59,9 +79,13 @@ async function accessToken(): Promise<string | null> {
     signal: AbortSignal.timeout(10_000),
     cache: "no-store",
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    lastAuthError = `google oauth ${res.status} ${(await res.text().catch(() => "")).slice(0, 160)}`;
+    return null;
+  }
   const data: any = await res.json().catch(() => ({}));
-  if (!data.access_token) return null;
+  if (!data.access_token) { lastAuthError = "google oauth returned no access_token"; return null; }
+  lastAuthError = null;
   tokenCache = { at: Date.now(), token: data.access_token };
   return data.access_token;
 }
