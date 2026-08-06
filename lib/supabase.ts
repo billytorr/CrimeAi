@@ -80,6 +80,7 @@ export function rowToProfile(r: any): Profile {
     sosEnabled: r.sos_enabled !== false, // default on
     plan: r.plan === "pro" ? "pro" : "free",
     showProBadge: r.show_pro_badge !== false,
+    pushTypes: r.push_types || undefined,
     bio: r.bio || "",
     phone: r.phone || "",
     address: r.address || "",
@@ -113,6 +114,7 @@ export function profileToRow(p: Profile, id: string, name: string, email: string
     is_private: !!p.isPrivate,
     sos_enabled: p.sosEnabled !== false,
     show_pro_badge: p.showProBadge !== false,
+    ...(p.pushTypes ? { push_types: p.pushTypes } : {}),
     bio: p.bio || "",
     phone: p.phone || "",
     address: p.address,

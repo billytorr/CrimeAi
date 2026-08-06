@@ -154,6 +154,33 @@ export default function SettingsScreen({
               );
             })}
           </div>
+          {/* which notifications get pushed to the device */}
+          <div className="mt-4 text-xs font-medium uppercase tracking-wide text-ink2">Push me about</div>
+          <div className="mt-2 space-y-2">
+            {([
+              ["report", "Reports near me"],
+              ["comment", "Comments on my posts"],
+              ["corroboration", "Confirmations of my reports"],
+              ["message", "Direct messages"],
+              ["follow", "New followers"],
+              ["news", "News & announcements"],
+              ["like", "Likes"],
+            ] as const).map(([key, label]) => {
+              const types = profile.pushTypes ?? {};
+              const on = types[key] ?? (key !== "like"); // likes default off
+              return (
+                <Toggle key={key} label={label} on={on}
+                  onChange={(v) => {
+                    const np = { ...profile, pushTypes: { ...types, [key]: v } };
+                    onProfile(np); saveProfile(np).catch(() => {});
+                  }} />
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink3">
+            Critical incidents near you always come through, even with push off — that&apos;s a safety feature, not a setting.
+          </p>
+
           <div className="mt-4 text-xs font-medium uppercase tracking-wide text-ink2">Notify me via</div>
           <div className="mt-2 space-y-2">
             {([["push", "Push notifications"], ["sms", "Text message (SMS)"], ["email", "Email"]] as const).map(([ch, label]) => {

@@ -21,6 +21,7 @@ export interface Profile {
   sosEnabled?: boolean; // floating SOS button on/off (Settings → Emergency SOS); default on
   plan?: "free" | "pro"; // Protector Plan — projection of tier_subscriptions (never set directly)
   showProBadge?: boolean; // Protector's choice: display the badge on their profile (default true)
+  pushTypes?: Record<string, boolean>; // which push notification types they want
   bio?: string; // shown on the profile page
   phone?: string;
   address: string;
