@@ -54,7 +54,7 @@ Legend: ✅ working & verified · 🟡 built, dormant/waiting on a switch or acc
 - ✅ Read-only audit committed: `GAMIFICATION-PHASE0-AUDIT.md`
 - ✅ Direct answer: legacy Safety Score NOT influenced by engagement/payment
 - ✅ Billy's tabs (My Score / My Reports / My Neighborhood) mapped — unchanged, additive slots identified
-- ✅ Security finds reported: committed Apple .p8 key, plaintext admin passwords (Billy to rotate)
+- ✅ Security finds reported: plaintext admin passwords in seed SQL (Billy to rotate). (An earlier claim that the Apple .p8 key was committed was WRONG — it is gitignored and never was in git.)
 
 ### Phase 4 — Scoring foundation ✅ (merged 2026-08-05)
 **What's new:**
@@ -84,7 +84,7 @@ Legend: ✅ working & verified · 🟡 built, dormant/waiting on a switch or acc
 
 ## Billy's open action items
 1. Rotate production Authorize.Net keys (compromised in chat) — before launch
-2. Remove + rotate the committed Apple `.p8` key; change seeded admin passwords
+2. Change seeded admin passwords (the Apple `.p8` key needs nothing — it was never committed)
 3. Flip enforcement kill switch when ready (Command Center → Finance)
 4. Apple/Google merchant verification when wallets are wanted
 5. Twilio account when SMS/L1 phone verification is wanted

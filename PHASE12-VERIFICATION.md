@@ -142,7 +142,7 @@ Genuinely incomplete, by design or dependency:
 
 ## 9. Pre-existing issues noticed (report-only, unchanged)
 
-- **`AuthKey_5YH697B4BL.p8` (Apple auth key) is committed at the repo root** — remove from git history and rotate.
+- ~~Apple auth key committed at repo root~~ — **retracted.** Verified `git rev-list --all --objects` contains no `.p8` blob; the file is untracked and covered by `.gitignore:30`. My earlier audits reported this incorrectly.
 - Plaintext admin/persona passwords in `supabase/admin.sql:160-162`, `personas.sql:27`.
 - `/api/ingest/sync` is unauthenticated unless `SYNC_KEY`/`CRON_SECRET` is set, with wildcard CORS.
 - Banned users can still like/comment/message (only posting is blocked).

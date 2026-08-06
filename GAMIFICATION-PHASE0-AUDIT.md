@@ -91,7 +91,7 @@ All client-only in `components/SOS.tsx`: SosFab `:15-86`, SosPill `:89-95`, SosS
 
 ## 11. Pre-existing issues noticed (report-only, per prime directive — nothing touched)
 
-- **SECURITY: Apple auth key `AuthKey_5YH697B4BL.p8` is committed at the repo root** — should be removed from the repo + rotated (Billy).
+- ~~Apple auth key committed at repo root~~ — **CORRECTED 2026-08-05: this was wrong.** `AuthKey_5YH697B4BL.p8` exists on the local disk only. It is matched by `.gitignore` (`*.p8`), is untracked, and no `.p8` blob exists in any commit on any branch. No exposure, no rotation needed on this account.
 - Plaintext admin + persona passwords committed (`supabase/admin.sql:160-162`, `personas.sql:27`) — already flagged; rotate before launch.
 - `/api/ingest/sync` is unauthenticated unless `SYNC_KEY`/`CRON_SECRET` set, with wildcard CORS.
 - Banned users can still like/comment/message (only posting is blocked).
