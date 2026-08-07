@@ -10,6 +10,7 @@ import UsernameField, { type UsernameState } from "@/components/UsernameField";
 import { CATEGORIES } from "@/lib/categories";
 import { milesBetween } from "@/lib/data";
 import SuggestedFollows from "@/components/auth/SuggestedFollows";
+import { resizeImage, importRemotePhoto } from "@/lib/photo";
 
 // Miami examples front and center (beta focus), but any US place works.
 const EXAMPLES = ["Brickell", "South Beach", "Wynwood", "Coral Gables", "33139", "Orlando FL"];
@@ -22,33 +23,6 @@ function nearest(lat: number, lon: number) {
     if (dd < d) { d = dd; best = n; }
   }
   return best;
-}
-
-// Downscale + compress the picked image to a square-ish JPEG data URL so
-// it reliably saves to the profile (raw multi-MB phone photos would bloat
-// or fail the upsert — that's the "photo didn't save" bug).
-function resizeImage(file: File, max = 512): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
-        const canvas = document.createElement("canvas");
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return reject(new Error("no canvas"));
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
-      };
-      img.onerror = () => reject(new Error("bad image"));
-      img.src = String(reader.result);
-    };
-    reader.onerror = () => reject(new Error("read failed"));
-    reader.readAsDataURL(file);
-  });
 }
 
 export default function Onboarding({
@@ -121,8 +95,15 @@ export default function Onboarding({
 
   async function finish() {
     if (!location) return;
+
+    // If they kept the Google/Apple avatar, copy it into our own storage now.
+    // Done HERE rather than on mount so we only upload a photo they actually
+    // kept — replacing it during onboarding leaves nothing orphaned. Fails
+    // soft to the provider URL, so this can never block finishing signup.
+    const storedPhoto = await importRemotePhoto(photo, userId);
+
     const profile: Profile = {
-      photo, handle, bio: bio.trim(), address, location, usedGeolocation: usedGeo,
+      photo: storedPhoto, handle, bio: bio.trim(), address, location, usedGeolocation: usedGeo,
       phone: existing?.phone || "", contacts: existing?.contacts || [], alerts,
     };
     try {
