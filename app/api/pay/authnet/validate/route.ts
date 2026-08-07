@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyCheckoutToken } from "@/lib/authnet/checkout-token";
 import { loadTierConfig } from "@/lib/entitlements/config";
 import { anetPublic, statementDescriptor } from "@/lib/authnet/env";
+import { billingPeriod } from "@/lib/pricing";
 
 // GET /api/pay/authnet/validate?t=<token>
 // The checkout server validates the signed token BEFORE rendering anything
@@ -17,10 +18,17 @@ export async function GET(req: Request) {
   if (!v.valid) return NextResponse.json({ valid: false, reason: v.reason }, { status: 200, headers: CORS });
 
   let amountCents = 0;
+  // The checkout page has to state the REAL billing period. Without this it
+  // fell back to "/mo" and an annual plan advertised itself as $69.99 a month
+  // on the very screen where the customer authorises the charge — the kind of
+  // misstatement that loses a chargeback dispute.
+  let interval: "month" | "year" = "month";
   try {
     const cfg = await loadTierConfig();
-    amountCents = cfg.prices.find((p) => p.id === v.claims.priceId)?.amountCents ?? 0;
-  } catch { /* fall through with 0 */ }
+    const price = cfg.prices.find((p) => p.id === v.claims.priceId);
+    amountCents = price?.amountCents ?? 0;
+    interval = billingPeriod(price);
+  } catch { /* fall through with defaults */ }
 
   const pub = anetPublic();
   return NextResponse.json({
@@ -28,6 +36,7 @@ export async function GET(req: Request) {
     plan: v.claims.plan,
     priceId: v.claims.priceId,
     amountCents,
+    interval,
     descriptor: statementDescriptor(),
     accept: { env: pub.env, apiLoginId: pub.apiLoginId, clientKey: pub.clientKey, acceptJsUrl: pub.acceptJsUrl },
   }, { headers: CORS });

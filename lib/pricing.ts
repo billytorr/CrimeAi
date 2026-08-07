@@ -86,3 +86,19 @@ export const rowToPrice = (r: any): Price => ({
   label: r.label || undefined,
   active: r.active !== false,
 });
+
+/**
+ * How a price actually bills. Defaults to monthly for anything unknown.
+ *
+ * Extracted because the checkout page was hardcoding "/mo", so an ANNUAL
+ * plan advertised itself as $69.99 a month on the screen where the customer
+ * authorises the charge. Keeping this in one tested function means the
+ * server, the pricing page and the pay button cannot disagree about the
+ * billing period.
+ */
+export function billingPeriod(price?: { interval?: string } | null): Interval {
+  return price?.interval === "year" ? "year" : "month";
+}
+
+/** Suffix for a price label — "/yr" or "/mo". */
+export const perLabel = (interval: Interval): string => (interval === "year" ? "/yr" : "/mo");

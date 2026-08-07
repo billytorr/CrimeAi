@@ -70,3 +70,33 @@ describe("priceFor", () => {
     expect(priceFor(prices, "guardian", "month")).toBeUndefined();
   });
 });
+
+// This is the regression guard for a real defect: checkout hardcoded "/mo",
+// so an ANNUAL plan showed "$69.99/mo" on the screen where the customer
+// authorises the charge. One tested function now decides the period, so the
+// server, the pricing page and the pay button cannot disagree.
+describe("billingPeriod", () => {
+  it("reads a yearly price as yearly", async () => {
+    const { billingPeriod } = await import("@/lib/pricing");
+    expect(billingPeriod({ interval: "year" })).toBe("year");
+  });
+  it("reads a monthly price as monthly", async () => {
+    const { billingPeriod } = await import("@/lib/pricing");
+    expect(billingPeriod({ interval: "month" })).toBe("month");
+  });
+  it("defaults to monthly for a missing or unknown interval", async () => {
+    const { billingPeriod } = await import("@/lib/pricing");
+    expect(billingPeriod(undefined)).toBe("month");
+    expect(billingPeriod(null)).toBe("month");
+    expect(billingPeriod({})).toBe("month");
+    expect(billingPeriod({ interval: "quarterly" })).toBe("month");
+  });
+});
+
+describe("perLabel", () => {
+  it("suffixes correctly", async () => {
+    const { perLabel } = await import("@/lib/pricing");
+    expect(perLabel("year")).toBe("/yr");
+    expect(perLabel("month")).toBe("/mo");
+  });
+});

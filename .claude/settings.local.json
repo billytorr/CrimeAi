@@ -101,7 +101,10 @@
       "Bash(d.message)",
       "Bash(d.error)",
       "Bash(cd /Users/blackseedlabs/Desktop/Crime_AI *)",
-      "Bash(node scripts/migrate-profile-photos.mjs --dry-run)"
+      "Bash(node scripts/migrate-profile-photos.mjs --dry-run)",
+      "Bash(interval)",
+      "Bash(echo \"════ does loadTierConfig even carry `interval`? ════\")",
+      "Bash(grep -n \"const per\\\\|{per}\\\\|\\\\${per}\\\\|interval?:\" app/crimeai/pricing/checkout/page.tsx)"
     ]
   }
 }
