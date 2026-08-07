@@ -70,7 +70,31 @@ consent mechanism is unlawful in several states on day one.
 
 ---
 
-## ⚠️ Data & identity — OPEN DECISIONS (blocking)
+## 📋 Data & identity — DECIDED 2026-08-06
+
+Billy answered all six questions. Full specification in
+**[DATA-GOVERNANCE.md](DATA-GOVERNANCE.md)**; summary:
+
+1. **Capture** selfie, face template, ID document, ID number, DOB — all of it
+2. **BIPA consent** as its own onboarding step, before any capture
+3. **Retention schedule** published, per data class
+4. **Law enforcement**: cooperate on legal process; safety app, not a
+   surveillance vendor
+5. **Train on everything** except biometrics, IDs, DMs and payment data
+6. **Comply in all states** — strictest rule applied nationally, no geofencing
+
+**Where 5 and 6 collided, 6 won** (Billy's stated priority): biometrics carry
+real destruction deadlines and stay out of model training, because every US
+biometric statute is built on destruction and purpose limitation. Behavioural
+data — the part with actual model value — is retained broadly.
+
+**Architecture: verify-and-discard.** Capture everything, keep the biometric
+only long enough to verify (≤24h), then destroy it and retain the *result*.
+Preserves identity gating, evidentiary value and LE cooperation while removing
+the highest-liability asset from the database. See DATA-GOVERNANCE.md §
+"Recommended architecture" for why this also protects crime reporters.
+
+### Superseded — kept for history
 
 Removing Rules 3 and 4 is a policy change. Turning it into code needs answers
 to the following, because the wrong default here is not a bug — it is
@@ -201,9 +225,10 @@ Postgres trigger), and balances can never go negative.
 
 | Item | Status |
 |---|---|
-| **Answer the six Data & identity questions above** (blocks all biometric/IDV work) | **blocking** |
-| **Privacy attorney review of the biometric plan — BIPA specifically** | **recommended before build** |
-| Rewrite the "What CrimeAI will never do" panel + site description + Privacy Policy v2 | before any capture ships |
+| ~~Answer the six Data & identity questions~~ | ✅ answered 2026-08-06 |
+| **Attorney review of [DATA-GOVERNANCE.md](DATA-GOVERNANCE.md) — BIPA-experienced** | **before any capture ships** |
+| **Choose the IDV vendor** (needs a BIPA-compliant DPA + 24h deletion) | blocking the build |
+| Rewrite the "What CrimeAI will never do" panel + site description + Privacy Policy v2 | **must land before capture** |
 | Rotate the production Authorize.Net keys (pasted in chat — compromised) | outstanding |
 | Rotate `PUSH_EVENT_SECRET` (appeared in a screenshot) | outstanding |
 | Rotate the APNs `.p8` `6UA7W3YC7X` (contents appeared in chat) | outstanding |
