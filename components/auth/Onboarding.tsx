@@ -9,6 +9,7 @@ import { Pin, Camera } from "@/components/Icons";
 import UsernameField, { type UsernameState } from "@/components/UsernameField";
 import { CATEGORIES } from "@/lib/categories";
 import { milesBetween } from "@/lib/data";
+import SuggestedFollows from "@/components/auth/SuggestedFollows";
 
 // Miami examples front and center (beta focus), but any US place works.
 const EXAMPLES = ["Brickell", "South Beach", "Wynwood", "Coral Gables", "33139", "Orlando FL"];
@@ -56,6 +57,8 @@ export default function Onboarding({
   name: string; email: string; userId: string; existing?: Profile | null; draftHandle?: string; onDone: (p: Profile) => void;
 }) {
   const [step, setStep] = useState(0);
+  // the saved profile, held across the final "who to follow" step
+  const [saved, setSaved] = useState<Profile | null>(null);
   const [name, setName] = useState(initialName === "Neighbor" ? "" : initialName);
   const [photo, setPhoto] = useState(existing?.photo || "");
   const [bio, setBio] = useState(existing?.bio || "");
@@ -144,7 +147,10 @@ export default function Onboarding({
       } catch { /* a push failure must never strand the user in onboarding */ }
     }
 
-    onDone(profile);
+    // Suggestions run AFTER the profile is saved — the query matches on the
+    // radius and coordinates that were just written, so it cannot run first.
+    setSaved(profile);
+    setStep(3);
   }
 
   const toggleCat = (id: string) =>
@@ -260,9 +266,13 @@ export default function Onboarding({
           )}
 
           <button onClick={finish} className="mt-7 w-full rounded-xl bg-brand py-3.5 text-sm font-semibold text-white active:scale-[0.99]">
-            Enter CrimeAI →
+            Continue →
           </button>
         </>
+      )}
+
+      {step === 3 && saved && (
+        <SuggestedFollows userId={userId} onDone={() => onDone(saved)} />
       )}
     </div>
   );

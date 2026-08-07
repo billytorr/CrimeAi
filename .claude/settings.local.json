@@ -93,7 +93,11 @@
       "Bash(NEXT_PUBLIC_API_BASE=https://app.publicsafetycrimecenter.com npm run build:mobile)",
       "Bash(grep -rioE \"\\(we \\(never|do not|don't|will not\\)[^.]{0,90}\\\\.\\)\" app/privacy/page.tsx)",
       "Bash(grep -oE '\"[^\"]{40,160}\"' app/privacy/page.tsx)",
-      "Bash(grep -oiE \"\\(never|do not|does not|will not|no \\)[^.<]{15,120}\\\\.\" components/LegalPage.tsx)"
+      "Bash(grep -oiE \"\\(never|do not|does not|will not|no \\)[^.<]{15,120}\\\\.\" components/LegalPage.tsx)",
+      "Bash(cp supabase/official-account.sql /tmp/oa.bak)",
+      "Bash(sed -i '' 's|and coalesce\\(p.is_private, false\\) = false|and true|' supabase/official-account.sql)",
+      "Bash(cp /tmp/oa.bak supabase/official-account.sql)",
+      "Bash(rm /tmp/oa.bak)"
     ]
   }
 }
