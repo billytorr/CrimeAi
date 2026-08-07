@@ -88,7 +88,9 @@
       "Bash(plutil -p ios/App/App/Info.plist)",
       "Bash(npm view *)",
       "Bash(node -p \"require\\('./package.json'\\).dependencies['@aparajita/capacitor-biometric-auth']\")",
-      "Bash(npx cap *)"
+      "Bash(npx cap *)",
+      "Bash(node -p \"JSON.stringify\\(require\\('./package.json'\\).scripts,null,2\\)\")",
+      "Bash(NEXT_PUBLIC_API_BASE=https://app.publicsafetycrimecenter.com npm run build:mobile)"
     ]
   }
 }
