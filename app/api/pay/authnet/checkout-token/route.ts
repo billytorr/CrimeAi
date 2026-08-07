@@ -28,7 +28,16 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
     const cfg = await loadTierConfig();
-    const arm = assignPriceArm(user.id, cfg.prices);
+
+    // The caller may name a price — that is how the monthly/annual toggle
+    // works. VALIDATED against the active price list rather than trusted:
+    // an unvalidated priceId would let anyone subscribe at any amount they
+    // cared to send, including one cent.
+    const body = await req.json().catch(() => ({}));
+    const requested = body?.priceId ? cfg.prices.find((p) => p.id === body.priceId && p.active) : undefined;
+
+    // No explicit choice → the existing A/B assignment, unchanged.
+    const arm = requested || assignPriceArm(user.id, cfg.prices);
 
     const nonce = newNonce();
     const db = serverDb(true);

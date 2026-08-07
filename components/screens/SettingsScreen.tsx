@@ -19,6 +19,7 @@ import { authenticate, biometryStatus, biometryLabel, type BiometryKind } from "
 import { appLockEnabled, setAppLockEnabled } from "@/lib/biometric/lock";
 import { useVerification } from "@/lib/identity/verify-client";
 import VerifyPrompt from "@/components/VerifyPrompt";
+import PlanComparison from "@/components/PlanComparison";
 import { Verified } from "@/components/Icons";
 
 // alert-preference chips render from the shared crime taxonomy
@@ -264,6 +265,7 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
   const [features, setFeatures] = useState<string[]>([]);
   const [price, setPrice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [chosen, setChosen] = useState<string | null>(null);
   const isPro = profile.plan === "pro";
 
   useEffect(() => {
@@ -281,7 +283,7 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
   // Signed checkout handoff: the server mints a short-lived token (checked
   // against the logged-in session) and returns the checkout URL. Nothing
   // identifying goes in a URL we build client-side.
-  async function openCheckout() {
+  async function openCheckout(priceId?: string) {
     if (busy) return;
     setBusy(true);
     try {
@@ -289,7 +291,11 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
       const jwt = data.session?.access_token;
       if (!jwt) { alert("Please log in again to upgrade."); return; }
       const r = await fetch(apiUrl("/api/pay/authnet/checkout-token"), {
-        method: "POST", headers: { Authorization: `Bearer ${jwt}` },
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+        // whichever interval they picked in the comparison chart; omitted
+        // falls back to the existing A/B assignment
+        body: JSON.stringify(priceId ? { priceId } : {}),
       });
       const d = await r.json();
       if (r.ok && d.checkoutUrl) window.open(d.checkoutUrl, "_blank");
@@ -332,23 +338,17 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
     );
   }
 
+  // The comparison chart replaces the old single-plan pitch: monthly vs
+  // annual, and the two coming-soon plans beside Protector so people can see
+  // where this is going before they decide.
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <ProBadge size={18} />
-        <span className="text-sm font-semibold">Become a Protector{price ? ` — ${price}/mo` : ""}</span>
-      </div>
-      <ul className="mt-2.5 space-y-1.5">
-        {(features.length ? features : ["Red Protector badge on your profile and posts", "Priority visibility for your reports", "Extended alert radius"]).map((f, i) => (
-          <li key={i} className="flex items-start gap-2 text-xs text-ink2">
-            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />{f}
-          </li>
-        ))}
-      </ul>
-      <button onClick={openCheckout} disabled={busy} className="mt-3 block w-full rounded-xl bg-brand py-3 text-center text-sm font-bold text-white active:scale-[0.99] disabled:opacity-60">
-        {busy ? "Opening secure checkout…" : "Upgrade to Protector →"}
-      </button>
-      <p className="mt-2 text-[11px] text-ink3">Secure checkout on publicsafetycrimecenter.com. Cancel anytime.</p>
+      <PlanComparison
+        currentPlanId={profile.plan === "pro" ? "pro" : "free"}
+        onChoose={(p) => { setChosen(p.id); openCheckout(p.id); }}
+        busyPriceId={busy ? chosen : null}
+      />
+      <p className="mt-2 text-center text-[11px] text-ink3">Secure checkout on publicsafetycrimecenter.com. Cancel anytime.</p>
     </div>
   );
 }
