@@ -5,6 +5,8 @@ import { getCurrentAccount, type Account, type Profile } from "@/lib/auth";
 import AuthScreen from "@/components/auth/AuthScreen";
 import Onboarding from "@/components/auth/Onboarding";
 import AppShell from "@/components/AppShell";
+import AppLock from "@/components/AppLock";
+import { appLockEnabled } from "@/lib/biometric/lock";
 import Logo from "@/components/Logo";
 
 type Stage = "loading" | "auth" | "onboarding" | "app";
@@ -20,6 +22,11 @@ export default function Page() {
   const [account, setAccount] = useState<Account | null>(null);
   const [minElapsed, setMinElapsed] = useState(false);
   const [splashGone, setSplashGone] = useState(false);
+  // Locked until proven otherwise, but only for users who opted in — read
+  // once on mount so a re-render can't silently re-lock a live session.
+  const [locked, setLocked] = useState(false);
+
+  useEffect(() => { setLocked(appLockEnabled()); }, []);
 
   async function refresh() {
     const u = await getCurrentAccount();
@@ -70,6 +77,14 @@ export default function Page() {
               setStage("onboarding");
             }}
           />
+        )}
+
+        {/* Renders OVER the app, never instead of it, so unlocking reveals
+            the screen already loaded underneath. Only for signed-in users who
+            turned the lock on — see components/AppLock.tsx for why SOS stays
+            reachable from it. */}
+        {locked && stage === "app" && account?.profile && (
+          <AppLock profile={account.profile} onUnlock={() => setLocked(false)} />
         )}
 
         {!splashGone && <VideoSplash fading={splashFading} />}

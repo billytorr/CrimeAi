@@ -40,6 +40,16 @@ const FORBIDDEN = [
   /\bwatch[_ ]?points\b/i,
 ];
 
+// Applied to SAFETY_FILES only — NOT to AppLock, which is the lock itself and
+// necessarily imports this layer. An emergency must never wait on a
+// fingerprint, so SOS may not authenticate anybody.
+const NO_BIOMETRIC = [
+  /from\s+["']@\/lib\/biometric/,
+  /\bbiometr/i,
+  /\bFace\s?ID\b/i,
+  /\bTouch\s?ID\b/i,
+];
+
 describe("Rule 1 — safety paths have zero entitlement dependency", () => {
   for (const file of SAFETY_FILES) {
     it(`${file} contains no entitlement/tier/subscription reference`, () => {
@@ -53,7 +63,66 @@ describe("Rule 1 — safety paths have zero entitlement dependency", () => {
     });
   }
 
+  for (const file of SAFETY_FILES) {
+    it(`${file} never gates an emergency behind biometrics`, () => {
+      const src = readFileSync(path.join(process.cwd(), file), "utf8");
+      for (const pat of NO_BIOMETRIC) {
+        const m = src.match(pat);
+        expect(m, `${file} must not reference ${pat} (found: ${m?.[0]})`).toBeNull();
+      }
+    });
+  }
+
   it("the guard list is non-empty (someone didn't delete the coverage)", () => {
     expect(SAFETY_FILES.length).toBeGreaterThan(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// The app lock hides the user's content behind Face ID / fingerprint. The
+// one thing it must NOT hide is the way to call for help: biometrics fail
+// routinely — a mask, the dark, wet or shaking hands — and "authenticate
+// before you can call for help" is the one failure this app cannot ship.
+//
+// These tests are the structural guarantee that the escape hatch survives
+// future edits to AppLock.tsx.
+// ══════════════════════════════════════════════════════════════════
+describe("Rule 1 — the lock screen never blocks SOS", () => {
+  const abs = path.join(process.cwd(), "components/AppLock.tsx");
+
+  it("AppLock exists and renders the real SOS component", () => {
+    expect(existsSync(abs), "components/AppLock.tsx should exist").toBe(true);
+    const src = readFileSync(abs, "utf8");
+    // the genuine article, not a lookalike button that does nothing
+    expect(src).toMatch(/from\s+["']@\/components\/SOS["']/);
+    expect(src).toMatch(/<SosSheets\b/);
+  });
+
+  it("the SOS control is not disabled or hidden while locked", () => {
+    const src = readFileSync(abs, "utf8");
+    // Scope to the SOS <button> element itself — a wider window picks up the
+    // unlock button's `disabled:opacity-60` and fails for the wrong reason.
+    const label = src.indexOf("Emergency — SOS");
+    expect(label, "the SOS button label should be present").toBeGreaterThan(-1);
+    const sosButton = src.slice(src.lastIndexOf("<button", label), label);
+
+    // Unconditionally rendered: no disabled state, no auth check in front.
+    expect(sosButton).not.toMatch(/disabled/);
+    expect(sosButton).not.toMatch(/unlocked|authenticated|verified/i);
+    expect(sosButton).toMatch(/onClick/);
+  });
+
+  it("AppLock carries no entitlement, tier or scoring dependency", () => {
+    const src = readFileSync(abs, "utf8");
+    for (const pat of FORBIDDEN) {
+      const m = src.match(pat);
+      expect(m, `AppLock must not reference ${pat} (found: ${m?.[0]})`).toBeNull();
+    }
+  });
+
+  it("an unavailable sensor fails OPEN, never locking the user out", () => {
+    const src = readFileSync(abs, "utf8");
+    // if biometry is unavailable we must call onUnlock, not strand the user
+    expect(src).toMatch(/if\s*\(!s\.available\)\s*onUnlock\(\)/);
   });
 });

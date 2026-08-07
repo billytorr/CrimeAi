@@ -26,6 +26,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>CrimeAI uses your camera to capture photos and videos of safety incidents you choose to report or share.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>CrimeAI uses Face ID to unlock the app so your reports, messages and saved places stay private if someone else picks up your phone. Your Face ID data never leaves your device.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>CrimeAI uses your location to show nearby incidents on the map and send safety alerts for your area.</string>
 	<key>NSMicrophoneUsageDescription</key>

@@ -129,6 +129,21 @@ export default function Onboarding({
       }
       throw e;
     }
+
+    // Ask for notification permission HERE, and only here. This is the moment
+    // the user has just chosen a radius, picked categories and switched push
+    // on — so the OS prompt lands with the reason for it still on screen,
+    // rather than as a cold interruption at first launch. iOS only ever shows
+    // this prompt once per install; if they said no to our toggle we don't
+    // spend it at all. Awaited so the prompt appears over onboarding, but
+    // never allowed to block entry into the app.
+    if (alerts.channels.push) {
+      try {
+        const { registerForPush } = await import("@/lib/push/client");
+        await registerForPush({ promptIfNeeded: true });
+      } catch { /* a push failure must never strand the user in onboarding */ }
+    }
+
     onDone(profile);
   }
 
@@ -234,6 +249,15 @@ export default function Onboarding({
             <Toggle label="Text message (SMS)" on={alerts.channels.sms} onChange={(v) => setAlerts((a) => ({ ...a, channels: { ...a.channels, sms: v } }))} />
             <Toggle label="Email" on={alerts.channels.email} onChange={(v) => setAlerts((a) => ({ ...a, channels: { ...a.channels, email: v } }))} />
           </div>
+
+          {/* Pre-prompt priming: tell them the OS dialog is coming and why, so
+              a reflexive "Don't Allow" doesn't permanently cost them alerts. */}
+          {alerts.channels.push && (
+            <p className="mt-3 text-xs leading-relaxed text-ink3">
+              Next, {typeof navigator !== "undefined" && /iPhone|iPad/.test(navigator.userAgent) ? "iOS" : "your phone"} will
+              ask you to allow notifications — that&apos;s how we reach you about incidents within {alerts.radiusMiles} mi.
+            </p>
+          )}
 
           <button onClick={finish} className="mt-7 w-full rounded-xl bg-brand py-3.5 text-sm font-semibold text-white active:scale-[0.99]">
             Enter CrimeAI →

@@ -85,7 +85,10 @@
       "Bash(curl -s -o /dev/null -w \"  http1.1 → %{http_code} \\(0 = connection refused\\)\\\\n\" --http1.1 --max-time 10 https://api.push.apple.com/3/device/0000)",
       "Bash(curl -s -o /dev/null -w \"  http2   → %{http_code}\\\\n\" --http2 --max-time 10 https://api.push.apple.com/3/device/0000)",
       "Bash(plutil -lint ios/App/App/Info.plist)",
-      "Bash(plutil -p ios/App/App/Info.plist)"
+      "Bash(plutil -p ios/App/App/Info.plist)",
+      "Bash(npm view *)",
+      "Bash(node -p \"require\\('./package.json'\\).dependencies['@aparajita/capacitor-biometric-auth']\")",
+      "Bash(npx cap *)"
     ]
   }
 }

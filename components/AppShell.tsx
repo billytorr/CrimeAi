@@ -39,18 +39,21 @@ export default function AppShell({
   useEffect(() => { track("app_open", {}); }, []);
   useEffect(() => { track("tab_view", { tab }); }, [tab]);
 
-  // Register this device for push, once, after sign-in. AppShell only mounts
-  // for an authenticated account, so the token is always attributable to a
-  // user. No-ops on web and returns a reason rather than throwing, so a push
-  // failure can never interfere with the app loading.
+  // Refresh this device's push token on launch — WITHOUT prompting. The
+  // permission prompt itself is asked once, in onboarding, right after the
+  // user sets their alert radius and says they want push (see Onboarding).
+  // Here we only re-register devices that already granted it, because APNs
+  // and FCM tokens rotate and a stale token silently stops delivering.
   useEffect(() => {
     let cancelled = false;
     import("@/lib/push/client")
-      .then(({ registerForPush }) => registerForPush())
+      .then(({ registerForPush }) => registerForPush({ promptIfNeeded: false }))
       .then((r) => {
         if (cancelled) return;
         if (r.registered) track("push_registered", {});
-        else if (r.reason && !/not a native build/.test(r.reason)) {
+        // "not a native build" is the web case and "permission prompt" means
+        // onboarding hasn't asked yet — neither is a failure worth recording.
+        else if (r.reason && !/not a native build|permission prompt/.test(r.reason)) {
           track("push_register_failed", { reason: r.reason });
         }
       })

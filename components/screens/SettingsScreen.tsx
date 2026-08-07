@@ -15,6 +15,8 @@ import { apiUrl, authHeaders } from "@/lib/api";
 import { CATEGORIES } from "@/lib/categories";
 import { useLang, useT } from "@/components/LanguageProvider";
 import { LANGS } from "@/lib/i18n";
+import { authenticate, biometryStatus, biometryLabel, type BiometryKind } from "@/lib/biometric/client";
+import { appLockEnabled, setAppLockEnabled } from "@/lib/biometric/lock";
 
 // alert-preference chips render from the shared crime taxonomy
 const CAT_ICONS: Record<string, typeof Alert> = {
@@ -120,6 +122,9 @@ export default function SettingsScreen({
             New followers must send a request — you approve or decline it from your Inbox.
           </p>
         </Section>
+
+        {/* app lock — device-scoped, hidden entirely where biometry can't run */}
+        <AppLockSection />
 
         {/* appearance */}
         <Section title="Appearance">
@@ -547,6 +552,51 @@ function LanguagePicker() {
       </div>
       <p className="mt-2.5 text-[11px] leading-relaxed text-ink3">{t("Choose the language for the whole app. It follows your device by default.")}</p>
     </div>
+  );
+}
+
+// Biometric app lock. Renders nothing at all where biometry is unavailable —
+// on web, on a handset with nothing enrolled, or before the native build has
+// the plugin — so nobody is offered a switch that cannot do anything.
+//
+// Turning it ON verifies first. Offering a lock and only discovering at the
+// next launch that Face ID doesn't work would lock the user out of their own
+// safety app; the prompt here proves it works before we ever rely on it.
+function AppLockSection() {
+  const [status, setStatus] = useState<{ available: boolean; kind: BiometryKind } | null>(null);
+  const [on, setOn] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    biometryStatus().then((s) => setStatus({ available: s.available, kind: s.kind }));
+    setOn(appLockEnabled());
+  }, []);
+
+  if (!status?.available) return null;
+  const label = biometryLabel(status.kind);
+
+  async function toggle(next: boolean) {
+    setErr(null);
+    if (!next) { setAppLockEnabled(false); setOn(false); return; }
+    const r = await authenticate(`Turn on ${label} lock`);
+    if (!r.ok) {
+      if (!r.cancelled) setErr(`Couldn't turn on ${label} lock — ${r.reason || "verification failed"}`);
+      return;
+    }
+    setAppLockEnabled(true);
+    setOn(true);
+  }
+
+  return (
+    <Section title="App lock">
+      <Toggle label={`Require ${label}`} on={on} onChange={toggle} />
+      {err && <p className="mt-2 text-[11px] text-danger">{err}</p>}
+      <p className="mt-2 text-[11px] leading-relaxed text-ink3">
+        Locks CrimeAI behind {label} on this device. <strong className="text-ink2">SOS still works from the lock
+        screen</strong> — an emergency never waits for a fingerprint. Your {label} data never leaves your phone
+        and is never sent to us.
+      </p>
+    </Section>
   );
 }
 

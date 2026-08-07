@@ -15,7 +15,21 @@ function isNative(): boolean {
   return p === "capacitor:" || p === "ionic:";
 }
 
-export async function registerForPush(): Promise<RegisterResult> {
+export interface RegisterOptions {
+  /**
+   * Show the OS permission prompt if it hasn't been answered yet.
+   *
+   * You only get ONE shot at this prompt per install — once denied, iOS will
+   * never show it again and the user has to go to Settings. So it is asked at
+   * the single moment the user has just told us they want alerts (the end of
+   * onboarding), and NOT on every app launch. Everywhere else passes false,
+   * which silently refreshes the token of an already-granted device and
+   * returns without prompting otherwise.
+   */
+  promptIfNeeded?: boolean;
+}
+
+export async function registerForPush(opts: RegisterOptions = {}): Promise<RegisterResult> {
   if (!isNative()) return { registered: false, reason: "not a native build" };
   try {
     // dynamic import: absent on web, and absent until the plugin is installed
@@ -23,7 +37,11 @@ export async function registerForPush(): Promise<RegisterResult> {
     const PushNotifications = mod?.PushNotifications;
     if (!PushNotifications) return { registered: false, reason: "push plugin not installed" };
 
-    const perm = await PushNotifications.requestPermissions();
+    let perm = await PushNotifications.checkPermissions();
+    if (perm.receive !== "granted") {
+      if (!opts.promptIfNeeded) return { registered: false, reason: `permission ${perm.receive}` };
+      perm = await PushNotifications.requestPermissions();
+    }
     if (perm.receive !== "granted") return { registered: false, reason: "permission denied" };
 
     return await new Promise<RegisterResult>((resolve) => {
