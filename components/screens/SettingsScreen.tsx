@@ -332,6 +332,14 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
                 const r = await fetch(apiUrl("/api/pay/portal"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
                 const d = await r.json();
                 if (r.ok && d.url) window.open(d.url, "_blank");
+                else if (r.ok && d.message) {
+                  // Authorize.Net has no hosted subscriber portal, so there is
+                  // nothing to redirect to. Show the plan facts and how to
+                  // cancel rather than a bare error.
+                  const renews = d.renewsAt ? new Date(d.renewsAt).toLocaleDateString() : null;
+                  alert([d.card ? `Paying with ${d.card}` : null, renews ? `Renews ${renews}` : null, "", d.message]
+                    .filter((x) => x !== null).join("\n"));
+                }
                 else alert(d.error || "Contact support to manage your subscription.");
               } catch { alert("Contact support to manage your subscription."); }
             }}

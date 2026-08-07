@@ -11,6 +11,28 @@ export async function POST(req: Request) {
     if (!userId) return NextResponse.json({ error: "Missing user" }, { status: 400 });
 
     const db = serverDb(true);
+    // Authorize.Net subscribers live in tier_subscriptions — this route was
+    // only ever reading the legacy `subscriptions` table, so EVERY paying
+    // customer got "No active subscription found" when they tapped Manage.
+    const { data: tier } = await db.from("tier_subscriptions")
+      .select("status, price_id, anet_subscription_id, current_period_end, card_last4, card_brand")
+      .eq("user_id", userId).maybeSingle();
+
+    if (tier && ["active", "grace", "past_due"].includes(tier.status)) {
+      // Authorize.Net has no hosted subscriber portal, so there is nothing to
+      // redirect to. Return the facts the app can show, and say plainly that
+      // cancelling is not self-serve yet rather than pretending otherwise.
+      return NextResponse.json({
+        provider: "authorize",
+        selfServe: false,
+        status: tier.status,
+        priceId: tier.price_id,
+        renewsAt: tier.current_period_end,
+        card: tier.card_last4 ? `${tier.card_brand || "card"} ····${tier.card_last4}` : null,
+        message: "To change or cancel your plan, email support@publicsafetycrimecenter.com and we'll take care of it the same day.",
+      });
+    }
+
     const { data: sub } = await db.from("subscriptions")
       .select("provider, provider_customer_id")
       .eq("user_id", userId).eq("status", "active")

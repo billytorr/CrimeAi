@@ -10,7 +10,12 @@ import { signCheckoutToken, newNonce } from "@/lib/authnet/checkout-token";
 // assigned A/B price arm and a single-use nonce — nothing identifying in
 // the URL. Server validates the caller's Supabase session (Rule 2).
 export const dynamic = "force-dynamic";
-const TTL_MS = 10 * 60 * 1000;
+// 2 hours. Was 10 minutes, which pre-dated the pricing page — a customer who
+// opens Compare plans, reads it, switches monthly/annual and then finds their
+// card now has a real chance of expiring mid-purchase, and "Invalid checkout
+// (expired)" is a terrible place to lose someone. The token is signed,
+// single-use and bound to one user, so the longer window costs little.
+const TTL_MS = 2 * 60 * 60 * 1000;
 
 async function resolveUser(req: Request) {
   const auth = req.headers.get("authorization") || "";
