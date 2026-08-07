@@ -46,26 +46,88 @@ A paying user and a free user standing on the same corner see the same number.
 
 *Enforced:* `lib/scoring/boundary.test.ts`, at the module boundary.
 
-## 🔒 Rule 3 — Identity is never required to post or report
+## ~~Rule 3 — Identity is never required to post or report~~ — REMOVED
 
-An L0 (unverified) user files a report exactly like an L4 user. The report
-path — composer → `addPost` → insert — contains no identity reference at all.
-Verification changes how much a report *weighs*, never whether it can be made.
+**Removed 2026-08-06 by Billy.** Identity verification may now be required to
+post or report. Replaced by the open decisions in *Data & identity* below.
 
-*Enforced:* `lib/identity/rules.test.ts`. Covers `components/ComposeSheet.tsx`,
-`lib/social.ts`.
+*Consequence to weigh:* mandatory ID suppresses reporting most from the people
+whose reports matter most — undocumented residents, domestic-violence victims,
+and witnesses who fear retaliation. Expect fewer reports, skewed away from the
+neighbourhoods with the least trust in institutions. Worth deciding
+deliberately, not as a side effect.
 
-## 🔒 Rule 4 — No biometric or ID-document data is ever stored
+## ~~Rule 4 — No biometric or ID-document data is ever stored~~ — REMOVED
 
-No column in any migration may hold a face image, face template/embedding, ID
-document, ID number or date of birth. `over_18 boolean` is the single
-permitted age fact.
+**Removed 2026-08-06 by Billy.** Intent: capture biometric and identity data
+for law-enforcement/legal use, and broaden what CrimeAI learns about users to
+train Torr AI and CrimeAI models.
 
-Face ID / fingerprint unlock does **not** violate this: iOS and Android keep
-the template in the Secure Enclave / TEE and return only a yes/no. We never
-receive, transmit or store anything biometric.
+Replaced by the open decisions in *Data & identity* below. **Nothing has been
+built** — the CI guard in `lib/identity/rules.test.ts` still blocks biometric
+columns until those decisions are made, because collecting this data without a
+consent mechanism is unlawful in several states on day one.
 
-*Enforced:* `lib/identity/rules.test.ts` scans **every** migration file.
+---
+
+## ⚠️ Data & identity — OPEN DECISIONS (blocking)
+
+Removing Rules 3 and 4 is a policy change. Turning it into code needs answers
+to the following, because the wrong default here is not a bug — it is
+statutory damages and an App Store removal.
+
+### 1. Two public promises now contradict the plan
+
+These ship in the product **today** and must be changed before any biometric
+capture exists, or they become actively deceptive:
+
+| Where | Text |
+|---|---|
+| `app/layout.tsx:6` — site/store description | "No facial recognition, no profiling." |
+| `components/CoverageMatrix.tsx:49` — in-app panel headed **"What CrimeAI will never do"** | "No facial recognition — we never identify strangers from a photo." |
+| same panel | "No predictive policing or profiling of people." |
+| `lib/legal.ts` — published Privacy Policy v1 | enumerates what we collect; biometrics are **not** in the list |
+
+A published privacy policy is a representation. Collecting a category it does
+not disclose, while an in-app panel promises the opposite, is the textbook FTC
+Act §5 deceptive-practice fact pattern — and here it is provable from a
+screenshot.
+
+### 2. Biometric law is consent-first, and Illinois has teeth
+
+**Illinois BIPA** requires written consent *before* collection, a published
+retention/destruction schedule, and bars profiting from biometric identifiers.
+It carries a **private right of action** with statutory damages **per person,
+per violation** — the statute behind Facebook's $650M and Clearview AI's
+settlements. Texas (CUBI), Washington, Colorado, and CCPA/CPRA (biometrics =
+sensitive personal information) add their own duties; GDPR Art. 9 treats
+biometrics as a special category if there are ever EU users.
+
+CrimeAI search is nationwide, so Illinois and Texas users are not hypothetical.
+
+### 3. Questions that must be answered before code
+
+1. **What exactly is captured?** Selfie image, face *template/embedding*, ID
+   document scan, DOB, government ID number? Each has a different legal
+   footing — a stored template is the one BIPA is aimed at.
+2. **What is the consent flow?** BIPA needs a written release, separate from
+   the general ToS, obtained *before* capture.
+3. **Retention and destruction schedule?** Must be published. BIPA's default
+   ceiling is 3 years after last interaction.
+4. **Law-enforcement disclosure standard?** Warrant/subpoena only, or
+   voluntary? Published policy or discretionary? This determines whether
+   CrimeAI is a safety app or a surveillance vendor, in users' eyes and a
+   court's.
+5. **ML training scope.** "Learn as much as it can" needs a boundary: which
+   fields train models, is training opt-in or opt-out, and does biometric data
+   enter training at all? (BIPA's no-profit clause is implicated.)
+6. **Jurisdiction strategy.** Geofence Illinois/Texas out of biometric
+   capture, or comply everywhere?
+
+**Recommendation:** get an hour with a privacy attorney before writing any of
+this. Not a general counsel — someone who has litigated BIPA. The design
+choices above are cheap to make now and very expensive to unwind after
+launch.
 
 ## 🔒 Rule 12 — No engagement signals in the alerts ranker
 
@@ -139,6 +201,9 @@ Postgres trigger), and balances can never go negative.
 
 | Item | Status |
 |---|---|
+| **Answer the six Data & identity questions above** (blocks all biometric/IDV work) | **blocking** |
+| **Privacy attorney review of the biometric plan — BIPA specifically** | **recommended before build** |
+| Rewrite the "What CrimeAI will never do" panel + site description + Privacy Policy v2 | before any capture ships |
 | Rotate the production Authorize.Net keys (pasted in chat — compromised) | outstanding |
 | Rotate `PUSH_EVENT_SECRET` (appeared in a screenshot) | outstanding |
 | Rotate the APNs `.p8` `6UA7W3YC7X` (contents appeared in chat) | outstanding |

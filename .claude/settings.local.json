@@ -90,7 +90,10 @@
       "Bash(node -p \"require\\('./package.json'\\).dependencies['@aparajita/capacitor-biometric-auth']\")",
       "Bash(npx cap *)",
       "Bash(node -p \"JSON.stringify\\(require\\('./package.json'\\).scripts,null,2\\)\")",
-      "Bash(NEXT_PUBLIC_API_BASE=https://app.publicsafetycrimecenter.com npm run build:mobile)"
+      "Bash(NEXT_PUBLIC_API_BASE=https://app.publicsafetycrimecenter.com npm run build:mobile)",
+      "Bash(grep -rioE \"\\(we \\(never|do not|don't|will not\\)[^.]{0,90}\\\\.\\)\" app/privacy/page.tsx)",
+      "Bash(grep -oE '\"[^\"]{40,160}\"' app/privacy/page.tsx)",
+      "Bash(grep -oiE \"\\(never|do not|does not|will not|no \\)[^.<]{15,120}\\\\.\" components/LegalPage.tsx)"
     ]
   }
 }
