@@ -3,7 +3,8 @@ import { serverDb } from "@/lib/payments/serverdb";
 import { loadTierConfig } from "@/lib/entitlements/config";
 import { verifyCheckoutToken } from "@/lib/authnet/checkout-token";
 import { createCustomerProfileFromOpaque } from "@/lib/authnet/customer-profile";
-import { createMonthlySubscription } from "@/lib/authnet/arb";
+import { createMonthlySubscription, chargeStoredProfile, nextPeriodISO } from "@/lib/authnet/arb";
+import { statementDescriptor } from "@/lib/authnet/env";
 import { sendProtectorWelcome } from "@/lib/email/payment-emails";
 
 // POST /api/pay/authnet/subscribe  { token, opaque, email, name }
@@ -44,30 +45,62 @@ export async function POST(req: Request) {
     const price = cfg.prices.find((p) => p.id === v.claims.priceId && p.active);
     if (!price) return NextResponse.json({ error: "Price no longer available" }, { status: 409, headers: CORS });
 
-    let card, sub;
+    const interval: "month" | "year" = price.interval === "year" ? "year" : "month";
+    let card, sub, charge;
     try {
       // 1) store the card off-site as a Customer Profile (masked last4 only).
       //    The billing name is stored on the payment profile so ARB can charge it.
       card = await createCustomerProfileFromOpaque(v.claims.userId, String(email || ""), opaque, String(name || ""));
-      // 2) create the recurring subscription against the stored profile
-      //    (retries E00040 while a fresh profile propagates to ARB).
-      sub = await createMonthlySubscription({
+
+      // 2) CHARGE THE FIRST PERIOD NOW.
+      //    ARB does not bill when a subscription is created — even with
+      //    startDate = today it waits for Authorize.Net's next daily batch.
+      //    We were flipping the user to `active` at this point regardless, so
+      //    subscribers got Protector without any money moving. Charging here
+      //    means the subscription is only recorded if payment actually
+      //    succeeded; a decline throws and nothing is written.
+      charge = await chargeStoredProfile({
         amountCents: price.amountCents,
         customerProfileId: card.customerProfileId,
         customerPaymentProfileId: card.customerPaymentProfileId,
+        description: `${statementDescriptor()} ${interval === "year" ? "annual" : "monthly"}`,
       });
+
     } catch (gatewayErr) {
-      // No subscription was created, so nothing can be replayed — un-redeem
-      // the nonce so the SAME checkout link can simply be retried (otherwise
-      // a transient gateway failure burns the link and strands the customer).
+      // Nothing was charged, so nothing can be replayed — un-redeem the nonce
+      // so the SAME checkout link can simply be retried (otherwise a transient
+      // gateway failure burns the link and strands the customer).
       await db.from("checkout_nonces").update({ used_at: null }).eq("nonce", v.claims.nonce);
       return NextResponse.json({ error: (gatewayErr as Error).message, retryable: true }, { status: 502, headers: CORS });
     }
 
-    // 3) record in OUR db (source of truth). Webhook/reconciliation confirm
+    // 3) Set up recurring billing from the NEXT period — the one just paid for
+    //    is covered, so starting today would double-charge.
+    //
+    //    ⚠️ SEPARATE try: the money is already taken. If ARB fails here we must
+    //    NOT tell the customer to retry — that would charge them twice. Record
+    //    the paid period, leave anet_subscription_id null, and let
+    //    reconciliation/admin attach recurring billing later. Losing recurring
+    //    setup costs us one renewal; double-charging costs a customer.
+    try {
+      sub = await createMonthlySubscription({
+        amountCents: price.amountCents,
+        customerProfileId: card.customerProfileId,
+        customerPaymentProfileId: card.customerPaymentProfileId,
+        interval,
+        startDate: nextPeriodISO(interval),
+      });
+    } catch (arbErr) {
+      console.error("[subscribe] CHARGED but ARB setup failed — needs manual attach.",
+        { userId: v.claims.userId, transactionId: charge.transactionId, error: (arbErr as Error).message });
+    }
+
+    // 4) record in OUR db (source of truth). Webhook/reconciliation confirm
     //    settlement and keep status honest going forward.
     const now = new Date();
-    const periodEnd = new Date(now); periodEnd.setMonth(periodEnd.getMonth() + 1);
+    const periodEnd = new Date(now);
+    if (interval === "year") periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    else periodEnd.setMonth(periodEnd.getMonth() + 1);
     const { error } = await db.from("tier_subscriptions").upsert({
       user_id: v.claims.userId,
       plan_id: "pro",
@@ -76,7 +109,7 @@ export async function POST(req: Request) {
       current_period_start: now.toISOString(),
       current_period_end: periodEnd.toISOString(),
       grace_until: null,
-      anet_subscription_id: sub.subscriptionId,
+      anet_subscription_id: sub?.subscriptionId ?? null,
       anet_customer_profile_id: card.customerProfileId,
       card_last4: card.last4 || null,
       card_brand: card.brand || null,

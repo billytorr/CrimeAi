@@ -10,6 +10,83 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+export type BillingInterval = "month" | "year";
+
+/** One billing period from now, as ARB's YYYY-MM-DD. */
+export function nextPeriodISO(interval: BillingInterval, from: Date = new Date()): string {
+  const d = new Date(from);
+  if (interval === "year") d.setFullYear(d.getFullYear() + 1);
+  else d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+export interface ChargeResult { transactionId: string; authCode?: string; last4?: string }
+
+/**
+ * Charge a stored Customer Profile ONCE, right now.
+ *
+ * ⚠️ THIS IS WHY SUBSCRIBERS WERE NOT BEING BILLED. ARB never charges at the
+ * moment you create a subscription — even with startDate = today it bills in
+ * Authorize.Net's next daily batch. Meanwhile our database flipped the user
+ * to `active` immediately, so they got Protector before any money moved (and
+ * in sandbox testMode, often no money ever moved).
+ *
+ * The correct shape is: charge the first period HERE, then start ARB one
+ * period later so nobody is billed twice for the same month.
+ */
+export async function chargeStoredProfile(opts: {
+  amountCents: number;
+  customerProfileId: string;
+  customerPaymentProfileId: string;
+  description?: string;
+  invoiceNumber?: string;
+  retryAttempts?: number;
+  retryDelayMs?: number;
+}): Promise<ChargeResult> {
+  const retryAttempts = opts.retryAttempts ?? 10;
+  const retryDelayMs = opts.retryDelayMs ?? 2000;
+  const body = {
+    transactionRequest: {
+      transactionType: "authCaptureTransaction",
+      amount: (opts.amountCents / 100).toFixed(2),
+      profile: {
+        customerProfileId: opts.customerProfileId,
+        paymentProfile: { paymentProfileId: opts.customerPaymentProfileId },
+      },
+      order: {
+        invoiceNumber: (opts.invoiceNumber || `PSCC-${Date.now()}`).slice(0, 20),
+        description: (opts.description || statementDescriptor()).slice(0, 255),
+      },
+    },
+  };
+
+  // Same create-then-charge race the subscription hits (E00040).
+  let res = await anetPost("createTransactionRequest", body);
+  for (let attempt = 0; attempt < retryAttempts && !res.ok && anetCode(res) === "E00040"; attempt++) {
+    await sleep(retryDelayMs);
+    res = await anetPost("createTransactionRequest", body);
+  }
+
+  // resultCode can be "Ok" while the TRANSACTION itself was declined, so the
+  // envelope alone is not proof of payment — responseCode 1 is.
+  const txn = res.raw?.transactionResponse;
+  const approved = txn?.responseCode === "1" || txn?.responseCode === 1;
+  if (!approved) {
+    const errs = txn?.errors?.[0] || txn?.errors;
+    const detail = errs?.errorText || errs?.[0]?.errorText
+      || (Array.isArray(res.raw?.messages?.message)
+          ? res.raw.messages.message.map((m: any) => `${m.code}:${m.text}`).join(" | ")
+          : `${res.code || ""} ${res.text || ""}`);
+    throw new Error(`Card was not charged: ${String(detail).trim() || "declined"}`);
+  }
+
+  return {
+    transactionId: String(txn.transId || ""),
+    authCode: txn.authCode ? String(txn.authCode) : undefined,
+    last4: txn.accountNumber ? String(txn.accountNumber).slice(-4) : undefined,
+  };
+}
+
 export interface CreatedSubscription {
   subscriptionId: string;
 }
@@ -26,6 +103,17 @@ export async function createMonthlySubscription(opts: {
   customerProfileId: string;
   customerPaymentProfileId: string;
   subscriptionName?: string;
+  /** month (default) or year — matches tier_prices.interval. */
+  interval?: BillingInterval;
+  /**
+   * When recurring billing begins, YYYY-MM-DD.
+   *
+   * ⚠️ PASS THE NEXT PERIOD, NOT TODAY. The first period is charged
+   * immediately by chargeStoredProfile(); leaving this at today would bill
+   * the customer a second time for a period they have already paid for.
+   * Defaults to today only so existing callers keep their old behaviour.
+   */
+  startDate?: string;
   // E00040-retry tuning (defaults chosen for production; tests override to run fast)
   retryAttempts?: number;
   retryDelayMs?: number;
@@ -42,8 +130,9 @@ export async function createMonthlySubscription(opts: {
     subscription: {
       name: (opts.subscriptionName || statementDescriptor()).slice(0, 50),
       paymentSchedule: {
-        interval: { length: 1, unit: "months" },
-        startDate: todayISO(),
+        // ARB accepts only "days" or "months" — an annual plan is 12 months.
+        interval: { length: opts.interval === "year" ? 12 : 1, unit: "months" },
+        startDate: opts.startDate || todayISO(),
         totalOccurrences: 9999, // "until canceled"
       },
       amount,
