@@ -108,3 +108,68 @@ describe("Rule 1 — push delivery is free of entitlement and scoring checks", (
     }
   });
 });
+
+// The environment trap: a debug Xcode build gets a SANDBOX APNs token, a
+// TestFlight build gets a PRODUCTION one, and JS cannot tell which build it
+// is in. Apple rejects a cross-environment token with the same BadDeviceToken
+// it uses for a genuinely dead one — so without a retry, every debug device
+// is disabled on its first push and never recovers.
+describe("sendPush — APNs environment self-correction", () => {
+  beforeEach(() => {
+    profileRow = { alert_channels: { push: true } };
+    tokenRows = [{ token: "tok-ios", platform: "ios", environment: "production" }];
+    dupRow = null; inserted.length = 0; updated.length = 0;
+    apns.mockReset();
+  });
+
+  it("retries the other environment when the token looks dead, and counts it sent", async () => {
+    apns.mockResolvedValueOnce({ sent: false, error: "apns 400 BadDeviceToken", deadToken: true })
+        .mockResolvedValueOnce({ sent: true });
+    const { sendPush } = await import("@/lib/push/send");
+    const r = await sendPush("u1", { title: "t", body: "b", kind: "alert" });
+
+    expect(apns).toHaveBeenCalledTimes(2);
+    expect(apns.mock.calls[0][2]).toBe("production");
+    expect(apns.mock.calls[1][2]).toBe("sandbox");   // tried the other host
+    expect(r.sent).toBe(1);
+    expect(r.disabled).toBe(0);                       // must NOT be disabled
+  });
+
+  it("persists the corrected environment so the next send is right first time", async () => {
+    apns.mockResolvedValueOnce({ sent: false, error: "apns 400 BadDeviceToken", deadToken: true })
+        .mockResolvedValueOnce({ sent: true });
+    const { sendPush } = await import("@/lib/push/send");
+    await sendPush("u1", { title: "t", body: "b", kind: "alert" });
+
+    expect(updated).toContainEqual({ patch: { environment: "sandbox" }, token: "tok-ios" });
+  });
+
+  it("still disables a token that fails on BOTH environments", async () => {
+    apns.mockResolvedValue({ sent: false, error: "apns 410 Unregistered", deadToken: true });
+    const { sendPush } = await import("@/lib/push/send");
+    const r = await sendPush("u1", { title: "t", body: "b", kind: "alert" });
+
+    expect(apns).toHaveBeenCalledTimes(2);
+    expect(r.disabled).toBe(1);
+    expect(r.failed).toBe(1);
+  });
+
+  it("does not retry a failure that is not a token problem", async () => {
+    apns.mockResolvedValue({ sent: false, error: "apns 403 InvalidProviderToken" });
+    const { sendPush } = await import("@/lib/push/send");
+    await sendPush("u1", { title: "t", body: "b", kind: "alert" });
+
+    expect(apns).toHaveBeenCalledTimes(1);   // a bad key is not fixed by another host
+  });
+
+  it("starts from sandbox and corrects to production when that is the mismatch", async () => {
+    tokenRows = [{ token: "tok-ios", platform: "ios", environment: "sandbox" }];
+    apns.mockResolvedValueOnce({ sent: false, error: "apns 400 BadDeviceToken", deadToken: true })
+        .mockResolvedValueOnce({ sent: true });
+    const { sendPush } = await import("@/lib/push/send");
+    await sendPush("u1", { title: "t", body: "b", kind: "alert" });
+
+    expect(apns.mock.calls[1][2]).toBe("production");
+    expect(updated).toContainEqual({ patch: { environment: "production" }, token: "tok-ios" });
+  });
+});

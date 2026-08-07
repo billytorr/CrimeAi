@@ -37,8 +37,14 @@ export async function registerForPush(): Promise<RegisterResult> {
             body: JSON.stringify({
               token: t.value,
               platform,
-              // debug builds talk to APNs sandbox; release builds to production
-              environment: process.env.NODE_ENV === "production" ? "production" : "sandbox",
+              // Best guess only. A debug Xcode build gets a *sandbox* APNs
+              // token and a TestFlight/App Store build gets a *production*
+              // one, but JS cannot tell them apart: the Capacitor bundle is
+              // always compiled with NODE_ENV=production, so checking it here
+              // would report "production" for every build including debug.
+              // The server corrects this on first send by retrying the other
+              // APNs host and persisting whichever one works (see send.ts).
+              environment: "production",
             }),
           });
           done({ registered: res.ok, reason: res.ok ? undefined : `server ${res.status}` });

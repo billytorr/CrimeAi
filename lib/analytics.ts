@@ -7,7 +7,8 @@ import { supabase, supabaseEnabled } from "./supabase";
 
 export type EventName =
   | "app_open" | "tab_view" | "post_create" | "like" | "comment" | "follow"
-  | "dm_send" | "sos_open" | "live_start" | "search" | "report_create" | "profile_view" | "repost";
+  | "dm_send" | "sos_open" | "live_start" | "search" | "report_create" | "profile_view" | "repost"
+  | "push_registered" | "push_register_failed";
 
 export function track(name: EventName, props: Record<string, unknown> = {}): void {
   if (!supabaseEnabled) return;

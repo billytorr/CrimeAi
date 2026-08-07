@@ -53,7 +53,24 @@ export async function sendPush(userId: string, msg: PushMessage): Promise<Fanout
   for (const t of tokens) {
     out.attempted++;
     let r: PushResult;
-    if (t.platform === "ios") r = await sendApns(t.token, msg, (t.environment as "production" | "sandbox") || "production");
+    if (t.platform === "ios") {
+      const primary = (t.environment as "production" | "sandbox") || "production";
+      r = await sendApns(t.token, msg, primary);
+      // A token minted against the OTHER APNs environment fails with exactly
+      // the same BadDeviceToken as a genuinely dead one — and the client
+      // cannot tell a debug build from a release build to label it correctly.
+      // So before believing a token is dead, try the other host; if that
+      // works, persist the correction so we get it right first time after.
+      // Without this, every debug build's token is disabled on first send.
+      if (!r.sent && r.deadToken) {
+        const alt = primary === "production" ? "sandbox" : "production";
+        const retry = await sendApns(t.token, msg, alt);
+        if (retry.sent) {
+          await db.from("device_tokens").update({ environment: alt }).eq("token", t.token);
+          r = retry;
+        }
+      }
+    }
     else if (t.platform === "android") r = await sendFcm(t.token, msg);
     else r = { sent: false, skipped: "web push not implemented" };
 

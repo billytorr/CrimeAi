@@ -39,6 +39,25 @@ export default function AppShell({
   useEffect(() => { track("app_open", {}); }, []);
   useEffect(() => { track("tab_view", { tab }); }, [tab]);
 
+  // Register this device for push, once, after sign-in. AppShell only mounts
+  // for an authenticated account, so the token is always attributable to a
+  // user. No-ops on web and returns a reason rather than throwing, so a push
+  // failure can never interfere with the app loading.
+  useEffect(() => {
+    let cancelled = false;
+    import("@/lib/push/client")
+      .then(({ registerForPush }) => registerForPush())
+      .then((r) => {
+        if (cancelled) return;
+        if (r.registered) track("push_registered", {});
+        else if (r.reason && !/not a native build/.test(r.reason)) {
+          track("push_register_failed", { reason: r.reason });
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     authHeaders().then((h) =>
       fetch(apiUrl("/api/crimeai/lookup"), {
