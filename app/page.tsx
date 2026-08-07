@@ -60,6 +60,7 @@ export default function Page() {
             userId={account.id}
             existing={account.profile}
             draftHandle={account.draftHandle}
+            draftPhoto={account.draftPhoto}
             onDone={(p: Profile) => {
               setAccount({ ...account, profile: p });
               setStage("app");

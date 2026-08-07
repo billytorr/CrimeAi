@@ -52,15 +52,19 @@ function resizeImage(file: File, max = 512): Promise<string> {
 }
 
 export default function Onboarding({
-  name: initialName, email, userId, existing, draftHandle, onDone,
+  name: initialName, email, userId, existing, draftHandle, draftPhoto, onDone,
 }: {
-  name: string; email: string; userId: string; existing?: Profile | null; draftHandle?: string; onDone: (p: Profile) => void;
+  name: string; email: string; userId: string; existing?: Profile | null;
+  draftHandle?: string;
+  /** Avatar supplied by Google/Apple at sign-in — a prefill only, never for an existing profile. */
+  draftPhoto?: string;
+  onDone: (p: Profile) => void;
 }) {
   const [step, setStep] = useState(0);
   // the saved profile, held across the final "who to follow" step
   const [saved, setSaved] = useState<Profile | null>(null);
   const [name, setName] = useState(initialName === "Neighbor" ? "" : initialName);
-  const [photo, setPhoto] = useState(existing?.photo || "");
+  const [photo, setPhoto] = useState(existing?.photo || draftPhoto || "");
   const [bio, setBio] = useState(existing?.bio || "");
   // username chosen during email signup is carried in via draftHandle;
   // SSO users (no credentials step) pick it here instead.

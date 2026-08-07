@@ -30,7 +30,7 @@ export interface Profile {
   contacts: TrustedContact[];
   alerts: AlertPrefs;
 }
-export interface Account { id: string; name: string; email: string; profile: Profile | null; draftHandle?: string }
+export interface Account { id: string; name: string; email: string; profile: Profile | null; draftHandle?: string; draftPhoto?: string }
 
 // The user's public @handle everywhere in the app — their chosen username,
 // falling back to the email prefix for accounts created before handles.
@@ -319,7 +319,13 @@ export async function getCurrentAccount(): Promise<Account | null> {
     // onboarding. Same for the username/handle.
     const displayName = profile ? name : ((meta.name as string) || (meta.full_name as string) || name);
     const draftHandle = handle || (meta.handle as string | undefined);
-    return { id: data.user.id, name: displayName, email: email || data.user.email || "", profile, draftHandle };
+    // Google/Apple hand us an avatar at sign-in and it was being dropped, so
+    // an SSO user reached onboarding with a blank photo even though the
+    // provider had supplied one. Prefill it — under the SAME rule as the name
+    // above: brand-new accounts ONLY. Once a profile exists its photo is
+    // authoritative and SSO metadata can never overwrite it.
+    const draftPhoto = profile ? undefined : ((meta.avatar_url as string) || (meta.picture as string) || undefined);
+    return { id: data.user.id, name: displayName, email: email || data.user.email || "", profile, draftHandle, draftPhoto };
   }
   if (typeof window === "undefined") return null;
   const key = localStorage.getItem(SESSION_KEY);
