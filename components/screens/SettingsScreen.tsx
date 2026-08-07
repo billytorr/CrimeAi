@@ -19,7 +19,6 @@ import { authenticate, biometryStatus, biometryLabel, type BiometryKind } from "
 import { appLockEnabled, setAppLockEnabled } from "@/lib/biometric/lock";
 import { useVerification } from "@/lib/identity/verify-client";
 import VerifyPrompt from "@/components/VerifyPrompt";
-import PlanComparison from "@/components/PlanComparison";
 import { Verified } from "@/components/Icons";
 
 // alert-preference chips render from the shared crime taxonomy
@@ -265,7 +264,6 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
   const [features, setFeatures] = useState<string[]>([]);
   const [price, setPrice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [chosen, setChosen] = useState<string | null>(null);
   const isPro = profile.plan === "pro";
 
   useEffect(() => {
