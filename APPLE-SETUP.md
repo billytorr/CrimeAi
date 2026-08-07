@@ -120,6 +120,91 @@ on conflict (key) do update set value = excluded.value;
 Until APNs/FCM keys exist the events will resolve recipients and log, but
 send nothing — which is exactly the intended dormant state.
 
+## 6. How to test it works
+
+### Level 1 — prove the credentials, no device needed ⭐ do this first
+
+`GET /api/push/diagnose` sends to a deliberately fake device token and reads
+which error comes back. Reaching a *token* rejection means auth already
+succeeded — so the failure we want is a token failure.
+
+```bash
+curl -s -H "x-push-secret: YOUR_PUSH_EVENT_SECRET" \
+  https://app.publicsafetycrimecenter.com/api/push/diagnose | python3 -m json.tool
+```
+
+A pass looks like:
+
+```json
+{
+  "apns": { "configured": true, "keyId": "ABC123XYZ0", "bundleId": "com.pscc.crimeai",
+    "checks": [
+      { "name": "APNs key parses", "ok": true },
+      { "name": "APNs credentials (production)", "ok": true,
+        "detail": "Apple accepted the JWT and rejected only the fake device token — this is the expected pass" }
+    ]},
+  "ok": true
+}
+```
+
+Every failure comes back with a `fix` field naming the specific variable to
+change. HTTP 200 = all green, 503 = something is wrong.
+
+**This catches the mistakes that otherwise cost you a TestFlight round-trip:**
+wrong key type (SIWA key instead of APNs), key ID not matching the .p8, wrong
+team ID, wrong bundle ID, `private_key` newlines flattened on paste.
+
+### Level 2 — prove the app receives (real device)
+
+The Simulator cannot receive real APNs pushes. You need a physical iPhone.
+
+1. Build to your iPhone from Xcode, accept the notifications prompt
+2. Confirm a row landed: `select platform, created_at from device_tokens order by created_at desc limit 5;`
+3. Send yourself one:
+   ```sql
+   -- from Supabase SQL editor, replace the uuid with your own
+   select net.http_post(
+     url := 'https://app.publicsafetycrimecenter.com/api/push/event',
+     headers := jsonb_build_object('x-push-secret', 'YOUR_SECRET', 'content-type', 'application/json'),
+     body := jsonb_build_object('type','test','record', jsonb_build_object('user_id','YOUR_USER_UUID'))
+   );
+   ```
+
+⚠️ **Debug builds register against APNs *sandbox*, App Store/TestFlight builds
+against *production*.** They are different token namespaces — a sandbox token
+will fail with `BadDeviceToken` on the production host. `device_tokens` records
+the environment per row so the sender picks the right host.
+
+### Level 3 — prove the triggers fire
+
+With two accounts (or a second device), do the real thing: comment on a post,
+like a post past its milestone, send a DM, file a report near the other user.
+Then check what was recorded:
+
+```sql
+select kind, title, sent, error, created_at
+from push_deliveries order by created_at desc limit 20;
+```
+
+`sent = false` with an `error` tells you delivery failed; **no row at all**
+tells you the trigger never fired — check `app_settings` has `push_endpoint`
+and `push_secret`.
+
+### Level 4 — app-side handling, no APNs at all
+
+To test how the app *displays* and *routes* a notification without any server
+round-trip, push a local payload straight into the Simulator:
+
+```bash
+xcrun simctl push booted com.pscc.crimeai payload.apns
+```
+
+with `payload.apns` = `{"aps":{"alert":{"title":"Test","body":"Body"}},"type":"comment"}`.
+This exercises the tap-through and foreground handling only — it proves
+nothing about your keys.
+
+---
+
 ## What is built and waiting
 
 | Piece | State |
