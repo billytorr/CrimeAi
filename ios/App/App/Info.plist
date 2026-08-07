@@ -24,6 +24,10 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- Export compliance. HTTPS only, no proprietary crypto — this is the
+	     standard exemption and it stops Xcode prompting on every upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>CrimeAI uses your camera to capture photos and videos of safety incidents you choose to report or share.</string>
 	<key>NSFaceIDUsageDescription</key>

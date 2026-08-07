@@ -107,7 +107,8 @@
       "Bash(grep -n \"const per\\\\|{per}\\\\|\\\\${per}\\\\|interval?:\" app/crimeai/pricing/checkout/page.tsx)",
       "Bash(curl -s \"https://pay.publicsafetycrimecenter.com/api/pay/authnet/validate?t=bogus\" -o /dev/null)",
       "Bash(curl -s \"https://pay.publicsafetycrimecenter.com/api/pay/providers\")",
-      "Bash(curl -s \"https://pay.publicsafetycrimecenter.com/api/pay/status\")"
+      "Bash(curl -s \"https://pay.publicsafetycrimecenter.com/api/pay/status\")",
+      "Bash(plutil -lint ios/App/App/PrivacyInfo.xcprivacy)"
     ]
   }
 }
