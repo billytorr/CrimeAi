@@ -32,7 +32,10 @@ export default function PricingPage() {
 }
 
 function Pricing() {
-  const token = useSearchParams().get("t") || "";
+  const params = useSearchParams();
+  const token = params.get("t") || "";
+  // Display only — the server is the authority on what anyone is entitled to.
+  const currentPlanId = params.get("current") || "";
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [prices, setPrices] = useState<Price[]>([]);
   const [interval, setInterval] = useState<Interval>("month");
@@ -143,6 +146,7 @@ function Pricing() {
                 price={priceFor(prices, plan.id, interval)}
                 interval={interval}
                 percentOff={plan.id === "pro" && interval === "year" ? saving?.percentOff : undefined}
+                isCurrent={plan.id === currentPlanId}
                 busy={busy === priceFor(prices, plan.id, interval)?.id}
                 onChoose={choose}
               />
@@ -168,10 +172,10 @@ function Pricing() {
 }
 
 function Card({
-  plan, price, interval, percentOff, busy, onChoose,
+  plan, price, interval, percentOff, isCurrent, busy, onChoose,
 }: {
   plan: Plan; price?: Price; interval: Interval; percentOff?: number;
-  busy: boolean; onChoose: (p: Price) => void;
+  isCurrent?: boolean; busy: boolean; onChoose: (p: Price) => void;
 }) {
   const soon = plan.status === "coming_soon";
   const featured = plan.highlight && !soon;
@@ -189,6 +193,9 @@ function Card({
       <div className="flex items-center gap-1.5">
         <h3 className="text-lg font-bold text-ink">{plan.name}</h3>
         {plan.id === "pro" && <ProBadge size={15} />}
+        {isCurrent && (
+          <span className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] font-semibold text-brand">Your plan</span>
+        )}
       </div>
       {plan.tagline && <p className="mt-1 text-xs leading-relaxed text-ink2">{plan.tagline}</p>}
 
@@ -234,6 +241,10 @@ function Card({
           <p className="rounded-lg bg-ink/5 px-3 py-2.5 text-[11px] leading-relaxed text-ink3">
             We&apos;re designing this with you. Features and price come from what members ask for after launch.
           </p>
+        ) : isCurrent ? (
+          <div className="w-full rounded-xl border border-brand/30 bg-brand/5 py-3 text-center text-sm font-semibold text-brand">
+            Your current plan
+          </div>
         ) : price ? (
           <button
             onClick={() => onChoose(price)}
@@ -242,7 +253,7 @@ function Card({
               featured ? "bg-brand text-white" : "border border-ink/20 text-ink"
             }`}
           >
-            {busy ? "Starting…" : `Subscribe — ${interval === "year" ? `${money(price.amountCents)}/yr` : `${money(price.amountCents)}/mo`}`}
+            {busy ? "Starting…" : "Subscribe to this plan"}
           </button>
         ) : (
           <div className="w-full rounded-xl border border-ink/10 py-3 text-center text-sm font-semibold text-ink3">

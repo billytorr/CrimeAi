@@ -305,7 +305,8 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
       // it's where a customer can actually see the domain and the padlock.
       if (r.ok && d.token) {
         const payBase = process.env.NEXT_PUBLIC_PAY_BASE || "https://pay.publicsafetycrimecenter.com";
-        window.open(`${payBase}/crimeai/pricing?t=${encodeURIComponent(d.token)}`, "_blank");
+        const current = profile.plan === "pro" ? "pro" : "free";
+        window.open(`${payBase}/crimeai/pricing?t=${encodeURIComponent(d.token)}&current=${current}`, "_blank");
       } else alert(d.error || "Couldn't start checkout. Try again in a moment.");
     } catch {
       alert("Couldn't start checkout. Check your connection and try again.");
@@ -345,17 +346,29 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
     );
   }
 
-  // The comparison chart replaces the old single-plan pitch: monthly vs
-  // annual, and the two coming-soon plans beside Protector so people can see
-  // where this is going before they decide.
+  // Settings makes the PITCH; the pricing page makes the comparison. Keeping
+  // the full chart in both places meant two plan pickers to maintain and two
+  // places for prices to drift out of step.
   return (
     <div>
-      <PlanComparison
-        currentPlanId={profile.plan === "pro" ? "pro" : "free"}
-        onChoose={(p) => { setChosen(p.id); openCheckout(p.id); }}
-        busyPriceId={busy ? chosen : null}
-      />
-      <p className="mt-2 text-center text-[11px] text-ink3">Secure checkout on publicsafetycrimecenter.com. Cancel anytime.</p>
+      <div className="flex items-center gap-2">
+        <ProBadge size={18} />
+        <span className="text-sm font-semibold">Become a Protector{price ? ` — from ${price}/mo` : ""}</span>
+      </div>
+      <p className="mt-1.5 text-xs leading-relaxed text-ink2">
+        A wider alert radius, full incident history, a deeper Safety Score breakdown and the red shield beside your
+        name. Billed monthly, or yearly for less. Cancel any time.
+      </p>
+      <button
+        onClick={() => openCheckout()}
+        disabled={busy}
+        className="mt-3 block w-full rounded-xl bg-brand py-3 text-center text-sm font-bold text-white active:scale-[0.99] disabled:opacity-60"
+      >
+        {busy ? "Opening…" : "Compare plans →"}
+      </button>
+      <p className="mt-2 text-[11px] text-ink3">
+        Opens publicsafetycrimecenter.com in your browser, where you can compare plans and subscribe securely.
+      </p>
     </div>
   );
 }

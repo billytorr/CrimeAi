@@ -15,6 +15,7 @@ declare global { interface Window { Accept?: any } }
 interface Validated {
   valid: boolean;
   amountCents?: number;
+  interval?: "month" | "year";
   priceId?: string;
   descriptor?: string;
   accept?: { env: string; apiLoginId: string; clientKey: string; acceptJsUrl: string };
@@ -55,6 +56,8 @@ function Checkout() {
   }, [info?.accept?.acceptJsUrl]);
 
   const price = useMemo(() => info?.amountCents ? `$${(info.amountCents / 100).toFixed(2)}` : "", [info]);
+  const per = info?.interval === "year" ? "/yr" : "/mo";
+  const billedEvery = info?.interval === "year" ? "billed once a year" : "billed every month";
 
   function pay() {
     setError("");
@@ -118,7 +121,7 @@ function Checkout() {
       <div className="mt-6 rounded-2xl border border-ink/10 bg-card p-5">
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-semibold">CrimeAI Protector</span>
-          <span className="text-2xl font-bold">{price}<span className="text-sm font-normal text-ink3">/mo</span></span>
+          <span className="text-2xl font-bold">{price}<span className="text-sm font-normal text-ink3">{per}</span></span>
         </div>
         <ul className="mt-3 space-y-1.5 text-xs text-ink2">
           <li>· Red Protector badge on your profile & posts</li>
@@ -147,7 +150,7 @@ function Checkout() {
       {error && <p className="mt-3 text-center text-sm text-red-400">{error}</p>}
       <button onClick={pay} disabled={busy || !scriptReady}
         className="mt-5 w-full rounded-xl bg-brand py-3.5 text-sm font-bold text-white active:scale-[0.99] disabled:opacity-60">
-        {busy ? "Processing securely…" : scriptReady ? `Subscribe — ${price}/mo` : "Loading secure checkout…"}
+        {busy ? "Processing securely…" : scriptReady ? `Subscribe — ${price}${per}` : "Loading secure checkout…"}
       </button>
       <p className="mt-3 text-center text-[11px] leading-relaxed text-ink3">
         Cancel anytime. Card details are encrypted by our payment processor and never touch CrimeAI servers.
