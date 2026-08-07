@@ -33,11 +33,20 @@ export default function PlanComparison({
   useEffect(() => {
     if (!supabaseEnabled) { setPlans([]); return; }
     (async () => {
+      // Filter and sort CLIENT-side rather than in the query: the display
+      // columns (status, sort_order) arrive with pricing-plans.sql, and a
+      // .neq("status", …) against a database that hasn't run it yet fails the
+      // whole request. rowToPlan defaults the missing fields, so this renders
+      // on an un-migrated database instead of showing nothing.
       const [{ data: pl }, { data: pr }] = await Promise.all([
-        supabase!.from("tier_plans").select("*").eq("active", true).neq("status", "hidden").order("sort_order"),
+        supabase!.from("tier_plans").select("*").eq("active", true),
         supabase!.from("tier_prices").select("*").eq("active", true),
       ]);
-      setPlans((pl || []).map(rowToPlan));
+      setPlans(
+        (pl || []).map(rowToPlan)
+          .filter((p) => p.status !== "hidden")
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+      );
       setPrices((pr || []).map(rowToPrice));
     })();
   }, []);
