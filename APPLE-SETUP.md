@@ -120,6 +120,31 @@ on conflict (key) do update set value = excluded.value;
 Until APNs/FCM keys exist the events will resolve recipients and log, but
 send nothing — which is exactly the intended dormant state.
 
+## ✅ VERIFIED 2026-08-06 — credentials proven live
+
+`GET /api/push/diagnose` returns `"ok": true` against production:
+
+| Check | Result |
+|---|---|
+| APNs key parses (`6UA7W3YC7X`, team `5Q28Y7C4FL`, `com.pscc.crimeai`) | ✅ |
+| APNs credentials — **production** host | ✅ Apple validated the JWT |
+| APNs credentials — **sandbox** host | ✅ Apple validated the JWT |
+| FCM credentials (`crimeai-app`) | ✅ Google validated the service account |
+| `PUSH_EVENT_SECRET` set + `app_settings` rows inserted | ✅ |
+
+**Both platforms' credentials are proven.** What is *not* yet proven is
+end-to-end delivery to a real handset — that needs a device (§6 level 2).
+
+> Two defects were found and fixed getting here, both of which would have
+> looked like a bad Apple key:
+> 1. **APNs was written on `fetch()`, which cannot work.** APNs is HTTP/2-only
+>    and Node's fetch is HTTP/1.1-only. Rewritten on `node:http2`. Never
+>    "simplify" `lib/push/apns.ts` back to fetch.
+> 2. **Nothing called `registerForPush()`**, so no device could ever have
+>    registered a token. Now called from `AppShell`.
+
+---
+
 ## 6. How to test it works
 
 ### Level 1 — prove the credentials, no device needed ⭐ do this first
