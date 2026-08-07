@@ -28,9 +28,17 @@ export default function VerifyPrompt({
     setBusy(true);
     const r = await startVerification(true);
     setBusy(false);
-    if (r.pendingVendor || !r.ok) { setNote(r.message || "Could not start verification."); return; }
-    onSubmitted?.();
-    onClose();
+
+    if (r.ok) {
+      // Consent is recorded either way; alreadyPending just means they had
+      // an attempt open, which is still a success from here.
+      onSubmitted?.();
+      onClose();
+      return;
+    }
+    // Show what actually went wrong. A single generic string for every
+    // failure made a missing migration indistinguishable from a dead network.
+    setNote(r.message || "Could not start verification. Please try again.");
   }
 
   if (status === "pending") {

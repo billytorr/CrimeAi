@@ -51,7 +51,9 @@ export function useVerification(): VerificationState {
 }
 
 /** Record consent (or refusal) and open a verification. */
-export async function startVerification(consent: boolean): Promise<{ ok: boolean; pendingVendor?: boolean; message?: string }> {
+export async function startVerification(
+  consent: boolean,
+): Promise<{ ok: boolean; pendingVendor?: boolean; alreadyPending?: boolean; message?: string; code?: string }> {
   try {
     const res = await fetch(apiUrl("/api/me/verification"), {
       method: "POST",
@@ -59,8 +61,17 @@ export async function startVerification(consent: boolean): Promise<{ ok: boolean
       body: JSON.stringify({ consent }),
     });
     const d = await res.json().catch(() => ({}));
-    return { ok: !!d.ok, pendingVendor: !!d.pendingVendor, message: d.message };
+    return {
+      ok: !!d.ok,
+      pendingVendor: !!d.pendingVendor,
+      alreadyPending: !!d.alreadyPending,
+      // `message` is the friendly not-yet-switched-on copy; `error` is a real
+      // failure. Reading only `message` was throwing away the one string that
+      // said what actually went wrong.
+      message: d.message || d.error,
+      code: d.code,
+    };
   } catch {
-    return { ok: false, message: "Network error — try again." };
+    return { ok: false, message: "Couldn't reach the server — check your connection and try again." };
   }
 }

@@ -97,7 +97,9 @@
       "Bash(cp supabase/official-account.sql /tmp/oa.bak)",
       "Bash(sed -i '' 's|and coalesce\\(p.is_private, false\\) = false|and true|' supabase/official-account.sql)",
       "Bash(cp /tmp/oa.bak supabase/official-account.sql)",
-      "Bash(rm /tmp/oa.bak)"
+      "Bash(rm /tmp/oa.bak)",
+      "Bash(d.message)",
+      "Bash(d.error)"
     ]
   }
 }

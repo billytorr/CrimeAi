@@ -78,8 +78,18 @@ export async function POST(req: NextRequest) {
   }).select("id").single();
 
   if (consentErr) {
-    console.error("[me/verification] consent", consentErr.message);
-    return NextResponse.json({ error: "Could not record consent" }, { status: 500 });
+    console.error("[me/verification] consent", consentErr.code, consentErr.message);
+    // 42P01 = undefined_table. Distinguish "the migration was never applied"
+    // from a genuine failure — they look identical to a user otherwise, and
+    // the first is the far likelier explanation on a fresh environment.
+    const notMigrated = consentErr.code === "42P01" || /does not exist/i.test(consentErr.message);
+    return NextResponse.json({
+      ok: false,
+      error: notMigrated
+        ? "Verification isn't set up on this environment yet (database migration pending)."
+        : "Could not record consent — please try again.",
+      code: notMigrated ? "not_migrated" : "consent_failed",
+    }, { status: notMigrated ? 503 : 500 });
   }
   if (!granted) return NextResponse.json({ ok: true, declined: true });
 
@@ -106,8 +116,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, alreadyPending: true });
   }
   if (error) {
-    console.error("[me/verification] submit", error.message);
-    return NextResponse.json({ error: "Could not start verification" }, { status: 500 });
+    console.error("[me/verification] submit", error.code, error.message);
+    const notMigrated = error.code === "42P01" || /does not exist/i.test(error.message);
+    return NextResponse.json({
+      ok: false,
+      error: notMigrated
+        ? "Verification isn't set up on this environment yet (database migration pending)."
+        : "Could not start verification — please try again.",
+      code: notMigrated ? "not_migrated" : "submit_failed",
+    }, { status: notMigrated ? 503 : 500 });
   }
   return NextResponse.json({ ok: true, status: "pending" });
 }
