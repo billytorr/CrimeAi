@@ -1,136 +1,178 @@
-# CrimeAI — Store Submission Kit
-Everything to copy-paste into App Store Connect and Google Play Console.
-Bundle ID / Package name: **com.pscc.crimeai** · Updated July 2026
+# CrimeAI — App Store Submission Kit
+
+Copy-paste into App Store Connect. Bundle ID **com.pscc.crimeai** · Rewritten
+2026-08-07 for v1.0.
+
+⚠️ The previous version of this file predated identity verification, the
+biometric app lock, wallet payments and AI training. Its privacy labels were
+wrong. **The App Privacy section below must match
+`ios/App/App/PrivacyInfo.xcprivacy` and the published Privacy Policy** — a
+mismatch between the three is a rejection, and once live it is a
+deceptive-practices problem. See DATA-GOVERNANCE.md.
 
 ---
 
-## 1. APP STORE CONNECT (Apple)
+## Promotional Text (170 max — editable without review)
 
-**Name:** CrimeAI
-**Subtitle** (30 chars max): `See it. Report it. Stop it.`
-**Primary category:** News · **Secondary:** Social Networking
-**Content rights:** Contains third-party content? → No
+```
+Real safety intelligence for your block. See what's actually happening nearby, report what you witness, and ask CrimeAI anything about staying safe.
+```
 
-**Promotional text** (170 chars, editable without review):
-> Real-time safety for Miami neighborhoods. See what's happening around you, report incidents in seconds, and talk to CrimeAI about staying safe.
+## Description (4000 max)
 
-**Description:**
-> CrimeAI is your neighborhood's safety network — built for Miami, powered by AI.
->
-> SEE IT. A live map of incidents around you, from official data and neighbor reports, with safety scores for every neighborhood and alerts tuned to your exact radius.
->
-> REPORT IT. Spot something? Open the camera, capture it, choose a category, done — your report pins to the map and alerts neighbors instantly. No confrontation, no risk: report from a safe distance and let the community know.
->
-> STOP IT. Awareness prevents crime. Follow your neighborhood's watch accounts, join the conversation, and keep your block informed with posts, reels, and threads — a social network where the feed makes you safer.
->
-> ASK CRIMEAI. Our AI safety companion answers questions about your area with real, cited data — "Is it safe to walk here tonight?" gets a real answer, not a guess.
->
-> BUILT RESPONSIBLY. No facial recognition. No profiling. No predictive policing. Community reports are clearly marked as unverified. CrimeAI is informational only — in an emergency, always call 911.
->
-> Features:
-> • Live incident map with neighborhood safety scores
-> • Camera-first incident reporting with category pins
-> • Local feed: posts, reels, threads from your area
-> • CrimeAI conversations grounded in real local data
-> • Custom alerts: radius, categories, quiet hours
-> • SOS tools: trusted circle, walk-with-me
-> • Private accounts, follower approvals, full moderation tools
->
-> Starting in Miami-Dade. Expanding across Florida.
+```
+CrimeAI is a neighborhood safety network built on real data.
 
-**Keywords** (100 chars max):
-`crime,safety,alerts,neighborhood,watch,miami,report,security,community,map,local,incident`
+SEE WHAT'S HAPPENING
+A live map of incidents around you, drawn from official records and verified neighbor reports. Every incident is traceable to its source, with a confidence level — so you know what's confirmed and what's still a claim.
 
-**Support URL:** https://app.publicsafetycrimecenter.com
-**Marketing URL:** https://app.publicsafetycrimecenter.com
-**Privacy Policy URL:** https://app.publicsafetycrimecenter.com/privacy
+YOUR SAFETY SCORE
+Every neighborhood gets a Safety Score built from incident severity, recency and distance, compared against your metro area. It shows its work: what's driving the number, how confident it is, and what changed. It is never influenced by engagement or by whether anyone paid us.
 
-**App Review Information (the credentials box):**
-- Sign-in required: YES
-- Demo account: `reviewer@crimeai.app` / `ReviewCrimeAI2026!`
-- Notes for reviewer:
-> CrimeAI is a community safety network for Miami, FL. The demo account is pre-configured for the Brickell neighborhood. Key flows: Feed (local safety posts), Map (incidents + community report pins), + button (camera-first reporting — camera/mic/location permissions are requested in context), CrimeAI tab (AI safety Q&A, informational only, directs emergencies to 911). NOTE: The LIVE streaming feature is intentionally invite-only ("Live Media Brand Ambassador" program) — tapping LIVE shows a Coming Soon application screen by design. User-generated content protections: every post has a Report option and Block User (⋮ menu), moderation is staffed via our internal Command Center, in-app account deletion is under Settings → Danger zone.
+ASK CRIMEAI
+Ask about your street, a route you're taking, or a place you're thinking of moving to. Answers come with citations to the data behind them.
 
-### Age rating questionnaire (answers → lands at 12+)
+ALERTS THAT FIT YOUR LIFE
+Choose your radius, the categories you care about, and how severe something has to be before it reaches you. Alerts are ranked by relevance to your safety — never by what's popular.
+
+SAFETY FEATURES, FREE FOR EVERYONE
+SOS, "I'm not safe", Walk-with-me, one-tap 911 and Trusted Circle dispatch work on every plan, including the free one. They are never behind a paywall, and a billing problem can never switch one off.
+
+REPORT WHAT YOU WITNESS
+Post what you see so your neighbors know. Filing a crime report requires a verified ID — reports pin to the map and people act on them, so they come from real, accountable people. Everything else works without it.
+
+WHAT CRIMEAI WILL NEVER DO
+· Identify a stranger from a photo
+· Describe anyone's race or ethnicity
+· Predict who will commit a crime
+· Sell your data to advertisers or data brokers
+· Give any agency standing or bulk access to our data
+
+PROTECTOR PLAN
+A wider alert radius, full incident history, a deeper Safety Score breakdown, a larger trusted circle, SMS alerts and the red Protector shield beside your name. $7.99/month or $69.99/year.
+
+IMPORTANT
+CrimeAI is an informational community safety network. It is NOT an emergency service and not a substitute for 911. Community reports are unverified information. In an emergency, call 911.
+```
+
+## Keywords (100 max, comma separated, no spaces)
+
+```
+crime,safety,neighborhood,alerts,map,police,scanner,incident,report,community,watch,local,news,sos
+```
+
+## URLs
+
+| Field | Value |
+|---|---|
+| Support URL | `https://publicsafetycrimecenter.com/support` |
+| Marketing URL | `https://publicsafetycrimecenter.com` |
+| Privacy Policy URL | `https://publicsafetycrimecenter.com/privacy` |
+| Copyright | `2026 BlackSeed Labs LLC` |
+
+⚠️ The Support URL must resolve to a real page with a contact method —
+reviewers check it, and Guideline 1.2 requires published contact info for a
+UGC app.
+
+---
+
+## App Privacy — must match PrivacyInfo.xcprivacy
+
+For each, answer **linked to identity: Yes · used for tracking: No**.
+
+| Data type | Purpose |
+|---|---|
+| Precise Location | App Functionality |
+| Coarse Location | App Functionality |
+| Email Address | App Functionality |
+| Name | App Functionality |
+| Phone Number | App Functionality |
+| Photos or Videos | App Functionality |
+| Other User Content | App Functionality |
+| Product Interaction | App Functionality **+ Analytics** |
+| Device ID | App Functionality |
+| Payment Info | App Functionality |
+
+**Do NOT declare biometric data.** Face ID unlock never gives the app the
+template — it stays in the Secure Enclave. Identity verification is not in
+this build. When IDV ships, this section, the manifest and the Privacy
+Policy all change together.
+
+---
+
+## App Review Information
+
+**Demo account — required.** Reviewers cannot get past sign-in without one,
+and this is the most common cause of a first rejection.
+
+| Field | Value |
+|---|---|
+| Sign-in required | Yes |
+| Username | *(create a real account, completed onboarding, in a populated area)* |
+| Password | *(set one; never reuse a personal password)* |
+
+**Notes for review:**
+
+```
+CrimeAI is a community safety network. The demo account is fully onboarded and located in Miami, FL, where there is live incident data to see.
+
+WHAT TO TRY
+· Feed — neighbor posts and reports
+· Map — live incidents with sources
+· Ask — question the AI about a neighborhood
+· Profile → My Safety — the Safety Score with its breakdown
+
+USER-GENERATED CONTENT (Guideline 1.2)
+Posts can be reported and authors blocked from the "..." menu on any post. Reported content reaches a moderation queue reviewed daily. Blocked users disappear from feed, search and messaging. Terms prohibit identifying private individuals and require reporting only what was witnessed.
+
+SUBSCRIPTIONS
+The Protector plan is sold on our website, not through in-app purchase. The app links out to publicsafetycrimecenter.com in the device browser. The service is available and purchasable independently of the app.
+
+EMERGENCY FEATURES
+SOS, Walk-with-me and one-tap 911 hand off to the system dialer and the user's own contacts. CrimeAI does not dispatch emergency services and states this in the Terms and in the app.
+```
+
+---
+
+## Age Rating
+
+Answer honestly; the crime subject matter and user-generated content both
+raise it.
+
 | Question | Answer |
 |---|---|
-| Cartoon/fantasy violence | None |
-| Realistic violence | Infrequent/Mild (news-style descriptions of local incidents) |
-| Prolonged graphic violence | None |
-| Profanity or crude humor | None |
-| Mature/suggestive themes | Infrequent/Mild (crime-related community reports) |
-| Horror/fear themes | None |
-| Medical/treatment info | None |
-| Alcohol, tobacco, drug use | None |
-| Simulated gambling | None |
-| Sexual content or nudity | None |
-| Unrestricted web access | No |
-| Gambling and contests | No |
-| **Made for Kids** | No |
+| Realistic Violence | Infrequent/Mild |
+| Horror/Fear Themes | Infrequent/Mild |
+| Profanity or Crude Humor | Infrequent/Mild (user content) |
+| **Unrestricted Web Access** | **No** |
+| **User Generated Content** | **Yes** |
+| Contests / Gambling / Drugs | None |
 
-### App Privacy (nutrition labels) — declare "Data Linked to You", NOT used for tracking
-- **Contact info:** Email address, Phone number (optional) — App functionality
-- **Location:** Precise + Coarse — App functionality (map, alerts)
-- **User content:** Photos or Videos, Other user content (posts/reports/messages) — App functionality
-- **Identifiers:** User ID — App functionality
-- **Usage data:** Product interaction (in-app analytics events) — Analytics
-- Tracking (cross-app/ad tracking): **NO** → "Data Not Used to Track You"
+Expect **17+**. UGC alone usually forces it, and understating it to reach a
+lower rating is its own violation.
 
 ---
 
-## 2. GOOGLE PLAY CONSOLE
+## Screenshots
 
-**App name:** CrimeAI
-**Short description** (80 chars): `Your neighborhood safety network — live crime map, alerts, and AI answers.`
-**Full description:** (use the Apple description above — same text works)
-**Category:** News & Magazines (or Social) · **Tags:** safety, local news, community
-**Contact email:** support@publicsafetycrimecenter.com
-**Privacy policy:** https://app.publicsafetycrimecenter.com/privacy
+6.5" iPhone is required (1242×2688 or 1284×2778). Only the first three show
+on the install sheet — order them deliberately:
 
-**App access (for review):** All functionality requires login →
-`reviewer@crimeai.app` / `ReviewCrimeAI2026!` + same reviewer notes as Apple.
+1. **Map** with live incidents
+2. **Safety Score** with the breakdown open
+3. **Ask CrimeAI** with a cited answer
+4. Feed
+5. Alerts / radius settings
 
-### Data Safety form
-Collects data? YES · Shares data with third parties? NO · Data encrypted in transit? YES · Users can request deletion? YES (in-app: Settings → Danger zone → Delete account)
-
-| Data type | Collected | Shared | Purpose |
-|---|---|---|---|
-| Email address | Yes | No | Account management |
-| Phone number | Yes (optional) | No | Account management |
-| Name / Username | Yes | No | Account management, personalization |
-| Precise location | Yes (optional permission) | No | App functionality |
-| Approximate location | Yes | No | App functionality |
-| Photos & videos | Yes (user-provided) | No | App functionality (UGC) |
-| Other user content (posts, messages) | Yes | No | App functionality |
-| App interactions (analytics events) | Yes | No | Analytics |
-| User IDs | Yes | No | Account management |
-
-### Content rating (IARC questionnaire) → expect Teen
-- Violence: references to realistic violence (news/community reports) — no graphic depictions
-- User-generated content: YES, with moderation, reporting, and blocking
-- Users can interact/exchange content: YES
-- Shares user location with other users: YES (approximate — reports pin to map; disclosed)
-- No sexual content, no gambling, no drugs facilitation
-
-### Play policy declarations
-- News app? No (community + AI, not a news publisher)
-- COVID-19 app? No · Government app? No
-- Target audience: 18+ primary (13+ permitted) — do NOT include children
-- Login credentials for review: provided above
+Capture on a real device with real data. Empty states read as a broken app.
 
 ---
 
-## 3. SCREENSHOTS (both stores)
-Capture from iPhone (6.7" for Apple; any modern phone for Play):
-1. Feed with local posts (For You)
-2. Crime Map with pins + safety radius
-3. Camera capture screen (report flow)
-4. CrimeAI conversation
-5. Profile with safety score
-Optional: splash/brand frame first. I can generate framed marketing shots on request.
+## Before you submit
 
----
-
-## 4. CREDENTIALS SUMMARY
-- Reviewer (both stores): `reviewer@crimeai.app` / `ReviewCrimeAI2026!` (pre-onboarded, Brickell)
-- Never expose: service_role key, DB password, ANTHROPIC_API_KEY (server-side only)
+- [ ] TestFlight on a real device — push registration, Face ID lock, purchase opens Safari
+- [ ] Support URL resolves with a contact method
+- [ ] Demo account works from a clean install
+- [ ] Privacy labels match `PrivacyInfo.xcprivacy` exactly
+- [ ] Privacy Policy v2 published to the database (the app ships only a fallback)
+- [ ] **Decide the external-purchase question** — permitted for US-storefront apps post-*Epic*; likely rejected elsewhere. See FOUNDERS.md.
