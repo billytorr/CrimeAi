@@ -40,7 +40,57 @@ export function resizeImage(file: Blob, max = 512): Promise<string> {
   });
 }
 
-const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => (await fetch(dataUrl)).blob();
+/**
+ * Decode a data URL without fetch().
+ *
+ * `fetch(dataUrl)` also works, but it makes this untestable — any test that
+ * stubs global fetch (to simulate a CORS failure, say) breaks the decode too.
+ * Manual decode keeps the two concerns independent.
+ */
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const m = /^data:([^;,]+)(;base64)?,(.*)$/s.exec(dataUrl);
+  if (!m) throw new Error("not a data URL");
+  const [, contentType, isB64, payload] = m;
+  const raw = isB64 ? atob(payload) : decodeURIComponent(payload);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return new Blob([bytes], { type: contentType });
+}
+
+/**
+ * Put an already-resized data URL into our storage bucket.
+ *
+ * Split out from storeProfilePhoto so the upload/fallback behaviour is
+ * testable — resizeImage needs FileReader, Image and canvas, so anything
+ * calling it can only run in a browser.
+ *
+ * FALLS BACK to the data URL when storage is unavailable (demo mode) or the
+ * upload fails. Still smaller than the raw file, and the user keeps their
+ * picture rather than losing it to a bad network.
+ */
+export async function uploadDataUrl(dataUrl: string, userId: string): Promise<string> {
+  if (!supabaseEnabled || !userId || !dataUrl.startsWith("data:")) return dataUrl;
+  try {
+    const blob = dataUrlToBlob(dataUrl);
+    const up = await uploadMedia(new File([blob], "avatar.jpg", { type: blob.type || "image/jpeg" }), userId);
+    return up.url || dataUrl;
+  } catch {
+    return dataUrl;
+  }
+}
+
+/**
+ * THE single way a profile photo is saved. Resize, upload, return the URL.
+ *
+ * Every picker must go through this. Before it existed there were three:
+ * Onboarding resized to a data URI, while EditProfile and MeScreen stored
+ * the RAW file as base64 with no resize at all — a multi-MB phone photo
+ * became a multi-MB string in the profiles row, re-sent on every read. That
+ * is the "photo didn't save" bug: fixed in one picker, left in the other two.
+ */
+export async function storeProfilePhoto(file: Blob, userId: string): Promise<string> {
+  return uploadDataUrl(await resizeImage(file), userId);  // resize even on the fallback path
+}
 
 /**
  * Copy a third-party avatar (Google / Apple) into our own storage bucket.
@@ -66,10 +116,10 @@ export async function importRemotePhoto(url: string, userId: string): Promise<st
     const blob = await res.blob();
     if (!blob.type.startsWith("image/")) return url;
 
-    const compressed = await dataUrlToBlob(await resizeImage(blob));
-    const file = new File([compressed], "avatar.jpg", { type: "image/jpeg" });
-    const up = await uploadMedia(file, userId);
-    return up.url || url;
+    const stored = await uploadDataUrl(await resizeImage(blob), userId);
+    // uploadDataUrl hands back the data URL if the upload failed; prefer the
+    // provider URL over embedding a copy we meant to store properly.
+    return stored.startsWith("data:") ? url : stored;
   } catch {
     return url;
   }

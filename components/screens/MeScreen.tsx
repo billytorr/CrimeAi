@@ -16,6 +16,7 @@ import ProfileGrid from "@/components/ProfileGrid";
 import SettingsScreen from "@/components/screens/SettingsScreen";
 import { Settings as SettingsIcon, Grid, Report, Pin, Alert, Camera, ProBadge, Verified } from "@/components/Icons";
 import { useVerification } from "@/lib/identity/verify-client";
+import { storeProfilePhoto } from "@/lib/photo";
 
 type Section = "posts" | "safety";
 
@@ -36,16 +37,16 @@ export default function MeScreen({
   // first-photo prompt: users still on the default avatar get an upload
   // badge right on their profile; it disappears once a photo is set
   // (changing it later lives in Settings)
-  function pickFirstPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function pickFirstPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    const r = new FileReader();
-    r.onload = () => {
-      const np = { ...profile, photo: String(r.result) };
+    // Was storing the raw file as base64 in the profiles row. Resize +
+    // upload to our bucket, same path as every other picker.
+    try {
+      const np = { ...profile, photo: await storeProfilePhoto(f, account.id) };
       onProfile(np);
       saveProfile(np).catch(() => {});
-    };
-    r.readAsDataURL(f);
+    } catch { /* keep the existing photo rather than clearing it */ }
   }
   const [safetyTab, setSafetyTab] = useState<"score" | "reports" | "hood">("score");
   const [settingsOpen, setSettingsOpen] = useState(false);

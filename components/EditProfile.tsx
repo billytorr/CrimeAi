@@ -11,6 +11,7 @@ import { getProfileDirectory } from "@/lib/social";
 import UsernameField, { type UsernameState } from "@/components/UsernameField";
 import Avatar from "@/components/Avatar";
 import { Camera, Chevron } from "@/components/Icons";
+import { storeProfilePhoto } from "@/lib/photo";
 
 export default function EditProfile({
   account, currentHandle, onSaved, onClose,
@@ -28,12 +29,14 @@ export default function EditProfile({
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    const r = new FileReader();
-    r.onload = () => setPhoto(String(r.result));
-    r.readAsDataURL(f);
+    // Was reading the raw file straight to base64 — a multi-MB phone photo
+    // went into the profiles row verbatim. storeProfilePhoto resizes and
+    // uploads to our bucket.
+    try { setPhoto(await storeProfilePhoto(f, account.id)); }
+    catch { setError("Couldn't read that image — try another."); }
   }
 
   async function save() {

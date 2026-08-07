@@ -76,3 +76,65 @@ describe("importRemotePhoto", () => {
     await expect(importRemotePhoto(GOOGLE, "u1")).resolves.toBe(GOOGLE);
   });
 });
+
+// uploadDataUrl carries the guarantees that matter: never lose the photo when
+// storage is unavailable. storeProfilePhoto is just resizeImage + this, and
+// resizeImage needs FileReader/Image/canvas so it can only run in a browser.
+const JPEG = "data:image/jpeg;base64,/9j/4AAQSkZJRg==";
+
+describe("uploadDataUrl", () => {
+  beforeEach(() => { enabled = true; uploadMedia.mockReset(); });
+
+  it("uploads to the bucket and returns our URL", async () => {
+    uploadMedia.mockResolvedValue({ url: "https://ours.supabase.co/storage/avatar.jpg", type: "image" });
+    const { uploadDataUrl } = await import("@/lib/photo");
+    expect(await uploadDataUrl(JPEG, "u1")).toBe("https://ours.supabase.co/storage/avatar.jpg");
+    expect(uploadMedia).toHaveBeenCalled();
+  });
+
+  it("keeps the data URL when storage isn't configured", async () => {
+    enabled = false;
+    const { uploadDataUrl } = await import("@/lib/photo");
+    expect(await uploadDataUrl(JPEG, "u1")).toBe(JPEG);
+    expect(uploadMedia).not.toHaveBeenCalled();
+  });
+
+  it("keeps the data URL when the upload fails — never loses the photo", async () => {
+    uploadMedia.mockRejectedValue(new Error("bucket down"));
+    const { uploadDataUrl } = await import("@/lib/photo");
+    expect(await uploadDataUrl(JPEG, "u1")).toBe(JPEG);
+  });
+
+  it("does not upload without a user id", async () => {
+    const { uploadDataUrl } = await import("@/lib/photo");
+    expect(await uploadDataUrl(JPEG, "")).toBe(JPEG);
+    expect(uploadMedia).not.toHaveBeenCalled();
+  });
+
+  it("leaves an already-hosted URL alone", async () => {
+    const { uploadDataUrl } = await import("@/lib/photo");
+    const hosted = "https://ours.supabase.co/storage/x.jpg";
+    expect(await uploadDataUrl(hosted, "u1")).toBe(hosted);
+    expect(uploadMedia).not.toHaveBeenCalled();
+  });
+
+  it("never throws", async () => {
+    uploadMedia.mockImplementation(() => { throw new Error("boom"); });
+    const { uploadDataUrl } = await import("@/lib/photo");
+    await expect(uploadDataUrl(JPEG, "u1")).resolves.toBe(JPEG);
+  });
+});
+
+describe("dataUrlToBlob", () => {
+  it("decodes base64 without needing fetch", async () => {
+    const { dataUrlToBlob } = await import("@/lib/photo");
+    const b = dataUrlToBlob(JPEG);
+    expect(b.type).toBe("image/jpeg");
+    expect(b.size).toBeGreaterThan(0);
+  });
+
+  it("rejects a non-data URL", async () => {
+    const { dataUrlToBlob } = await import("@/lib/photo");
+    expect(() => dataUrlToBlob("https://example.com/x.jpg")).toThrow();
+  });
+});

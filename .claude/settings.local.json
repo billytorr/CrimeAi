@@ -100,7 +100,8 @@
       "Bash(rm /tmp/oa.bak)",
       "Bash(d.message)",
       "Bash(d.error)",
-      "Bash(cd /Users/blackseedlabs/Desktop/Crime_AI *)"
+      "Bash(cd /Users/blackseedlabs/Desktop/Crime_AI *)",
+      "Bash(node scripts/migrate-profile-photos.mjs --dry-run)"
     ]
   }
 }

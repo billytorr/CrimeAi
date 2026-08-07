@@ -10,7 +10,7 @@ import UsernameField, { type UsernameState } from "@/components/UsernameField";
 import { CATEGORIES } from "@/lib/categories";
 import { milesBetween } from "@/lib/data";
 import SuggestedFollows from "@/components/auth/SuggestedFollows";
-import { resizeImage, importRemotePhoto } from "@/lib/photo";
+import { storeProfilePhoto, importRemotePhoto } from "@/lib/photo";
 
 // Miami examples front and center (beta focus), but any US place works.
 const EXAMPLES = ["Brickell", "South Beach", "Wynwood", "Coral Gables", "33139", "Orlando FL"];
@@ -58,7 +58,7 @@ export default function Onboarding({
   async function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    try { setPhoto(await resizeImage(f)); }
+    try { setPhoto(await storeProfilePhoto(f, userId)); }
     catch { setError("Couldn't read that image — try another."); }
   }
 
