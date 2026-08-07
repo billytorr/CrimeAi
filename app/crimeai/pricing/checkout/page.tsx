@@ -27,6 +27,10 @@ function Checkout() {
   const [info, setInfo] = useState<Validated | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
   const [card, setCard] = useState({ number: "", exp: "", cvv: "", name: "", zip: "" });
+  // Billing address enables AVS at the issuer. The ZIP alone was being
+  // collected and discarded; a full address means fewer false declines on
+  // good cards and firmer ground in a chargeback dispute.
+  const [bill, setBill] = useState({ address: "", city: "", state: "", country: "US" });
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -70,7 +74,10 @@ function Checkout() {
         try {
           const r = await fetch(apiUrl("/api/pay/authnet/subscribe"), {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token, opaque: resp.opaqueData, email, name: card.name }),
+            body: JSON.stringify({
+                token, opaque: resp.opaqueData, email, name: card.name,
+                billing: { ...bill, zip: card.zip },
+              }),
           });
           const d = await r.json();
           if (!r.ok) {
@@ -129,6 +136,12 @@ function Checkout() {
           <Field label="ZIP" value={card.zip} onChange={(v) => setCard({ ...card, zip: v })} placeholder="33131" inputMode="numeric" />
         </div>
         <Field label="Name on card" value={card.name} onChange={(v) => setCard({ ...card, name: v })} placeholder="Maria López" />
+        <div className="pt-1 text-xs font-medium uppercase tracking-wide text-ink2">Billing address</div>
+        <Field label="Street address" value={bill.address} onChange={(v) => setBill({ ...bill, address: v })} placeholder="1200 Brickell Ave" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="City" value={bill.city} onChange={(v) => setBill({ ...bill, city: v })} placeholder="Miami" />
+          <Field label="State" value={bill.state} onChange={(v) => setBill({ ...bill, state: v })} placeholder="FL" />
+        </div>
       </div>
 
       {error && <p className="mt-3 text-center text-sm text-red-400">{error}</p>}

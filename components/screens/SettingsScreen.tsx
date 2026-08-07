@@ -298,8 +298,15 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
         body: JSON.stringify(priceId ? { priceId } : {}),
       });
       const d = await r.json();
-      if (r.ok && d.checkoutUrl) window.open(d.checkoutUrl, "_blank");
-      else alert(d.error || "Couldn't start checkout. Try again in a moment.");
+      // Send them to the PRICING page rather than straight into checkout:
+      // choosing the plan and the interval belongs in the browser, next to
+      // the price. "_blank" is what Capacitor hands to the DEVICE'S browser
+      // instead of an in-app webview — required for an external purchase, and
+      // it's where a customer can actually see the domain and the padlock.
+      if (r.ok && d.token) {
+        const payBase = process.env.NEXT_PUBLIC_PAY_BASE || "https://pay.publicsafetycrimecenter.com";
+        window.open(`${payBase}/crimeai/pricing?t=${encodeURIComponent(d.token)}`, "_blank");
+      } else alert(d.error || "Couldn't start checkout. Try again in a moment.");
     } catch {
       alert("Couldn't start checkout. Check your connection and try again.");
     } finally { setBusy(false); }

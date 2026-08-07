@@ -43,17 +43,40 @@ export async function deleteCustomerProfile(customerProfileId: string): Promise<
 }
 
 // opaque = { dataDescriptor: "COMMON.ACCEPT.INAPP.PAYMENT", dataValue }
+export interface BillingAddress {
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
+
 export async function createCustomerProfileFromOpaque(
   userId: string,
   email: string,
   opaque: { dataDescriptor: string; dataValue: string },
   name?: string,
+  billing?: BillingAddress,
 ): Promise<StoredCard> {
   // ARB charges the stored profile and requires a billing name ON the payment
   // profile (it rejects billTo in the subscription request itself). Store it
   // here at creation time.
+  //
+  // The ADDRESS matters as much as the name: it's what lets the issuer run
+  // AVS (Address Verification Service). Without it every charge is
+  // address-unverified, which issuers treat as higher risk — more declines on
+  // good cards, and weaker ground in a chargeback dispute. The checkout form
+  // was already collecting a ZIP and then throwing it away.
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-  const billTo = { firstName: (parts[0] || "CrimeAI").slice(0, 50), lastName: (parts.slice(1).join(" ") || "Member").slice(0, 50) };
+  const billTo = {
+    firstName: (parts[0] || "CrimeAI").slice(0, 50),
+    lastName: (parts.slice(1).join(" ") || "Member").slice(0, 50),
+    ...(billing?.address ? { address: billing.address.slice(0, 60) } : {}),
+    ...(billing?.city ? { city: billing.city.slice(0, 40) } : {}),
+    ...(billing?.state ? { state: billing.state.slice(0, 40) } : {}),
+    ...(billing?.zip ? { zip: billing.zip.slice(0, 20) } : {}),
+    ...(billing?.country ? { country: billing.country.slice(0, 60) } : {}),
+  };
 
   // validationMode "none": do NOT run a card-validation authorization. Any
   // other mode issues a ~$1.00 auth-and-void that triggers a receipt email and

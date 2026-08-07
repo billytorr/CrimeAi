@@ -27,7 +27,7 @@ export async function OPTIONS() { return new NextResponse(null, { status: 204, h
 
 export async function POST(req: Request) {
   try {
-    const { token, opaque, email, name } = await req.json();
+    const { token, opaque, email, name, billing } = await req.json();
     const v = verifyCheckoutToken(String(token || ""));
     if (!v.valid) return NextResponse.json({ error: `Invalid checkout (${v.reason})` }, { status: 400, headers: CORS });
     if (!opaque?.dataDescriptor || !opaque?.dataValue) {
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     try {
       // 1) store the card off-site as a Customer Profile (masked last4 only).
       //    The billing name is stored on the payment profile so ARB can charge it.
-      card = await createCustomerProfileFromOpaque(v.claims.userId, String(email || ""), opaque, String(name || ""));
+      card = await createCustomerProfileFromOpaque(v.claims.userId, String(email || ""), opaque, String(name || ""), billing || undefined);
 
       // 2) CHARGE THE FIRST PERIOD NOW.
       //    ARB does not bill when a subscription is created — even with
