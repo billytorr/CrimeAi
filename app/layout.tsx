@@ -3,7 +3,13 @@ import "./globals.css";
 import "leaflet/dist/leaflet.css";
 import { LanguageProvider } from "@/components/LanguageProvider";
 
-const DESC = "Talk to CrimeAI about safety near you. Real, cited data. No facial recognition, no profiling. Public safety, done right.";
+// ⚠️ This is the App Store / Play / search description. It must stay true of
+// what the product actually does. The old copy promised "No facial
+// recognition" — no longer accurate now that identity verification matches a
+// selfie against the user's own ID. What remains true, and is the claim worth
+// making, is that we never identify strangers and never predict who offends.
+// Guarded by lib/public-claims.test.ts. See DATA-GOVERNANCE.md.
+const DESC = "Talk to CrimeAI about safety near you. Real, cited data from verified neighbors. We never identify strangers from a photo and never predict who commits crime. Public safety, done right.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://crimeai.app"),

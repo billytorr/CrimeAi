@@ -44,24 +44,61 @@ export default function CoverageMatrix() {
   );
 }
 
+// ⚠️ These are PUBLIC PROMISES shown to every user, and a published privacy
+// representation. Every line must stay literally true of what the product
+// actually does — if a data practice changes, this panel changes FIRST, not
+// after. See DATA-GOVERNANCE.md.
+//
+// The distinction the first line draws is the important one and is not
+// marketing: 1:1 verification (does this selfie match this person's OWN ID?)
+// is a different act from 1:N identification (who is this stranger?). CrimeAI
+// does the first and must never do the second — the second is the Clearview
+// problem. Keeping the promise precise is what lets us keep making it.
 export function TrustPanel() {
-  const items = [
-    "No facial recognition — we never identify strangers from a photo.",
-    "No race or ethnicity descriptions in any output.",
-    "No predictive policing or profiling of people.",
+  const never = [
+    "Identify a stranger from a photo — face matching only ever checks your own selfie against your own ID.",
+    "Describe anyone's race or ethnicity in any output.",
+    "Predict who will commit a crime.",
+    "Sell your data to advertisers or data brokers.",
+    "Give any agency standing, bulk or self-serve access to our data.",
+  ];
+  const identity = [
+    "Your selfie, ID image and face scan are deleted within 24 hours of verification.",
+    "We keep only the result — that you were verified, when, and by what method.",
+    "Your biometric data never trains any AI model.",
+    "We ask for your written consent first, and you can decline.",
+  ];
+  const sharing = [
+    "Law enforcement gets your data only with a warrant, subpoena or court order — and we tell you unless a court bars us or someone is in immediate danger.",
+    "Your posts and activity help train CrimeAI and Torr AI models. You can opt out in Settings.",
     "Every incident is traceable to its source and confidence.",
   ];
+
+  const List = ({ items, mark }: { items: string[]; mark: string }) => (
+    <ul className="space-y-1.5">
+      {items.map((t) => (
+        <li key={t} className="flex gap-2 text-xs text-ink2">
+          <span className="shrink-0 text-brand">{mark}</span>
+          <span>{t}</span>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
-    <div className="rounded-2xl border border-brand/20 bg-brand/5 p-5">
-      <h2 className="mb-2 text-sm font-semibold text-brand">What CrimeAI will never do</h2>
-      <ul className="space-y-1.5">
-        {items.map((t) => (
-          <li key={t} className="flex gap-2 text-xs text-ink2">
-            <span className="text-brand">✓</span>
-            <span>{t}</span>
-          </li>
-        ))}
-      </ul>
+    <div className="space-y-4 rounded-2xl border border-brand/20 bg-brand/5 p-5">
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-brand">What CrimeAI will never do</h2>
+        <List items={never} mark="✓" />
+      </div>
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-brand">Your identity check</h2>
+        <List items={identity} mark="·" />
+      </div>
+      <div>
+        <h2 className="mb-2 text-sm font-semibold text-brand">Who sees your data</h2>
+        <List items={sharing} mark="·" />
+      </div>
     </div>
   );
 }
