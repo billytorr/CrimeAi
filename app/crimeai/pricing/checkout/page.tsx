@@ -10,6 +10,7 @@ import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import { apiUrl } from "@/lib/api";
 import { googlePayAvailable, payWithGoogle, type GooglePayResult } from "@/lib/pay/googlepay";
+import { GooglePayButton, ApplePayButton } from "@/components/WalletButtons";
 
 declare global { interface Window { Accept?: any } }
 
@@ -172,22 +173,18 @@ function Checkout() {
       </div>
 
       <div className="mt-4 space-y-2.5">
-        {gpayReady && (
-          <>
-            <button
-              onClick={payGoogle}
-              disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3.5 text-sm font-bold text-black active:scale-[0.99] disabled:opacity-60"
-            >
-              {busy ? "Processing…" : "Pay with Google Pay"}
-            </button>
-            <div className="flex items-center gap-3 py-1">
-              <span className="h-px flex-1 bg-ink/10" />
-              <span className="text-[11px] uppercase tracking-wide text-ink3">or pay by card</span>
-              <span className="h-px flex-1 bg-ink/10" />
-            </div>
-          </>
-        )}
+        {/* Wallets first — they're the fastest path and carry an
+            issuer-verified billing address. Apple Pay is present but disabled
+            until its certificates exist (see components/WalletButtons.tsx). */}
+        <div className="space-y-2">
+          {gpayReady && <GooglePayButton onClick={payGoogle} busy={busy} />}
+          <ApplePayButton />
+        </div>
+        <div className="flex items-center gap-3 py-1">
+          <span className="h-px flex-1 bg-ink/10" />
+          <span className="text-[11px] uppercase tracking-wide text-ink3">or pay by card</span>
+          <span className="h-px flex-1 bg-ink/10" />
+        </div>
         <Field label="Email for receipt" value={email} onChange={setEmail} placeholder="you@email.com" type="email" />
         <Field label="Card number" value={card.number} onChange={(v) => setCard({ ...card, number: v })} placeholder="1234 5678 9012 3456" inputMode="numeric" />
         <div className="flex gap-2.5">
