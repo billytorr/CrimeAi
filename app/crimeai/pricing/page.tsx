@@ -57,7 +57,14 @@ function Pricing() {
   // The token the app minted is bound to ONE price. Exchange it for the plan
   // actually chosen here, then hand off to checkout.
   const choose = useCallback(async (price: Price) => {
-    if (!token) { setError("Open this page from the CrimeAI app to subscribe."); return; }
+    // A subscription has to attach to an account, so without a token we send
+    // them to the app to sign in rather than into a checkout that can't
+    // complete. `next` brings them back to the plan they picked.
+    if (!token) {
+      const appBase = process.env.NEXT_PUBLIC_APP_BASE || "https://app.publicsafetycrimecenter.com";
+      window.location.href = `${appBase}/?upgrade=${encodeURIComponent(price.id)}`;
+      return;
+    }
     setBusy(price.id); setError("");
     try {
       const r = await fetch(apiUrl("/api/pay/authnet/retoken"), {
@@ -136,7 +143,6 @@ function Pricing() {
                 price={priceFor(prices, plan.id, interval)}
                 interval={interval}
                 percentOff={plan.id === "pro" && interval === "year" ? saving?.percentOff : undefined}
-                buyable={!!token}
                 busy={busy === priceFor(prices, plan.id, interval)?.id}
                 onChoose={choose}
               />
@@ -162,10 +168,10 @@ function Pricing() {
 }
 
 function Card({
-  plan, price, interval, percentOff, buyable, busy, onChoose,
+  plan, price, interval, percentOff, busy, onChoose,
 }: {
   plan: Plan; price?: Price; interval: Interval; percentOff?: number;
-  buyable: boolean; busy: boolean; onChoose: (p: Price) => void;
+  busy: boolean; onChoose: (p: Price) => void;
 }) {
   const soon = plan.status === "coming_soon";
   const featured = plan.highlight && !soon;
@@ -231,13 +237,12 @@ function Card({
         ) : price ? (
           <button
             onClick={() => onChoose(price)}
-            disabled={busy || !buyable}
-            title={buyable ? undefined : "Open from the CrimeAI app to subscribe"}
+            disabled={busy}
             className={`w-full rounded-xl py-3 text-sm font-semibold transition active:scale-[0.99] disabled:opacity-50 ${
               featured ? "bg-brand text-white" : "border border-ink/20 text-ink"
             }`}
           >
-            {busy ? "Starting…" : buyable ? `Choose ${plan.name}` : "Open in the app"}
+            {busy ? "Starting…" : `Subscribe — ${interval === "year" ? `${money(price.amountCents)}/yr` : `${money(price.amountCents)}/mo`}`}
           </button>
         ) : (
           <div className="w-full rounded-xl border border-ink/10 py-3 text-center text-sm font-semibold text-ink3">
