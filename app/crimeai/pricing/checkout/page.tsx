@@ -9,6 +9,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import { apiUrl } from "@/lib/api";
+import { googlePayAvailable, payWithGoogle, type GooglePayResult } from "@/lib/pay/googlepay";
 
 declare global { interface Window { Accept?: any } }
 
@@ -36,6 +37,7 @@ function Checkout() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [gpayReady, setGpayReady] = useState(false);
 
   useEffect(() => {
     if (!token) { setInfo({ valid: false, reason: "missing" }); return; }
@@ -97,6 +99,45 @@ function Checkout() {
     );
   }
 
+  // Google Pay's gatewayMerchantId is the Authorize.Net API Login ID, which
+  // validate already returns as public Accept.js config — no new env var.
+  const gatewayMerchantId = info?.accept?.apiLoginId || "";
+  useEffect(() => {
+    if (!gatewayMerchantId) return;
+    googlePayAvailable(gatewayMerchantId).then(setGpayReady);
+  }, [gatewayMerchantId]);
+
+  async function payGoogle() {
+    if (busy) return;
+    setError(""); setBusy(true);
+    try {
+      const res: GooglePayResult | null = await payWithGoogle({
+        gatewayMerchantId,
+        amountCents: info?.amountCents || 0,
+        label: `CrimeAI Protector ${info?.interval === "year" ? "(yearly)" : "(monthly)"}`,
+      });
+      if (!res) { setBusy(false); return; }   // user closed the sheet
+      // The SAME endpoint the card path uses. The wallet only swaps the
+      // token, so the charge, the ARB schedule and the period maths are the
+      // ones already proven. Its address is issuer-verified, so prefer it.
+      const r = await fetch(apiUrl("/api/pay/authnet/subscribe"), {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token, opaque: res.opaque,
+          email: res.email || email,
+          name: res.billing.name || card.name,
+          billing: res.billing,
+        }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Could not complete checkout.");
+      setDone(true);
+      if (d.returnTo) setTimeout(() => { window.location.href = d.returnTo; }, 2200);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally { setBusy(false); }
+  }
+
   if (!info) return <Shell><p className="py-16 text-center text-sm text-ink3">Loading…</p></Shell>;
   if (!info.valid) return (
     <Shell>
@@ -131,6 +172,22 @@ function Checkout() {
       </div>
 
       <div className="mt-4 space-y-2.5">
+        {gpayReady && (
+          <>
+            <button
+              onClick={payGoogle}
+              disabled={busy}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-white py-3.5 text-sm font-bold text-black active:scale-[0.99] disabled:opacity-60"
+            >
+              {busy ? "Processing…" : "Pay with Google Pay"}
+            </button>
+            <div className="flex items-center gap-3 py-1">
+              <span className="h-px flex-1 bg-ink/10" />
+              <span className="text-[11px] uppercase tracking-wide text-ink3">or pay by card</span>
+              <span className="h-px flex-1 bg-ink/10" />
+            </div>
+          </>
+        )}
         <Field label="Email for receipt" value={email} onChange={setEmail} placeholder="you@email.com" type="email" />
         <Field label="Card number" value={card.number} onChange={(v) => setCard({ ...card, number: v })} placeholder="1234 5678 9012 3456" inputMode="numeric" />
         <div className="flex gap-2.5">

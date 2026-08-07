@@ -132,3 +132,46 @@ Adapters translate merchant payloads into **five normalized events** —
 - The legacy `/api/pay/webhook` endpoint still accepts Stripe (routes by
   `stripe-signature` header) so older dashboard config keeps working; new
   merchants use `/api/pay/webhook/<id>` only.
+
+
+## Google Pay (web checkout)
+
+Tokenised through Authorize.Net. The wallet token goes into the SAME
+`opaqueData` slot the card form uses, so the immediate charge, the ARB
+schedule and the period maths downstream are the ones already proven in
+sandbox — the wallet only swaps the credential.
+
+**Env**
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_GOOGLE_PAY_MERCHANT_ID` | `BCR2DN6DTLA7RTSA` |
+| `NEXT_PUBLIC_GOOGLE_PAY_ENV` | `TEST` until Google grants production access, then `PRODUCTION` |
+
+`gatewayMerchantId` is the Authorize.Net **API Login ID** — already returned
+by `/api/pay/authnet/validate` as public Accept.js config, so there is no
+second copy to keep in step.
+
+**Dormant-safe:** with no merchant ID the availability probe returns false
+and checkout renders the card form alone. The button also hides itself on any
+error — a wallet button that opens and then fails is worse than no button.
+
+### ⚠️ Unproven: recurring on a device token
+
+Google Pay returns one of two credential types:
+
+| Auth method | What it is | Reusable for renewals? |
+|---|---|---|
+| `PAN_ONLY` | a card saved in the Google account — real card details | yes, storable in a CIM profile |
+| `CRYPTOGRAM_3DS` | a device token with a one-shot cryptogram | **not reliably** |
+
+We request both, because refusing `CRYPTOGRAM_3DS` hides the button from many
+users. The first charge works either way. **What has NOT been proven is
+whether a subscription funded by a device token survives its first renewal.**
+
+Test that in sandbox before switching `NEXT_PUBLIC_GOOGLE_PAY_ENV` to
+PRODUCTION: subscribe with Google Pay, confirm a CIM profile is created and an
+ARB subscription attaches (`anet_subscription_id` non-null in
+`tier_subscriptions`), then force the renewal. If device tokens fail there,
+the fix is to request `PAN_ONLY` only — fewer eligible users, but no silent
+lapse a month later.
