@@ -106,6 +106,12 @@ create table if not exists public.verification_media_purges (
   ran_at      timestamptz not null default now()
 );
 
+-- RLS on, and DELIBERATELY NO POLICY. This is the evidence that the 24-hour
+-- destruction schedule actually ran, so no app client should read or write
+-- it — only the service role, which bypasses RLS, and which is what runs the
+-- purge. With RLS enabled and no policy, anon and authenticated get nothing.
+alter table public.verification_media_purges enable row level security;
+
 create or replace function public.purge_expired_verification_media()
 returns int language plpgsql security definer set search_path = public as $$
 declare n int;
