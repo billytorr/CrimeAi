@@ -21,26 +21,39 @@ export async function GET(req: NextRequest) {
   const userId = await resolveUserId(req);
   if (!userId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
 
-  const { serverDb } = await import("@/lib/payments/serverdb");
-  const db = serverDb(true);
+  // FAIL CLOSED, but cleanly. If the database is unreachable we answer
+  // "not verified" with a 200 rather than throwing a 500: the client treats
+  // both the same (it also fails closed), and a 500 per page load just
+  // buries real errors in noise. Refusing a report is recoverable; showing
+  // a verified badge we could not confirm is not.
+  try {
+    const { serverDb } = await import("@/lib/payments/serverdb");
+    const db = serverDb(true);
 
-  const [{ data: verified }, { data: latest }] = await Promise.all([
-    db.rpc("is_identity_verified", { p_user: userId }),
-    db.from("identity_verifications")
-      .select("status, reason, submitted_at, reviewed_at")
-      .eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-  ]);
+    const [{ data: verified }, { data: latest }] = await Promise.all([
+      db.rpc("is_identity_verified", { p_user: userId }),
+      db.from("identity_verifications")
+        .select("status, reason, submitted_at, reviewed_at")
+        .eq("user_id", userId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    ]);
 
-  return NextResponse.json({
-    verified: !!verified,
-    status: latest?.status ?? "none",
-    reason: latest?.reason ?? null,
-    submittedAt: latest?.submitted_at ?? null,
-    reviewedAt: latest?.reviewed_at ?? null,
-    // Tells the client whether capture can actually run yet.
-    vendorConfigured: !!process.env.IDV_VENDOR,
-    consentVersion: CONSENT_VERSION,
-  });
+    return NextResponse.json({
+      verified: !!verified,
+      status: latest?.status ?? "none",
+      reason: latest?.reason ?? null,
+      submittedAt: latest?.submitted_at ?? null,
+      reviewedAt: latest?.reviewed_at ?? null,
+      // Tells the client whether capture can actually run yet.
+      vendorConfigured: !!process.env.IDV_VENDOR,
+      consentVersion: CONSENT_VERSION,
+    });
+  } catch (e) {
+    console.error("[me/verification]", (e as Error).message);
+    return NextResponse.json({
+      verified: false, status: "unknown", reason: null,
+      vendorConfigured: !!process.env.IDV_VENDOR, consentVersion: CONSENT_VERSION,
+    });
+  }
 }
 
 export async function POST(req: NextRequest) {
