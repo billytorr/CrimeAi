@@ -1,4 +1,11 @@
-// APNs sender — token-based auth (HTTP/2 JSON API), no SDK dependency.
+// APNs sender — token-based auth, HTTP/2.
+//
+// ⚠️ APNs IS HTTP/2-ONLY. api.push.apple.com refuses HTTP/1.1 outright, and
+// Node's built-in fetch() (undici) speaks only HTTP/1.1 — it fails with
+// "Response does not match the HTTP/1.1 protocol" before a request is even
+// sent. So this uses node:http2 directly. Do not "simplify" it back to
+// fetch(): it will fail 100% of the time, and it fails as a *network* error
+// rather than an HTTP status, which looks like a credential problem.
 //
 // Apple's token auth wants a short-lived ES256 JWT signed with a .p8 key.
 // We sign it with node:crypto and cache it (Apple requires refresh between
@@ -13,6 +20,7 @@
 // key with the "Apple Push Notifications service" capability enabled.
 
 import { createSign } from "node:crypto";
+import { connect, constants, type ClientHttp2Session } from "node:http2";
 
 export interface PushResult { sent: boolean; skipped?: string; error?: string; deadToken?: boolean }
 
@@ -21,7 +29,7 @@ export function apnsConfigured(): boolean {
 }
 
 function apnsHost(environment: string): string {
-  // sandbox = development builds (Xcode/TestFlight debug), production = App Store
+  // sandbox = development builds (Xcode debug), production = TestFlight/App Store
   return environment === "sandbox" ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
 }
 
@@ -52,6 +60,68 @@ export function buildApnsJwt(now: number = Date.now()): string {
   return token;
 }
 
+// ── HTTP/2 session reuse ────────────────────────────────────────────────
+// One TLS+H2 handshake per notification would dominate the cost of a fan-out
+// to hundreds of devices, so sessions are cached per host and reused for as
+// long as the serverless instance stays warm. Any error, close or GOAWAY
+// evicts the entry so the next send reconnects cleanly.
+const sessions = new Map<string, ClientHttp2Session>();
+
+function getSession(origin: string): ClientHttp2Session {
+  const existing = sessions.get(origin);
+  if (existing && !existing.closed && !existing.destroyed) return existing;
+
+  const session = connect(origin);
+  const evict = () => { if (sessions.get(origin) === session) sessions.delete(origin); };
+  session.on("error", evict);
+  session.on("close", evict);
+  session.on("goaway", evict);
+  // Nothing else keeps the event loop alive for this socket between requests.
+  session.setTimeout(60_000, () => { evict(); session.close(); });
+  sessions.set(origin, session);
+  return session;
+}
+
+/** Close pooled sessions — used by the diagnostic so a probe leaves nothing behind. */
+export function _closeApnsSessions(): void {
+  for (const [, s] of sessions) { try { s.close(); } catch { /* already gone */ } }
+  sessions.clear();
+}
+
+interface H2Response { status: number; body: string }
+
+function h2Post(origin: string, path: string, headers: Record<string, string>, body: string, timeoutMs: number): Promise<H2Response> {
+  return new Promise((resolve, reject) => {
+    let session: ClientHttp2Session;
+    try { session = getSession(origin); } catch (e) { return reject(e); }
+
+    let settled = false;
+    const finish = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
+
+    // A session-level failure (TLS, DNS, GOAWAY) never reaches req's error
+    // handler, so it has to be caught here or the promise hangs to timeout.
+    const onSessionError = (e: Error) => finish(() => reject(e));
+    session.once("error", onSessionError);
+
+    const req = session.request({
+      [constants.HTTP2_HEADER_METHOD]: "POST",
+      [constants.HTTP2_HEADER_PATH]: path,
+      ...headers,
+    });
+
+    let status = 0;
+    let data = "";
+    req.setEncoding("utf8");
+    req.setTimeout(timeoutMs, () => finish(() => { req.close(constants.NGHTTP2_CANCEL); reject(new Error("apns request timed out")); }));
+    req.on("response", (h) => { status = Number(h[constants.HTTP2_HEADER_STATUS]) || 0; });
+    req.on("data", (c) => { data += c; });
+    req.on("error", (e) => finish(() => { session.off("error", onSessionError); reject(e); }));
+    req.on("end", () => finish(() => { session.off("error", onSessionError); resolve({ status, body: data }); }));
+
+    req.end(body);
+  });
+}
+
 export async function sendApns(
   deviceToken: string,
   payload: { title: string; body: string; data?: Record<string, unknown>; sound?: string; threadId?: string },
@@ -59,31 +129,33 @@ export async function sendApns(
 ): Promise<PushResult> {
   if (!apnsConfigured()) return { sent: false, skipped: "apns not configured" };
   try {
-    const res = await fetch(`${apnsHost(environment)}/3/device/${deviceToken}`, {
-      method: "POST",
-      headers: {
+    const body = JSON.stringify({
+      aps: {
+        alert: { title: payload.title, body: payload.body },
+        sound: payload.sound ?? "default",
+        ...(payload.threadId ? { "thread-id": payload.threadId } : {}),
+      },
+      ...(payload.data || {}),
+    });
+
+    const res = await h2Post(
+      apnsHost(environment),
+      `/3/device/${deviceToken}`,
+      {
         authorization: `bearer ${buildApnsJwt()}`,
         "apns-topic": process.env.APNS_BUNDLE_ID!,
         "apns-push-type": "alert",
         "apns-priority": "10",
         "content-type": "application/json",
       },
-      body: JSON.stringify({
-        aps: {
-          alert: { title: payload.title, body: payload.body },
-          sound: payload.sound ?? "default",
-          ...(payload.threadId ? { "thread-id": payload.threadId } : {}),
-        },
-        ...(payload.data || {}),
-      }),
-      signal: AbortSignal.timeout(10_000),
-      cache: "no-store",
-    });
-    if (res.ok) return { sent: true };
-    const body = await res.text().catch(() => "");
+      body,
+      10_000,
+    );
+
+    if (res.status === 200) return { sent: true };
     // 410 Gone / BadDeviceToken → the token is dead and should be disabled
-    const dead = res.status === 410 || /BadDeviceToken|Unregistered/i.test(body);
-    return { sent: false, error: `apns ${res.status} ${body.slice(0, 120)}`, deadToken: dead };
+    const dead = res.status === 410 || /BadDeviceToken|Unregistered/i.test(res.body);
+    return { sent: false, error: `apns ${res.status} ${res.body.slice(0, 120)}`, deadToken: dead };
   } catch (e) {
     return { sent: false, error: (e as Error).message };
   }

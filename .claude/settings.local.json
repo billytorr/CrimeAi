@@ -80,7 +80,10 @@
       "Bash(git rev-list *)",
       "Bash(git check-ignore *)",
       "Bash(git status *)",
-      "Bash(python3 -)"
+      "Bash(python3 -)",
+      "Bash(curl -s -H 'x-push-secret: 28d2874b6c48b80c13a17c1ccdc437342bb7a31f34d0888bee1a53d6c86716ab' -w '\\\\nHTTP %{http_code}\\\\n' https://app.publicsafetycrimecenter.com/api/push/diagnose)",
+      "Bash(curl -s -o /dev/null -w \"  http1.1 → %{http_code} \\(0 = connection refused\\)\\\\n\" --http1.1 --max-time 10 https://api.push.apple.com/3/device/0000)",
+      "Bash(curl -s -o /dev/null -w \"  http2   → %{http_code}\\\\n\" --http2 --max-time 10 https://api.push.apple.com/3/device/0000)"
     ]
   }
 }

@@ -15,7 +15,7 @@
 // This exercises the real sendApns/sendFcm code paths rather than a parallel
 // implementation, so a pass here is a pass for production traffic.
 
-import { sendApns, apnsConfigured, _resetApnsJwt, buildApnsJwt } from "./apns";
+import { sendApns, apnsConfigured, _resetApnsJwt, buildApnsJwt, _closeApnsSessions } from "./apns";
 import { sendFcm, fcmConfigured, _resetFcmToken, lastFcmAuthError } from "./fcm";
 
 // Syntactically valid (64 hex chars) but guaranteed unregistered. Apple
@@ -160,6 +160,9 @@ export async function diagnose(): Promise<Diagnosis> {
       apnsChecks.push({ ...c, name: `${c.name} (${env})` });
     }
     _resetApnsJwt();
+    // A probe opens an HTTP/2 session to each Apple host; don't leave them
+    // pooled in the instance just because someone ran a diagnostic.
+    _closeApnsSessions();
   }
 
   // ---- FCM --------------------------------------------------------------
