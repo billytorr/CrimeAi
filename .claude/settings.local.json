@@ -99,7 +99,8 @@
       "Bash(cp /tmp/oa.bak supabase/official-account.sql)",
       "Bash(rm /tmp/oa.bak)",
       "Bash(d.message)",
-      "Bash(d.error)"
+      "Bash(d.error)",
+      "Bash(cd /Users/blackseedlabs/Desktop/Crime_AI *)"
     ]
   }
 }

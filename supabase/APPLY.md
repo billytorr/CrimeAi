@@ -8,10 +8,24 @@ useful to say.
 
 **When you add a `.sql` file, add it to this list in the same commit.**
 
-Apply by pasting into **Supabase → SQL Editor**, or:
+## Two ways to apply — don't mix them up
+
+**A. Supabase SQL Editor** (no setup). It accepts **SQL only** — a shell
+command pasted in returns `42601: syntax error at or near "psql"`. You need
+the *contents* of the file. On a Mac, put them on the clipboard:
 
 ```bash
-psql "$DATABASE_URL" -f supabase/<file>.sql
+cat supabase/verification.sql | pbcopy
+```
+
+then paste into the editor and press **Run**.
+
+**B. Terminal** (needs `psql` and a connection string — Supabase → Settings →
+Database → Connection string). This is a **shell** command, not something to
+paste into the SQL Editor:
+
+```bash
+psql "$DATABASE_URL" -f supabase/verification.sql
 ```
 
 Every file is written to be **idempotent** (`create table if not exists`,
