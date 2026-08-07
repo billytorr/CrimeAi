@@ -14,6 +14,8 @@ import { useEffect, useState } from "react";
 import { apiUrl, authHeaders } from "@/lib/api";
 import { toggleFollowState } from "@/lib/social";
 import Avatar from "@/components/Avatar";
+import VerifyPrompt from "@/components/VerifyPrompt";
+import { Verified } from "@/components/Icons";
 
 interface Suggestion {
   handle: string;
@@ -28,6 +30,7 @@ export default function SuggestedFollows({ userId, onDone }: { userId: string; o
   const [items, setItems] = useState<Suggestion[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,13 +126,36 @@ export default function SuggestedFollows({ userId, onDone }: { userId: string; o
         </p>
       )}
 
+      {/* Optional ID verification, offered once at the end of signup. Framed
+          as a choice with a stated cost, not a wall — declining still lands
+          you in a fully working app, and Settings has the way back. */}
+      <div className="mt-6 rounded-xl border border-brand/25 bg-brand/5 p-4">
+        <div className="flex items-center gap-1.5">
+          <span className="text-brand"><Verified size={15} /></span>
+          <p className="text-sm font-semibold text-ink">Want to report crime?</p>
+        </div>
+        <p className="mt-1.5 text-xs leading-relaxed text-ink2">
+          Filing a crime report needs a verified ID — reports pin to the map and neighbors act on them. Everything else
+          works without it. Your ID photo and face scan are deleted within 24 hours.
+        </p>
+        <button
+          onClick={() => setVerifying(true)}
+          className="mt-3 w-full rounded-lg border border-brand/40 bg-brand/10 py-2.5 text-xs font-semibold text-brand active:scale-[0.99]"
+        >
+          Verify my ID
+        </button>
+        <p className="mt-2 text-center text-[11px] text-ink3">Or skip — you can do this any time in Settings.</p>
+      </div>
+
       <button
         onClick={continueOn}
         disabled={busy}
-        className="mt-7 w-full rounded-xl bg-brand py-3.5 text-sm font-semibold text-white active:scale-[0.99] disabled:opacity-60"
+        className="mt-5 w-full rounded-xl bg-brand py-3.5 text-sm font-semibold text-white active:scale-[0.99] disabled:opacity-60"
       >
         {busy ? "Setting up…" : selected.size ? `Follow ${selected.size} & enter CrimeAI →` : "Enter CrimeAI →"}
       </button>
+
+      {verifying && <VerifyPrompt status="none" onClose={() => setVerifying(false)} />}
     </>
   );
 }

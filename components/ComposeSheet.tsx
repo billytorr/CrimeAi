@@ -12,8 +12,10 @@ import { accountHandle, type Account } from "@/lib/auth";
 import { addPost, type Post, type PostKind } from "@/lib/social";
 import { supabaseEnabled, uploadMedia } from "@/lib/supabase";
 import { applyForLive, getMyLiveApplication, type LiveApplication } from "@/lib/liveAccess";
-import { Close, Pin, Live as LiveIcon } from "@/components/Icons";
+import { Close, Pin, Live as LiveIcon, Lock } from "@/components/Icons";
 import { CATEGORIES } from "@/lib/categories";
+import { useVerification } from "@/lib/identity/verify-client";
+import VerifyPrompt from "@/components/VerifyPrompt";
 
 // Report categories come straight from the shared crime taxonomy —
 // anything that involves or can occur in a neighborhood.
@@ -66,6 +68,16 @@ export default function ComposeSheet({
   const [category, setCategory] = useState<string>("other"); // default until the reporter picks
   const [busy, setBusy] = useState(false);
   const [liveApply, setLiveApply] = useState(false);
+  // Crime reports require a verified ID; posting never does.
+  const idv = useVerification();
+  const [needsVerify, setNeedsVerify] = useState(false);
+
+  // Someone can arrive here on the REPORT tab (e.g. the map's "report this"
+  // shortcut) without being verified. Drop them to POST once we know, rather
+  // than letting them write a whole report only to be refused at submit.
+  useEffect(() => {
+    if (!idv.loading && !idv.verified && tab === "report") { setTab("post"); setNeedsVerify(true); }
+  }, [idv.loading, idv.verified, tab]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -433,7 +445,16 @@ export default function ComposeSheet({
       {/* bottom bar: POST · REPORT · LIVE */}
       <div className="safe-bottom flex items-center justify-center gap-10 bg-black py-3 text-[15px] font-semibold">
         <button onClick={() => setTab("post")} className={tab === "post" ? "text-white" : "text-white/40"}>POST</button>
-        <button onClick={() => setTab("report")} className={tab === "report" ? "text-white" : "text-white/40"}>REPORT</button>
+        {/* Posting is open to everyone; REPORTING requires a verified ID.
+            The tab stays visible and tappable — hiding it would leave people
+            hunting for where reporting went. Tapping it unverified explains
+            why and offers the way through. */}
+        <button
+          onClick={() => (idv.verified || idv.loading ? setTab("report") : setNeedsVerify(true))}
+          className={`flex items-center gap-1 ${tab === "report" ? "text-white" : "text-white/40"}`}
+        >
+          REPORT{!idv.verified && !idv.loading && <Lock size={11} />}
+        </button>
         <button
           onClick={() => (p.liveEnabled ? (onGoLive(), onClose()) : setLiveApply(true))}
           className="flex items-center gap-1 text-white/40"
@@ -443,6 +464,9 @@ export default function ComposeSheet({
       </div>
 
       {liveApply && <LiveApplySheet account={account} onClose={() => setLiveApply(false)} />}
+      {needsVerify && (
+        <VerifyPrompt status={idv.status} reason={idv.reason} onClose={() => setNeedsVerify(false)} />
+      )}
     </div>
   );
 }

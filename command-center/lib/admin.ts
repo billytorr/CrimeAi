@@ -18,7 +18,7 @@ export interface Admin { id: string; email: string; role: Role; name: string }
 // adapted to PSCC. Access is enforced twice: sections hidden here, and the
 // database RLS policies reject anything a role isn't allowed to touch.
 export type Role = "owner" | "admin" | "moderator" | "analyst" | "finance";
-export type SectionId = "overview" | "users" | "content" | "analytics" | "feedback" | "issues" | "updates" | "ambassadors" | "legal" | "finance" | "sources" | "scores" | "security" | "settings";
+export type SectionId = "overview" | "users" | "content" | "analytics" | "feedback" | "issues" | "updates" | "ambassadors" | "legal" | "finance" | "sources" | "scores" | "verifications" | "security" | "settings";
 
 export const ROLE_INFO: Record<Role, { label: string; blurb: string }> = {
   owner: { label: "Owner", blurb: "Full control. Manages every team member, including admins. Cannot be removed from the portal." },
@@ -41,6 +41,9 @@ const SECTION_ACCESS: Record<SectionId, Role[]> = {
   finance: ["owner", "admin", "finance"],
   sources: ["owner", "admin", "moderator"],
   scores: ["owner", "admin", "analyst"],
+  // Approving an ID grants the verified check and unlocks crime reporting —
+  // the highest-trust action in the portal. Not delegated to analysts.
+  verifications: ["owner", "admin"],
   security: ["owner", "admin"],
   settings: ["owner", "admin"],
 };

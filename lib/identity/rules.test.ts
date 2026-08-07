@@ -38,13 +38,23 @@ describe("Rule 4 — schema holds no biometric or ID-document data", () => {
   });
 });
 
-// ── RULE 3: identity is NEVER required to post or report ────────────
-// The report submission path (composer → addPost → posts insert) must have
-// no identity reference at all — level L0 users report exactly like L4.
-describe("Rule 3 — report submission is identity-free (L0 reports succeed)", () => {
-  const REPORT_PATH_FILES = [
-    "components/ComposeSheet.tsx", // the report composer
-    "lib/social.ts",               // addPost / persistence
+// ── Rule 3 — REVISED 2026-08-06 ─────────────────────────────────────
+// Was: "identity is never required to post OR report."
+// Now: identity gates REPORTING; POSTING stays open to everyone.
+//
+// The half that survives is the important one. A crime report pins to the
+// map and neighbours act on it, so it is reasonable to demand
+// accountability for one. Ordinary posting is how someone participates at
+// all — gating that would silently exclude anyone unwilling or unable to
+// hand over a government ID, which is disproportionately the people with
+// most reason to fear being identified.
+//
+// So: the POST path must stay identity-free, and the base INSERT policy
+// must never gate on identity level. Reporting is gated in the composer,
+// where the user can be told why and offered the way through.
+describe("Rule 3 (revised) — posting stays identity-free", () => {
+  const POST_PATH_FILES = [
+    "lib/social.ts", // addPost / persistence — shared by posts AND reports
   ];
   const FORBIDDEN = [
     /from\s+["']@\/lib\/identity/,
@@ -52,7 +62,7 @@ describe("Rule 3 — report submission is identity-free (L0 reports succeed)", (
     /computeLevel|updateIdentityFactors|recordVendorResult/,
     /\bIDV\b|verificationRequired/i,
   ];
-  for (const f of REPORT_PATH_FILES) {
+  for (const f of POST_PATH_FILES) {
     it(`${f} contains no identity requirement`, () => {
       const src = read(f);
       for (const rx of FORBIDDEN) {
@@ -60,10 +70,24 @@ describe("Rule 3 — report submission is identity-free (L0 reports succeed)", (
       }
     });
   }
+
   it("the posts INSERT policy gates only on auth + ban — never identity level", () => {
     const schema = read("supabase/schema.sql") + read("supabase/admin.sql");
-    // the only insert conditions may be user ownership and the ban flag.
     // (bare 'identity' is Postgres column syntax — check the real objects)
     expect(schema).not.toMatch(/identity_status|identity_level|identity_events/i);
+  });
+
+  it("the composer gates the REPORT tab, not the POST tab", () => {
+    const src = read("components/ComposeSheet.tsx");
+    // reporting is gated…
+    expect(src, "the report tab must consult verification").toMatch(/idv\.verified/);
+    // …and posting is not: setTab("post") must never be behind a check
+    const postBtn = src.slice(src.lastIndexOf("<button", src.indexOf('setTab("post")')), src.indexOf('setTab("post")') + 40);
+    expect(postBtn, "POST must not be conditioned on verification").not.toMatch(/verified|idv\./);
+  });
+
+  it("an unverified user is redirected to POST rather than blocked outright", () => {
+    const src = read("components/ComposeSheet.tsx");
+    expect(src).toMatch(/setTab\("post"\);\s*setNeedsVerify\(true\)/);
   });
 });

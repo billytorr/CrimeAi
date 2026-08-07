@@ -17,6 +17,9 @@ import { useLang, useT } from "@/components/LanguageProvider";
 import { LANGS } from "@/lib/i18n";
 import { authenticate, biometryStatus, biometryLabel, type BiometryKind } from "@/lib/biometric/client";
 import { appLockEnabled, setAppLockEnabled } from "@/lib/biometric/lock";
+import { useVerification } from "@/lib/identity/verify-client";
+import VerifyPrompt from "@/components/VerifyPrompt";
+import { Verified } from "@/components/Icons";
 
 // alert-preference chips render from the shared crime taxonomy
 const CAT_ICONS: Record<string, typeof Alert> = {
@@ -122,6 +125,9 @@ export default function SettingsScreen({
             New followers must send a request — you approve or decline it from your Inbox.
           </p>
         </Section>
+
+        {/* ID verification — the way back for anyone who skipped onboarding */}
+        <VerificationSection />
 
         {/* app lock — device-scoped, hidden entirely where biometry can't run */}
         <AppLockSection />
@@ -552,6 +558,64 @@ function LanguagePicker() {
       </div>
       <p className="mt-2.5 text-[11px] leading-relaxed text-ink3">{t("Choose the language for the whole app. It follows your device by default.")}</p>
     </div>
+  );
+}
+
+// ID verification. Skipping it in onboarding is a real option, so this is the
+// way back — and the only place that explains what verification actually buys
+// you (reporting) versus what it doesn't (everything else already works).
+function VerificationSection() {
+  const idv = useVerification();
+  const [open, setOpen] = useState(false);
+  const [justSubmitted, setJustSubmitted] = useState(false);
+
+  if (idv.loading) return null;
+  const status = justSubmitted ? "pending" : idv.status;
+
+  return (
+    <Section title="ID verification">
+      {idv.verified ? (
+        <div className="flex items-center gap-2 rounded-xl border border-brand/25 bg-brand/5 px-3 py-3">
+          <span className="text-brand"><Verified size={18} /></span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-ink">You&apos;re verified</p>
+            <p className="text-xs text-ink3">The red check shows on your profile, and you can file crime reports.</p>
+          </div>
+        </div>
+      ) : status === "pending" ? (
+        <div className="rounded-xl border border-ink/10 bg-shell px-3 py-3">
+          <p className="text-sm font-semibold text-ink">In review</p>
+          <p className="mt-0.5 text-xs text-ink3">We&apos;re checking your ID. You&apos;ll be able to report as soon as it clears.</p>
+        </div>
+      ) : (
+        <>
+          <button
+            onClick={() => setOpen(true)}
+            className="flex w-full items-center justify-between rounded-xl border border-ink/10 bg-shell px-3 py-3 active:scale-[0.99]"
+          >
+            <span className="text-left">
+              <span className="block text-sm font-semibold text-ink">
+                {status === "rejected" ? "Try verification again" : "Verify your ID"}
+              </span>
+              <span className="block text-xs text-ink3">Required to file crime reports</span>
+            </span>
+            <Chevron size={16} />
+          </button>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink3">
+            Optional. You can post, comment, follow and use every safety feature without it — only crime reporting needs
+            a verified ID. Your ID photo and face scan are deleted within 24 hours; we keep only the result.
+          </p>
+        </>
+      )}
+      {open && (
+        <VerifyPrompt
+          status={idv.status}
+          reason={idv.reason}
+          onClose={() => setOpen(false)}
+          onSubmitted={() => setJustSubmitted(true)}
+        />
+      )}
+    </Section>
   );
 }
 

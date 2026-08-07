@@ -14,7 +14,8 @@ import Avatar from "@/components/Avatar";
 import FeedList from "@/components/FeedList";
 import ProfileGrid from "@/components/ProfileGrid";
 import SettingsScreen from "@/components/screens/SettingsScreen";
-import { Settings as SettingsIcon, Grid, Report, Pin, Alert, Camera, ProBadge } from "@/components/Icons";
+import { Settings as SettingsIcon, Grid, Report, Pin, Alert, Camera, ProBadge, Verified } from "@/components/Icons";
+import { useVerification } from "@/lib/identity/verify-client";
 
 type Section = "posts" | "safety";
 
@@ -26,6 +27,7 @@ export default function MeScreen({
   focusPostId?: string | null; onFocusConsumed?: () => void; onName?: (n: string) => void;
 }) {
   const profile = account.profile!;
+  const idv = useVerification();
   const [section, setSection] = useState<Section>("posts");
   const [followList, setFollowList] = useState<"followers" | "following" | null>(null);
   const [editing, setEditing] = useState(false);
@@ -99,7 +101,15 @@ export default function MeScreen({
             </div>
           </div>
           <div className="mt-3">
-            <div className="flex items-center gap-1 font-semibold">{account.name} {profile.plan === "pro" && profile.showProBadge !== false && <ProBadge size={14} />} <span className="text-xs font-normal text-ink3">@{accountHandle(account)}</span></div>
+            <div className="flex items-center gap-1 font-semibold">
+                {account.name}
+                {/* ID-verified: a vendor matched this person's face to their own
+                    government ID. Distinct from the Protector badge — one is who
+                    you are, the other is what you pay. */}
+                {idv.verified && <span className="text-brand" title="ID verified"><Verified size={14} /></span>}
+                {profile.plan === "pro" && profile.showProBadge !== false && <ProBadge size={14} />}
+                <span className="text-xs font-normal text-ink3">@{accountHandle(account)}</span>
+              </div>
             <div className="flex items-center gap-1 text-xs text-ink2"><Pin size={12} /> {[profile.location.neighborhood, profile.location.city, profile.location.state].filter(Boolean).join(", ")} {profile.usedGeolocation && <span className="text-brand">· live location</span>}</div>
             {profile.bio && <p className="mt-1.5 text-sm text-ink2">{profile.bio}</p>}
             <button onClick={() => setEditing(true)} className="mt-3 w-full rounded-xl border border-ink/15 bg-card py-2.5 text-sm font-semibold text-ink active:scale-[0.99]">
