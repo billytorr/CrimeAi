@@ -75,7 +75,18 @@ export async function POST(req: NextRequest) {
     let ai: { limited: boolean; remaining?: number } = { limited: false };
     const meter = userId ? await enforceConsume(userId, "ai_analytical") : { allowed: false, remaining: 0 };
     if (meter.allowed) {
-      ({ answer, engine } = await askCrimeAI(question, context));
+      // Config from the Command Center (model, prompt, temperature) + what we
+      // know about this user, so the assistant answers as if it knows them.
+      const { loadAiConfig } = await import("@/lib/ai-config");
+      const { buildUserContext } = await import("@/lib/ai-user-context");
+      const [cfg, userContext] = await Promise.all([
+        loadAiConfig(),
+        userId ? buildUserContext(userId) : Promise.resolve(""),
+      ]);
+      ({ answer, engine } = await askCrimeAI(question, context, {
+        model: cfg.model, temperature: cfg.temperature, maxTokens: cfg.maxTokens,
+        system: cfg.systemPrompt, userContext,
+      }));
       if (Number.isFinite(meter.remaining)) ai.remaining = meter.remaining;
     } else {
       answer = fallbackAnswer(question, context);

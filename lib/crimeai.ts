@@ -64,20 +64,31 @@ interface AskResult {
   engine: "anthropic" | "ollama" | "fallback";
 }
 
-export async function askCrimeAI(question: string, context: string): Promise<AskResult> {
-  // 1) Anthropic Claude — best for a live demo.
+export interface AskOverrides {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  system?: string;      // Command Center system prompt; empty falls back to CRIMEAI_SYSTEM
+  userContext?: string; // "what CrimeAI knows about this user" block
+}
+
+export async function askCrimeAI(question: string, context: string, o: AskOverrides = {}): Promise<AskResult> {
+  // System prompt from the Command Center (or built-in), plus what we know
+  // about this specific user, so the assistant answers as if it knows them.
+  const system = [o.system?.trim() || CRIMEAI_SYSTEM, o.userContext?.trim()].filter(Boolean).join("\n\n");
+  // 1) Anthropic Claude.
   if (process.env.ANTHROPIC_API_KEY) {
     try {
       const client = new Anthropic();
-      // Real, current model id. The old default "claude-opus-4-8" is not a valid
-      // Anthropic model, so every call 404'd and silently dropped to the
-      // deterministic fallback — nobody was ever actually talking to Claude.
-      // Overridable from the Command Center via the ANTHROPIC/CRIMEAI_MODEL env.
-      const model = process.env.CRIMEAI_MODEL || "claude-sonnet-4-5";
+      // Model comes from ai_config (Command Center); env is the fallback. The
+      // old default "claude-opus-4-8" was not a valid id — every call 404'd
+      // into the deterministic fallback, so nobody was ever talking to Claude.
+      const model = o.model || process.env.CRIMEAI_MODEL || "claude-sonnet-4-5";
       const msg = await client.messages.create({
         model,
-        max_tokens: 1024,
-        system: CRIMEAI_SYSTEM,
+        max_tokens: o.maxTokens || 1200,
+        temperature: o.temperature ?? 0.4,
+        system,
         messages: [{ role: "user", content: `${context}\n\nUSER QUESTION: ${question}` }],
       });
       const answer = msg.content
@@ -102,7 +113,7 @@ export async function askCrimeAI(question: string, context: string): Promise<Ask
         model: process.env.OLLAMA_MODEL || "torr-crimeai",
         stream: false,
         messages: [
-          { role: "system", content: CRIMEAI_SYSTEM },
+          { role: "system", content: system },
           { role: "user", content: `${context}\n\nUSER QUESTION: ${question}` },
         ],
       }),

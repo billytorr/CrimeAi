@@ -204,6 +204,45 @@ who opted out
 - Cross-entity sharing (CrimeAI → Torr AI / BlackSeed Labs) needs a written
   data-sharing agreement and must be disclosed by name
 
+### 5a. CrimeAI assistant — personal memory + model improvement (2026-08-07)
+
+Billy's decision: CrimeAI must keep **personal memory** per user and must be
+able to **improve the shared model** from usage, "in the best practical way."
+Both are adopted, with the guardrails that make them lawful rather than
+optional niceties:
+
+**Personal memory (per user, private).** The assistant retains a private,
+per-user memory across their threads — their neighbourhood, their reports,
+recurring concerns, uploaded documents they asked it to remember.
+- Scoped to `user_id`; **one user's memory never reaches another's answers.**
+- Stored pseudonymously, surfaced only to that user's own sessions.
+- **Viewable and erasable** by the user in Settings (a memory you cannot see
+  or delete is a liability, not a feature). Deletion is honoured immediately.
+- Uploads are covered here: a file a user shares is readable within *their*
+  memory only.
+
+**Shared-model improvement.** Behavioural and conversational data may improve
+the shared CrimeAI model, under the training rules above **plus**:
+- The exclusions are **absolute and unchanged**: biometric identifiers, ID
+  documents/numbers, DM content, precise home address and payment credentials
+  **never** train anything, memory or shared model. Adding assistant memory
+  does not widen that list.
+- **Uploaded content trains the shared model only with explicit, separate
+  opt-in** — distinct from using it in the user's own chat. Reading your file
+  to answer you (per-conversation) is the default and needs no extra consent;
+  contributing it to the shared corpus is opt-in.
+- Human-review and retraining sets are **pseudonymised and PII-scrubbed**
+  before anyone or anything sees them.
+- A user who opts out of training keeps full personal memory — the two are
+  independent switches.
+
+**Still required before this shships (Billy owns):**
+- Privacy Policy update describing personal memory + the upload-training
+  opt-in (the current v2 covers behavioural training, not memory or uploads).
+- Counsel review of the upload-training opt-in specifically — user-generated
+  uploads can contain third parties' data, which is a different risk surface
+  from a user's own posts.
+
 ## 6. Jurisdiction
 
 Per answer 6 — comply everywhere, no geofencing. That means designing to the
