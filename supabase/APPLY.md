@@ -89,6 +89,7 @@ Added late; the likeliest to be missing on any given environment.
 |---|---|---|
 | `official-account.sql` | `is_official`, `suggested_follows()`, `designate_official()` | then run `select public.designate_official('crimeai@publicsafetycrimecenter.com','crimeai');` after creating the auth user in the dashboard |
 | `verification.sql` | `biometric_consents`, `identity_verifications`, `decide_verification()`, `is_identity_verified()`, 24h media purge | none |
+| `notifications.sql` | in-app Activity feed: `notifications` table + triggers on likes/comments/follows/corroborations/tier changes, `mark_notifications_read()`, `unread_notification_count()` | none |
 | `pricing-plans.sql` | plan display fields (tagline/blurb/features/status), Guardian + Community as coming-soon, **$69.99 annual Protector price**, retires the $4.99 arm | none |
 
 ---

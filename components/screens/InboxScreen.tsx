@@ -11,6 +11,7 @@ import { milesBetween } from "@/lib/data";
 import { Alert, Car, Eye, Flame, Comment as CommentIcon, Report, Messages as MessagesIcon, Bell, Verified, Home as HomeIcon, Lock, IdCard, Laptop } from "@/components/Icons";
 import { normalizeCat } from "@/lib/categories";
 import Avatar from "@/components/Avatar";
+import { getActivity, markActivityRead, type ActivityItem } from "@/lib/notifications";
 import MessageThread from "@/components/MessageThread";
 
 const CAT_ICON: Record<string, typeof Alert> = {
@@ -66,6 +67,24 @@ export default function InboxScreen({ account, refreshKey }: { account: Account;
     loadRequests();
   }
 
+  // Real activity — likes, comments, follows, corroborations, rank changes.
+  // Written by database triggers (supabase/notifications.sql), so nothing is
+  // missed by a code path that forgot to call something.
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    getActivity(50).then((rows) => { if (!cancelled) setActivity(rows); });
+    return () => { cancelled = true; };
+  }, [account.id]);
+
+  // Opening the tab IS the acknowledgement — same as Instagram and TikTok.
+  useEffect(() => {
+    if (tab === "activity" && activity.some((a) => !a.read)) {
+      markActivityRead();
+      setActivity((rows) => rows.map((r) => ({ ...r, read: true })));
+    }
+  }, [tab, activity]);
+
   const items = useMemo<Item[]>(() => {
     const out: Item[] = [];
     incidents
@@ -77,10 +96,12 @@ export default function InboxScreen({ account, refreshKey }: { account: Account;
       .filter((post) => milesBetween(p.location.lat, p.location.lon, post.lat, post.lon) <= p.alerts.radiusMiles + 1)
       .slice(0, 8)
       .forEach((post) => out.push({ id: `so-${post.id}`, tone: "social", title: `${post.author} posted a report`, body: post.text.slice(0, 80), ts: post.createdAt }));
+    // Personal activity sits alongside area alerts, sorted by time below.
+    activity.forEach((a) => out.push({ id: `nf-${a.id}`, tone: a.tone, cat: a.cat, title: a.title, body: a.body ?? "", ts: a.ts }));
     anns.forEach((a) => out.push({ id: `ann-${a.id}`, tone: "system", title: a.title, body: a.body, ts: a.published_at }));
     out.push({ id: "sys-welcome", tone: "system", title: "Welcome to CrimeAI", body: `You're watching ${p.location.neighborhood}. Alerts within ${p.alerts.radiusMiles} mi are on.`, ts: new Date(Date.now() - 3600000).toISOString() });
     return out.sort((a, b) => +new Date(b.ts) - +new Date(a.ts));
-  }, [incidents, reports, anns, p]);
+  }, [incidents, reports, anns, activity, p]);
 
   const unread = convos.filter((c) => c.unread).length;
 

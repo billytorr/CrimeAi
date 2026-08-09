@@ -108,7 +108,10 @@
       "Bash(curl -s \"https://pay.publicsafetycrimecenter.com/api/pay/authnet/validate?t=bogus\" -o /dev/null)",
       "Bash(curl -s \"https://pay.publicsafetycrimecenter.com/api/pay/providers\")",
       "Bash(curl -s \"https://pay.publicsafetycrimecenter.com/api/pay/status\")",
-      "Bash(plutil -lint ios/App/App/PrivacyInfo.xcprivacy)"
+      "Bash(plutil -lint ios/App/App/PrivacyInfo.xcprivacy)",
+      "Bash(items)",
+      "Bash(echo \"════ how `items` is currently built ════\")",
+      "Bash(awk 'NR==69 || NR==80 || NR==88 {printf \"%d:[%s]\\\\n\", NR, $0}' components/screens/InboxScreen.tsx)"
     ]
   }
 }
