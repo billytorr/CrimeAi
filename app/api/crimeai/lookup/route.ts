@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+
+// LLM calls routinely exceed Vercel Hobby's 10s default; without this the
+// function is killed mid-call and the app shows "Network error".
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
 import { resolveAddress } from "@/lib/geocode";
 import { computeStats, incidentsNear } from "@/lib/data";
 import { liveIncidentsNear } from "@/lib/ingest/live";

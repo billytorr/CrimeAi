@@ -69,7 +69,11 @@ export async function askCrimeAI(question: string, context: string): Promise<Ask
   if (process.env.ANTHROPIC_API_KEY) {
     try {
       const client = new Anthropic();
-      const model = process.env.CRIMEAI_MODEL || "claude-opus-4-8";
+      // Real, current model id. The old default "claude-opus-4-8" is not a valid
+      // Anthropic model, so every call 404'd and silently dropped to the
+      // deterministic fallback — nobody was ever actually talking to Claude.
+      // Overridable from the Command Center via the ANTHROPIC/CRIMEAI_MODEL env.
+      const model = process.env.CRIMEAI_MODEL || "claude-sonnet-4-5";
       const msg = await client.messages.create({
         model,
         max_tokens: 1024,
