@@ -13,7 +13,7 @@ import {
 } from "@/lib/social";
 import Avatar from "@/components/Avatar";
 import MessageThread from "@/components/MessageThread";
-import { useOpenProfile } from "@/lib/profileContext";
+import { useOpenProfile, useAskAbout } from "@/lib/profileContext";
 import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, SoundOn, SoundOff } from "@/components/Icons";
 
 import { catColor } from "@/lib/categories";
@@ -41,6 +41,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
   }
   const [messaging, setMessaging] = useState<Post | null>(null);
   const openProfile = useOpenProfile();
+  const askAbout = useAskAbout();
   // optimistic local overrides
   const [likeOver] = useState<Record<string, boolean>>({});
   const [saveOver] = useState<Record<string, boolean>>({});
@@ -116,6 +117,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
       {menuPost && (
         <PostMenuSheet
           post={menuPost}
+          onAsk={() => { askAbout({ id: menuPost.id, text: menuPost.text }); setMenuPost(null); }}
           onReport={() => { setReporting(menuPost); setMenuPost(null); }}
           onBlock={() => doBlock(menuPost)}
           onClose={() => setMenuPost(null)}
@@ -128,7 +130,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
 
 // ⋮ menu — the user-facing safety controls the app stores require:
 // report the post, or block the account entirely.
-function PostMenuSheet({ post, onReport, onBlock, onClose }: { post: Post; onReport: () => void; onBlock: () => void; onClose: () => void }) {
+function PostMenuSheet({ post, onAsk, onReport, onBlock, onClose }: { post: Post; onAsk: () => void; onReport: () => void; onBlock: () => void; onClose: () => void }) {
   return (
     <div className="fade-in fixed inset-0 z-[1400] flex flex-col justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60" />

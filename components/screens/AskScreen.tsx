@@ -2,10 +2,14 @@
 
 import { apiUrl, authHeaders } from "@/lib/api";
 import { bandFor } from "@/lib/scoring/bands";
-import { useEffect, useRef, useState } from "react";
-import type { Profile } from "@/lib/auth";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { Account, Profile } from "@/lib/auth";
 import type { AreaStats } from "@/lib/types";
 import Logo from "@/components/Logo";
+import {
+  listThreads, createThread, loadMessages, saveMessage, renameThread, deleteThread,
+  titleFrom, type AiThread,
+} from "@/lib/ai-threads";
 
 interface Msg { role: "user" | "assistant"; text: string; engine?: string }
 
@@ -19,55 +23,130 @@ const STARTERS = [
 
 const ENGINE_LABEL: Record<string, string> = { anthropic: "Claude", ollama: "torr-crimeai", fallback: "grounded" };
 
-export default function AskScreen({ name, profile, stats }: { name: string; profile: Profile; stats: AreaStats | null }) {
+/** A post can be shared into the assistant — AppShell passes it here. */
+export interface AskSeed { postId?: string; text: string }
+
+export default function AskScreen({
+  account, name, profile, stats, seed, onSeedConsumed,
+}: {
+  account: Account; name: string; profile: Profile; stats: AreaStats | null;
+  seed?: AskSeed | null; onSeedConsumed?: () => void;
+}) {
   const loc = profile.location;
   const first = (name || "").split(" ")[0];
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: "assistant",
-      text: `Hi${first ? " " + first : ""} — I'm CrimeAI. I'm watching ${loc.neighborhood} for you. Ask me anything about safety around here. I answer with real, cited data and I'll always tell you what I can't see.`,
-    },
-  ]);
+  const isPro = profile.plan === "pro";
+  const userId = account.id;
+
+  const greeting: Msg = {
+    role: "assistant",
+    text: `Hi${first ? " " + first : ""} — I'm CrimeAI. I'm watching ${loc.neighborhood} for you. Ask me anything about safety around here. I answer with real, cited data and I'll always tell you what I can't see.`,
+  };
+
+  const [messages, setMessages] = useState<Msg[]>([greeting]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [threads, setThreads] = useState<AiThread[]>([]);
+  const [drawer, setDrawer] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
-  async function send(q: string) {
+  const refreshThreads = useCallback(() => {
+    if (isPro) listThreads(userId).then(setThreads);
+  }, [isPro, userId]);
+
+  // On mount: resume the most recent thread (both tiers get persistence; only
+  // Pro gets the drawer to switch between many).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const list = await listThreads(userId, isPro ? 50 : 1);
+      if (cancelled) return;
+      setThreads(list);
+      if (list.length) {
+        setThreadId(list[0].id);
+        const msgs = await loadMessages(list[0].id);
+        if (!cancelled && msgs.length) setMessages(msgs.map((m) => ({ role: m.role, text: m.content, engine: m.engine })));
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // A shared post opens a fresh thread seeded with the post.
+  useEffect(() => {
+    if (!seed) return;
+    (async () => {
+      const id = await createThread(userId, titleFrom(seed.text || "About a post"), seed.postId);
+      setThreadId(id);
+      setMessages([greeting]);
+      refreshThreads();
+      const q = `About this post a neighbor shared:\n\n"${seed.text}"\n\nWhat should I make of it?`;
+      onSeedConsumed?.();
+      send(q, id);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed]);
+
+  async function ensureThread(firstUserText: string): Promise<string | null> {
+    if (threadId) return threadId;
+    const id = await createThread(userId, titleFrom(firstUserText));
+    setThreadId(id);
+    refreshThreads();
+    return id;
+  }
+
+  async function send(q: string, forceThread?: string | null) {
     const question = q.trim();
     if (!question || loading) return;
     setMessages((m) => [...m, { role: "user", text: question }]);
     setInput("");
     setLoading(true);
+
+    const tid = forceThread ?? (await ensureThread(question));
+    if (tid) saveMessage(userId, tid, { role: "user", content: question });
+
     try {
       const res = await fetch(apiUrl("/api/crimeai/ask"), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify({
-          question,
-          lat: loc.lat,
-          lon: loc.lon,
-          neighborhood: loc.neighborhood,
-          address: loc.query,
-          radiusMiles: profile.alerts.radiusMiles,
-          days: 30,
+          question, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood,
+          address: loc.query, radiusMiles: profile.alerts.radiusMiles, days: 30,
         }),
       });
       const data = await res.json();
       let text = data.answer || data.error || "Sorry, I couldn't answer that.";
-      // over the monthly AI allowance: grounded answer + honest upsell
       if (data.ai?.limited) {
         text += "\n\n— You've used this month's free AI analysis, so this answer comes straight from the live data. Protectors get a much larger monthly AI allowance (Settings → Become a Protector).";
       }
       setMessages((m) => [...m, { role: "assistant", text, engine: data.engine }]);
+      if (tid) saveMessage(userId, tid, { role: "assistant", content: text, engine: data.engine });
     } catch {
       setMessages((m) => [...m, { role: "assistant", text: "Network error — please try again." }]);
     } finally {
       setLoading(false);
     }
+  }
+
+  async function newChat() {
+    setThreadId(null);
+    setMessages([greeting]);
+    setDrawer(false);
+  }
+
+  async function openThread(t: AiThread) {
+    setDrawer(false);
+    setThreadId(t.id);
+    const msgs = await loadMessages(t.id);
+    setMessages(msgs.length ? msgs.map((m) => ({ role: m.role, text: m.content, engine: m.engine })) : [greeting]);
+  }
+
+  async function removeThread(t: AiThread) {
+    await deleteThread(t.id);
+    if (t.id === threadId) newChat();
+    refreshThreads();
   }
 
   const lastEngine = messages.filter((m) => m.engine).slice(-1)[0]?.engine;
@@ -78,29 +157,36 @@ export default function AskScreen({ name, profile, stats }: { name: string; prof
       <div className="safe-top flex items-center gap-3 border-b border-ink/10 bg-shell/95 px-5 pb-3 pt-4 backdrop-blur">
         <Logo size={38} />
         <div className="flex-1">
-          <div className="text-sm font-bold leading-tight">CrimeAI</div>
+          <div className="text-sm font-bold leading-tight">CrimeAI{isPro && <span className="ml-1.5 rounded bg-brand/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">Protector</span>}</div>
           <div className="flex items-center gap-1.5 text-xs text-ink2">
             <span className="h-1.5 w-1.5 rounded-full bg-brand" />
             Watching {loc.neighborhood}
           </div>
         </div>
-        {stats && <SafetyChip score={stats.safetyScore} />}
+        {/* Protectors get the ChatGPT-style threads menu here; free keeps the
+            Safety Score chip. Billy: nav icon top-right replaces Safe Score. */}
+        {isPro ? (
+          <div className="flex items-center gap-1">
+            <button onClick={newChat} aria-label="New chat" className="grid h-9 w-9 place-items-center rounded-full text-ink2 active:scale-95">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button onClick={() => { refreshThreads(); setDrawer(true); }} aria-label="Conversations" className="grid h-9 w-9 place-items-center rounded-full text-ink2 active:scale-95">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
+          </div>
+        ) : (
+          stats && <SafetyChip score={stats.safetyScore} />
+        )}
       </div>
 
       {/* messages */}
       <div className="scroll-area space-y-3.5 px-5 py-5">
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            {m.role === "assistant" && (
-              <div className="mr-2 mt-0.5 shrink-0">
-                <Logo size={26} />
-              </div>
-            )}
-            <div
-              className={`max-w-[82%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed ${
-                m.role === "user" ? "rounded-br-md bg-brand text-white" : "rounded-bl-md border border-ink/10 bg-card text-ink"
-              }`}
-            >
+            {m.role === "assistant" && <div className="mr-2 mt-0.5 shrink-0"><Logo size={26} /></div>}
+            <div className={`max-w-[82%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed ${
+              m.role === "user" ? "rounded-br-md bg-brand text-white" : "rounded-bl-md border border-ink/10 bg-card text-ink"
+            }`}>
               {m.text}
             </div>
           </div>
@@ -109,9 +195,7 @@ export default function AskScreen({ name, profile, stats }: { name: string; prof
           <div className="flex justify-start">
             <div className="mr-2 mt-0.5"><Logo size={26} /></div>
             <div className="rounded-2xl rounded-bl-md border border-ink/10 bg-card px-4 py-3">
-              <span className="inline-flex gap-1">
-                <Dot /><Dot d={0.15} /><Dot d={0.3} />
-              </span>
+              <span className="inline-flex gap-1"><Dot /><Dot d={0.15} /><Dot d={0.3} /></span>
             </div>
           </div>
         )}
@@ -122,11 +206,7 @@ export default function AskScreen({ name, profile, stats }: { name: string; prof
       {messages.length <= 1 && (
         <div className="flex gap-2 overflow-x-auto px-5 pb-2.5">
           {STARTERS.map((s) => (
-            <button
-              key={s}
-              onClick={() => send(s)}
-              className="shrink-0 rounded-full border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs text-ink2 active:scale-95"
-            >
+            <button key={s} onClick={() => send(s)} className="shrink-0 rounded-full border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs text-ink2 active:scale-95">
               {s}
             </button>
           ))}
@@ -148,22 +228,43 @@ export default function AskScreen({ name, profile, stats }: { name: string; prof
             placeholder={`Ask about ${loc.neighborhood}…`}
             className="w-full rounded-full border border-ink/10 bg-card px-4 py-3 text-[15px] outline-none placeholder:text-ink3 focus:border-brand/60"
           />
-          <button
-            onClick={() => send(input)}
-            disabled={loading}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand text-white active:scale-95 disabled:opacity-60"
-            aria-label="Send"
-          >
+          <button onClick={() => send(input)} disabled={loading} aria-label="Send"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand text-white active:scale-95 disabled:opacity-60">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
           </button>
         </div>
       </div>
+
+      {/* conversations drawer (Protector) */}
+      {drawer && (
+        <div className="fixed inset-0 z-[80] flex" onClick={() => setDrawer(false)}>
+          <div className="flex-1 bg-black/50" />
+          <div className="flex w-80 max-w-[85%] flex-col bg-shell shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="safe-top flex items-center justify-between border-b border-ink/10 px-4 pb-3 pt-4">
+              <span className="text-sm font-bold">Conversations</span>
+              <button onClick={newChat} className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white">+ New</button>
+            </div>
+            <div className="scroll-area flex-1 py-2">
+              {threads.length === 0 && <p className="px-4 py-8 text-center text-xs text-ink3">No conversations yet.</p>}
+              {threads.map((t) => (
+                <div key={t.id} className={`group flex items-center gap-2 px-4 py-2.5 active:bg-ink/5 ${t.id === threadId ? "bg-ink/5" : ""}`}>
+                  <button onClick={() => openThread(t)} className="min-w-0 flex-1 text-left">
+                    <div className="truncate text-sm text-ink">{t.title}</div>
+                  </button>
+                  <button onClick={() => removeThread(t)} aria-label="Delete conversation" className="shrink-0 text-ink3 active:scale-90">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function SafetyChip({ score }: { score: number }) {
-  // shared band source — no duplicated thresholds (lib/scoring/bands.ts)
   const { color } = bandFor(score);
   return (
     <div className="flex items-center gap-1.5 rounded-full px-2.5 py-1" style={{ background: `${color}22` }}>

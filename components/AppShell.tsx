@@ -35,6 +35,7 @@ export default function AppShell({
   const [profileHandle, setProfileHandle] = useState<string | null>(null);
   const [focusPostId, setFocusPostId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [askSeed, setAskSeed] = useState<import("@/components/screens/AskScreen").AskSeed | null>(null);
 
   useEffect(() => { track("app_open", {}); }, []);
   useEffect(() => { track("tab_view", { tab }); }, [tab]);
@@ -89,12 +90,17 @@ export default function AppShell({
             setProfileHandle(handle);
           }
         },
+        askAbout: (post) => {
+          // share a post into CrimeAI: seed a thread and jump to the Ask tab
+          setAskSeed({ postId: post.id, text: post.text });
+          setTab("ask");
+        },
       }}
     >
       <div className="relative flex-1 overflow-hidden">
         {tab === "feed" && <FeedScreen account={acct} onCompose={() => setComposing("post")} onSos={() => setSosOpen(true)} onSearch={() => setSearchOpen(true)} refreshKey={refreshKey} />}
         {tab === "map" && <MapScreen profile={profile} refreshKey={refreshKey} onReport={() => setComposing("report")} />}
-        {tab === "ask" && <AskScreen name={account.name} profile={profile} stats={stats} />}
+        {tab === "ask" && <AskScreen account={acct} name={account.name} profile={profile} stats={stats} seed={askSeed} onSeedConsumed={() => setAskSeed(null)} />}
         {tab === "inbox" && <InboxScreen account={acct} refreshKey={refreshKey} />}
         {tab === "you" && (
           <MeScreen
