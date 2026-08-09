@@ -111,7 +111,10 @@
       "Bash(plutil -lint ios/App/App/PrivacyInfo.xcprivacy)",
       "Bash(items)",
       "Bash(echo \"════ how `items` is currently built ════\")",
-      "Bash(awk 'NR==69 || NR==80 || NR==88 {printf \"%d:[%s]\\\\n\", NR, $0}' components/screens/InboxScreen.tsx)"
+      "Bash(awk 'NR==69 || NR==80 || NR==88 {printf \"%d:[%s]\\\\n\", NR, $0}' components/screens/InboxScreen.tsx)",
+      "Bash(curl -s \"https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_gaz_place_12.txt\" -o /private/tmp/claude-501/-Users-blackseedlabs-Desktop-Crime-AI/807c6f56-bd79-41c9-b335-e90f10363124/scratchpad/fl_places.txt)",
+      "Bash(curl -s -m 15 \"https://gis.fortlauderdale.gov/arcgis/rest/services?f=json\")",
+      "Bash(curl -s -m 20 \"https://hub.arcgis.com/api/search/v1/collections/dataset/items?q=police%20incidents%20fort%20lauderdale&limit=5\")"
     ]
   }
 }

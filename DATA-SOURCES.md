@@ -14,6 +14,29 @@ scores, and CrimeAI chat all switch to it automatically — no code changes.
 
 ---
 
+## Tri-county launch coverage (2026-08-07)
+
+Launch focus is every incorporated municipality in Miami-Dade (34),
+Broward (30) and Palm Beach (39) — 103 cities, list in
+`data/tricounty-cities.json` (Census centroids), resolution in
+`lib/gazetteer.ts`. **Focus, not a fence**: anywhere else in the US still
+resolves through the network geocoder.
+
+| Layer | Coverage | Status |
+|---|---|---|
+| NWS hazard/weather alerts | all 103 cities (3 county zones) | ✅ live — verified + registered enabled (`sources-tricounty.sql`) |
+| Miami-Dade jail bookings | Miami-Dade | ✅ live — registered enabled |
+| Citizen real-time (Miami metro) | most of tri-county population | ⏸ registered DISABLED — pending the legal review Billy owns; this is the single switch that adds real-time crime coverage |
+| Community reports | everywhere | ✅ tier 2 |
+| PSCC demo model | everywhere | tier-3 fallback, labelled |
+
+**Searched 2026-08-07 and confirmed absent:** incident-level open-data crime
+feeds from FLPD, BSO, PBSO, Boca Raton PD and West Palm Beach PD. All publish
+through LexisNexis Community Crime Map / CityProtect dashboards — no public
+API, same finding as Miami-Dade below. Re-check quarterly via the runbook at
+the bottom of this file; anything found gets registered in Command Center →
+Sources with zero code changes.
+
 ## Architecture
 
 ```

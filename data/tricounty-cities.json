@@ -1,0 +1,620 @@
+[
+ {
+  "name": "Aventura",
+  "county": "Miami-Dade",
+  "lat": 25.96016,
+  "lon": -80.133011
+ },
+ {
+  "name": "Bal Harbour",
+  "county": "Miami-Dade",
+  "lat": 25.893341,
+  "lon": -80.123188
+ },
+ {
+  "name": "Bay Harbor Islands",
+  "county": "Miami-Dade",
+  "lat": 25.887979,
+  "lon": -80.133582
+ },
+ {
+  "name": "Biscayne Park",
+  "county": "Miami-Dade",
+  "lat": 25.881696,
+  "lon": -80.181101
+ },
+ {
+  "name": "Coral Gables",
+  "county": "Miami-Dade",
+  "lat": 25.683061,
+  "lon": -80.261659
+ },
+ {
+  "name": "Cutler Bay",
+  "county": "Miami-Dade",
+  "lat": 25.576148,
+  "lon": -80.334007
+ },
+ {
+  "name": "Doral",
+  "county": "Miami-Dade",
+  "lat": 25.815956,
+  "lon": -80.357556
+ },
+ {
+  "name": "El Portal",
+  "county": "Miami-Dade",
+  "lat": 25.855316,
+  "lon": -80.196161
+ },
+ {
+  "name": "Florida City",
+  "county": "Miami-Dade",
+  "lat": 25.444071,
+  "lon": -80.467665
+ },
+ {
+  "name": "Golden Beach",
+  "county": "Miami-Dade",
+  "lat": 25.963274,
+  "lon": -80.122149
+ },
+ {
+  "name": "Hialeah",
+  "county": "Miami-Dade",
+  "lat": 25.869941,
+  "lon": -80.302865
+ },
+ {
+  "name": "Hialeah Gardens",
+  "county": "Miami-Dade",
+  "lat": 25.887713,
+  "lon": -80.356925
+ },
+ {
+  "name": "Homestead",
+  "county": "Miami-Dade",
+  "lat": 25.466694,
+  "lon": -80.444342
+ },
+ {
+  "name": "Indian Creek",
+  "county": "Miami-Dade",
+  "lat": 25.877871,
+  "lon": -80.137303
+ },
+ {
+  "name": "Key Biscayne",
+  "county": "Miami-Dade",
+  "lat": 25.69068,
+  "lon": -80.165587
+ },
+ {
+  "name": "Medley",
+  "county": "Miami-Dade",
+  "lat": 25.864855,
+  "lon": -80.357618
+ },
+ {
+  "name": "Miami",
+  "county": "Miami-Dade",
+  "lat": 25.775163,
+  "lon": -80.208615
+ },
+ {
+  "name": "Miami Beach",
+  "county": "Miami-Dade",
+  "lat": 25.810596,
+  "lon": -80.148852
+ },
+ {
+  "name": "Miami Gardens",
+  "county": "Miami-Dade",
+  "lat": 25.948892,
+  "lon": -80.243585
+ },
+ {
+  "name": "Miami Lakes",
+  "county": "Miami-Dade",
+  "lat": 25.912739,
+  "lon": -80.320422
+ },
+ {
+  "name": "Miami Shores",
+  "county": "Miami-Dade",
+  "lat": 25.867011,
+  "lon": -80.178341
+ },
+ {
+  "name": "Miami Springs",
+  "county": "Miami-Dade",
+  "lat": 25.820164,
+  "lon": -80.288945
+ },
+ {
+  "name": "North Bay Village",
+  "county": "Miami-Dade",
+  "lat": 25.849129,
+  "lon": -80.151029
+ },
+ {
+  "name": "North Miami",
+  "county": "Miami-Dade",
+  "lat": 25.900829,
+  "lon": -80.1686
+ },
+ {
+  "name": "North Miami Beach",
+  "county": "Miami-Dade",
+  "lat": 25.929996,
+  "lon": -80.165179
+ },
+ {
+  "name": "Opa-locka",
+  "county": "Miami-Dade",
+  "lat": 25.899998,
+  "lon": -80.255219
+ },
+ {
+  "name": "Palmetto Bay",
+  "county": "Miami-Dade",
+  "lat": 25.621703,
+  "lon": -80.318906
+ },
+ {
+  "name": "Pinecrest",
+  "county": "Miami-Dade",
+  "lat": 25.665174,
+  "lon": -80.304857
+ },
+ {
+  "name": "South Miami",
+  "county": "Miami-Dade",
+  "lat": 25.70855,
+  "lon": -80.295105
+ },
+ {
+  "name": "Sunny Isles Beach",
+  "county": "Miami-Dade",
+  "lat": 25.938818,
+  "lon": -80.123529
+ },
+ {
+  "name": "Surfside",
+  "county": "Miami-Dade",
+  "lat": 25.878819,
+  "lon": -80.125006
+ },
+ {
+  "name": "Sweetwater",
+  "county": "Miami-Dade",
+  "lat": 25.784402,
+  "lon": -80.38705
+ },
+ {
+  "name": "Virginia Gardens",
+  "county": "Miami-Dade",
+  "lat": 25.809521,
+  "lon": -80.297476
+ },
+ {
+  "name": "West Miami",
+  "county": "Miami-Dade",
+  "lat": 25.757805,
+  "lon": -80.296876
+ },
+ {
+  "name": "Coconut Creek",
+  "county": "Broward",
+  "lat": 26.280943,
+  "lon": -80.184718
+ },
+ {
+  "name": "Cooper City",
+  "county": "Broward",
+  "lat": 26.04806,
+  "lon": -80.284961
+ },
+ {
+  "name": "Coral Springs",
+  "county": "Broward",
+  "lat": 26.270722,
+  "lon": -80.259301
+ },
+ {
+  "name": "Dania Beach",
+  "county": "Broward",
+  "lat": 26.057213,
+  "lon": -80.164585
+ },
+ {
+  "name": "Davie",
+  "county": "Broward",
+  "lat": 26.079169,
+  "lon": -80.283013
+ },
+ {
+  "name": "Deerfield Beach",
+  "county": "Broward",
+  "lat": 26.311716,
+  "lon": -80.125378
+ },
+ {
+  "name": "Fort Lauderdale",
+  "county": "Broward",
+  "lat": 26.141227,
+  "lon": -80.146731
+ },
+ {
+  "name": "Hallandale Beach",
+  "county": "Broward",
+  "lat": 25.983955,
+  "lon": -80.140766
+ },
+ {
+  "name": "Hillsboro Beach",
+  "county": "Broward",
+  "lat": 26.278548,
+  "lon": -80.079508
+ },
+ {
+  "name": "Hollywood",
+  "county": "Broward",
+  "lat": 26.030967,
+  "lon": -80.164609
+ },
+ {
+  "name": "Lauderdale-by-the-Sea",
+  "county": "Broward",
+  "lat": 26.191337,
+  "lon": -80.09946
+ },
+ {
+  "name": "Lauderdale Lakes",
+  "county": "Broward",
+  "lat": 26.166932,
+  "lon": -80.200826
+ },
+ {
+  "name": "Lauderhill",
+  "county": "Broward",
+  "lat": 26.162225,
+  "lon": -80.224434
+ },
+ {
+  "name": "Lazy Lake",
+  "county": "Broward",
+  "lat": 26.156345,
+  "lon": -80.145203
+ },
+ {
+  "name": "Lighthouse Point",
+  "county": "Broward",
+  "lat": 26.277756,
+  "lon": -80.088619
+ },
+ {
+  "name": "Margate",
+  "county": "Broward",
+  "lat": 26.248037,
+  "lon": -80.211169
+ },
+ {
+  "name": "Miramar",
+  "county": "Broward",
+  "lat": 25.972529,
+  "lon": -80.338582
+ },
+ {
+  "name": "North Lauderdale",
+  "county": "Broward",
+  "lat": 26.21245,
+  "lon": -80.221392
+ },
+ {
+  "name": "Oakland Park",
+  "county": "Broward",
+  "lat": 26.179051,
+  "lon": -80.152411
+ },
+ {
+  "name": "Parkland",
+  "county": "Broward",
+  "lat": 26.32136,
+  "lon": -80.254296
+ },
+ {
+  "name": "Pembroke Park",
+  "county": "Broward",
+  "lat": 25.988941,
+  "lon": -80.180258
+ },
+ {
+  "name": "Pembroke Pines",
+  "county": "Broward",
+  "lat": 26.014716,
+  "lon": -80.340171
+ },
+ {
+  "name": "Plantation",
+  "county": "Broward",
+  "lat": 26.125573,
+  "lon": -80.261818
+ },
+ {
+  "name": "Pompano Beach",
+  "county": "Broward",
+  "lat": 26.241622,
+  "lon": -80.133851
+ },
+ {
+  "name": "Sea Ranch Lakes",
+  "county": "Broward",
+  "lat": 26.19987,
+  "lon": -80.098403
+ },
+ {
+  "name": "Southwest Ranches",
+  "county": "Broward",
+  "lat": 26.049688,
+  "lon": -80.373833
+ },
+ {
+  "name": "Sunrise",
+  "county": "Broward",
+  "lat": 26.171601,
+  "lon": -80.261633
+ },
+ {
+  "name": "Tamarac",
+  "county": "Broward",
+  "lat": 26.203298,
+  "lon": -80.256032
+ },
+ {
+  "name": "West Park",
+  "county": "Broward",
+  "lat": 25.978672,
+  "lon": -80.18101
+ },
+ {
+  "name": "Weston",
+  "county": "Broward",
+  "lat": 26.100391,
+  "lon": -80.402059
+ },
+ {
+  "name": "Atlantis",
+  "county": "Palm Beach",
+  "lat": 26.597248,
+  "lon": -80.1041
+ },
+ {
+  "name": "Belle Glade",
+  "county": "Palm Beach",
+  "lat": 26.692215,
+  "lon": -80.665559
+ },
+ {
+  "name": "Boca Raton",
+  "county": "Palm Beach",
+  "lat": 26.37269,
+  "lon": -80.103711
+ },
+ {
+  "name": "Boynton Beach",
+  "county": "Palm Beach",
+  "lat": 26.528334,
+  "lon": -80.080722
+ },
+ {
+  "name": "Briny Breezes",
+  "county": "Palm Beach",
+  "lat": 26.508902,
+  "lon": -80.052246
+ },
+ {
+  "name": "Cloud Lake",
+  "county": "Palm Beach",
+  "lat": 26.674876,
+  "lon": -80.071543
+ },
+ {
+  "name": "Delray Beach",
+  "county": "Palm Beach",
+  "lat": 26.455903,
+  "lon": -80.09042
+ },
+ {
+  "name": "Glen Ridge",
+  "county": "Palm Beach",
+  "lat": 26.67213,
+  "lon": -80.076686
+ },
+ {
+  "name": "Golf",
+  "county": "Palm Beach",
+  "lat": 26.50286,
+  "lon": -80.105766
+ },
+ {
+  "name": "Greenacres",
+  "county": "Palm Beach",
+  "lat": 26.627009,
+  "lon": -80.13761
+ },
+ {
+  "name": "Gulf Stream",
+  "county": "Palm Beach",
+  "lat": 26.486008,
+  "lon": -80.057414
+ },
+ {
+  "name": "Haverhill",
+  "county": "Palm Beach",
+  "lat": 26.690976,
+  "lon": -80.121683
+ },
+ {
+  "name": "Highland Beach",
+  "county": "Palm Beach",
+  "lat": 26.411621,
+  "lon": -80.064352
+ },
+ {
+  "name": "Hypoluxo",
+  "county": "Palm Beach",
+  "lat": 26.567253,
+  "lon": -80.051812
+ },
+ {
+  "name": "Juno Beach",
+  "county": "Palm Beach",
+  "lat": 26.875457,
+  "lon": -80.059625
+ },
+ {
+  "name": "Jupiter",
+  "county": "Palm Beach",
+  "lat": 26.918551,
+  "lon": -80.11694
+ },
+ {
+  "name": "Jupiter Inlet Colony",
+  "county": "Palm Beach",
+  "lat": 26.947962,
+  "lon": -80.075174
+ },
+ {
+  "name": "Lake Clarke Shores",
+  "county": "Palm Beach",
+  "lat": 26.645628,
+  "lon": -80.075276
+ },
+ {
+  "name": "Lake Park",
+  "county": "Palm Beach",
+  "lat": 26.800059,
+  "lon": -80.06746
+ },
+ {
+  "name": "Lake Worth Beach",
+  "county": "Palm Beach",
+  "lat": 26.61972,
+  "lon": -80.058718
+ },
+ {
+  "name": "Lantana",
+  "county": "Palm Beach",
+  "lat": 26.58336,
+  "lon": -80.05538
+ },
+ {
+  "name": "Loxahatchee Groves",
+  "county": "Palm Beach",
+  "lat": 26.720882,
+  "lon": -80.277195
+ },
+ {
+  "name": "Manalapan",
+  "county": "Palm Beach",
+  "lat": 26.56664,
+  "lon": -80.040186
+ },
+ {
+  "name": "Mangonia Park",
+  "county": "Palm Beach",
+  "lat": 26.758597,
+  "lon": -80.076142
+ },
+ {
+  "name": "North Palm Beach",
+  "county": "Palm Beach",
+  "lat": 26.820298,
+  "lon": -80.056905
+ },
+ {
+  "name": "Ocean Ridge",
+  "county": "Palm Beach",
+  "lat": 26.530938,
+  "lon": -80.046814
+ },
+ {
+  "name": "Pahokee",
+  "county": "Palm Beach",
+  "lat": 26.820209,
+  "lon": -80.662049
+ },
+ {
+  "name": "Palm Beach",
+  "county": "Palm Beach",
+  "lat": 26.694843,
+  "lon": -80.041863
+ },
+ {
+  "name": "Palm Beach Gardens",
+  "county": "Palm Beach",
+  "lat": 26.848788,
+  "lon": -80.167124
+ },
+ {
+  "name": "Palm Beach Shores",
+  "county": "Palm Beach",
+  "lat": 26.777352,
+  "lon": -80.034377
+ },
+ {
+  "name": "Palm Springs",
+  "county": "Palm Beach",
+  "lat": 26.635808,
+  "lon": -80.098352
+ },
+ {
+  "name": "Riviera Beach",
+  "county": "Palm Beach",
+  "lat": 26.781424,
+  "lon": -80.076059
+ },
+ {
+  "name": "Royal Palm Beach",
+  "county": "Palm Beach",
+  "lat": 26.699015,
+  "lon": -80.227581
+ },
+ {
+  "name": "South Bay",
+  "county": "Palm Beach",
+  "lat": 26.688379,
+  "lon": -80.735526
+ },
+ {
+  "name": "South Palm Beach",
+  "county": "Palm Beach",
+  "lat": 26.590437,
+  "lon": -80.037977
+ },
+ {
+  "name": "Tequesta",
+  "county": "Palm Beach",
+  "lat": 26.964872,
+  "lon": -80.113241
+ },
+ {
+  "name": "Wellington",
+  "county": "Palm Beach",
+  "lat": 26.648995,
+  "lon": -80.267208
+ },
+ {
+  "name": "West Palm Beach",
+  "county": "Palm Beach",
+  "lat": 26.745114,
+  "lon": -80.127038
+ },
+ {
+  "name": "Westlake",
+  "county": "Palm Beach",
+  "lat": 26.754683,
+  "lon": -80.301483
+ }
+]

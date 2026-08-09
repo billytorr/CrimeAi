@@ -9,6 +9,7 @@ import { Pin, Camera } from "@/components/Icons";
 import UsernameField, { type UsernameState } from "@/components/UsernameField";
 import { CATEGORIES } from "@/lib/categories";
 import { milesBetween } from "@/lib/data";
+import { nearestCity } from "@/lib/gazetteer";
 import SuggestedFollows from "@/components/auth/SuggestedFollows";
 import { storeProfilePhoto, importRemotePhoto } from "@/lib/photo";
 
@@ -80,13 +81,27 @@ export default function Onboarding({
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude: lat, longitude: lon } = pos.coords;
-        const n = nearest(lat, lon);
-        // only snap to a Miami neighborhood when the user is actually near it
-        const nearMiami = milesBetween(lat, lon, n.lat, n.lon) <= 30;
-        setLocation(nearMiami
-          ? { query: "My location", lat: n.lat, lon: n.lon, neighborhood: n.name, city: "Miami", state: "FL", source: "gazetteer" }
-          : { query: "My location", lat, lon, neighborhood: "My neighborhood", city: "", state: "", source: "gazetteer" });
-        setAddress(nearMiami ? n.name : "My location"); setUsedGeo(true); setBusy(false); setStep(2);
+        // The old 30-mile Miami-neighborhood snap labelled everyone from
+        // Homestead to Fort Lauderdale as "Miami". Now: prefer whichever is
+        // genuinely closer — a Miami neighborhood (fine-grained, wins inside
+        // the urban core) or one of the 103 tri-county municipalities, which
+        // carries its OWN city name. Outside both, keep raw coordinates and
+        // let the resolver name it.
+        const nb = nearest(lat, lon);
+        const nbMiles = milesBetween(lat, lon, nb.lat, nb.lon);
+        const city = nearestCity(lat, lon);
+        const cityMiles = city ? milesBetween(lat, lon, city.lat, city.lon) : Infinity;
+        if (city && (nbMiles > 8 || cityMiles <= nbMiles)) {
+          setLocation({ query: "My location", lat: city.lat, lon: city.lon, neighborhood: city.name, city: city.name, state: "FL", source: "gazetteer" });
+          setAddress(city.name);
+        } else if (nbMiles <= 8) {
+          setLocation({ query: "My location", lat: nb.lat, lon: nb.lon, neighborhood: nb.name, city: "Miami", state: "FL", source: "gazetteer" });
+          setAddress(nb.name);
+        } else {
+          setLocation({ query: "My location", lat, lon, neighborhood: "My neighborhood", city: "", state: "", source: "gazetteer" });
+          setAddress("My location");
+        }
+        setUsedGeo(true); setBusy(false); setStep(2);
       },
       () => { setBusy(false); setError("Couldn't get your location — type your address instead."); },
       { timeout: 8000 }

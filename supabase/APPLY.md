@@ -91,6 +91,7 @@ Added late; the likeliest to be missing on any given environment.
 | `verification.sql` | `biometric_consents`, `identity_verifications`, `decide_verification()`, `is_identity_verified()`, 24h media purge | none |
 | `account-exists.sql` | `account_exists(email)` — signup redirects existing users to password login (deliberate, documented enumeration trade-off) | none |
 | `notifications.sql` | in-app Activity feed: `notifications` table + triggers on likes/comments/follows/corroborations/tier changes, `mark_notifications_read()`, `unread_notification_count()` | none |
+| `sources-tricounty.sql` | registers NWS alert feeds for Miami-Dade/Broward/Palm Beach (enabled) + Miami-Dade jail bookings | none |
 | `pricing-plans.sql` | plan display fields (tagline/blurb/features/status), Guardian + Community as coming-soon, **$69.99 annual Protector price**, retires the $4.99 arm | none |
 
 ---

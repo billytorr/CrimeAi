@@ -1,4 +1,5 @@
 import { NEIGHBORHOODS, milesBetween } from "./data";
+import { cityInQuery, findCity } from "./gazetteer";
 import type { ResolvedLocation } from "./types";
 
 // Address resolution, nationwide:
@@ -42,6 +43,25 @@ const ALIASES: Record<string, string> = {
 
 function fromGazetteer(query: string): ResolvedLocation | null {
   const q = query.toLowerCase().trim();
+
+  // Miami NEIGHBORHOODS first, but only on an EXACT name match and only for
+  // names that are not themselves municipalities — "wynwood" stays a Miami
+  // neighborhood, while "coral gables" falls through to the city branch
+  // below. Labelling a real city as a neighborhood of Miami was exactly the
+  // launch bug: Coral Gables, Hialeah and Doral are their own cities.
+  const exactNb = NEIGHBORHOODS.find((n) => q === n.name.toLowerCase());
+  if (exactNb && !findCity(exactNb.name)) {
+    return { query, lat: exactNb.lat, lon: exactNb.lon, neighborhood: exactNb.name, city: "Miami", state: "FL", source: "gazetteer" };
+  }
+
+  // All 103 tri-county municipalities (data/tricounty-cities.json, Census
+  // centroids). Longest-name-first inside cityInQuery, so "North Miami
+  // Beach" beats "North Miami" beats "Miami".
+  const city = cityInQuery(q);
+  if (city) {
+    return { query, lat: city.lat, lon: city.lon, neighborhood: city.name, city: city.name, state: "FL", source: "gazetteer" };
+  }
+
   for (const [alias, name] of Object.entries(ALIASES)) {
     if (q === alias || q.includes(alias)) {
       const nb = NEIGHBORHOODS.find((n) => n.name === name);
@@ -64,6 +84,9 @@ function fromGazetteer(query: string): ResolvedLocation | null {
     "33176": "Kendall", "33160": "Aventura", "33149": "Key Biscayne",
   };
   if (zip && ZIPS[zip]) {
+    // A ZIP that maps to a real municipality labels it as one.
+    const zc = findCity(ZIPS[zip]);
+    if (zc) return { query, lat: zc.lat, lon: zc.lon, neighborhood: zc.name, city: zc.name, state: "FL", source: "gazetteer" };
     const nb = NEIGHBORHOODS.find((n) => n.name === ZIPS[zip]);
     if (nb) return { query, lat: nb.lat, lon: nb.lon, neighborhood: nb.name, city: "Miami", state: "FL", source: "gazetteer" };
   }
