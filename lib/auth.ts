@@ -294,7 +294,11 @@ export async function login(email: string, password: string): Promise<Account> {
 }
 
 export async function logout(): Promise<void> {
-  if (supabaseEnabled) { await supabase!.auth.signOut(); return; }
+  // scope "local" signs out THIS device only. Supabase defaults to "global",
+  // which revokes every session the user has anywhere — so signing out on a
+  // phone was also signing them out on their laptop and tablet. Nobody expects
+  // that from a Log out button.
+  if (supabaseEnabled) { await supabase!.auth.signOut({ scope: "local" }); return; }
   localStorage.removeItem(SESSION_KEY);
 }
 
