@@ -95,11 +95,25 @@ const OTP_RE = /^\d{6,10}$/;
 // password are set AFTER verification, then legal, then the profile.
 //
 // Step 1: enter email → Supabase emails an OTP (no password yet).
-export async function startEmailSignup(email: string): Promise<{ demoCode?: string }> {
+export async function startEmailSignup(email: string): Promise<{ demoCode?: string; existingAccount?: boolean }> {
   const key = email.trim().toLowerCase();
   if (!key || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(key)) throw new Error("Enter a valid email address.");
 
   if (supabaseEnabled) {
+    // An existing user on the Create Account tab should be asked for the
+    // password they already have, not OTP'd into a flow that ends with
+    // "choose a username and password" — which reads like their account got
+    // reset. account_exists() only counts FINISHED signups (password set):
+    // someone who abandoned mid-signup has no password yet, and for them the
+    // OTP flow is exactly right — it resumes where they left off.
+    //
+    // Fails OPEN: if the check itself errors, proceed with signup. Worst
+    // case is today's behaviour; blocking signup on a helper would be worse.
+    try {
+      const { data: exists } = await supabase!.rpc("account_exists", { p_email: key });
+      if (exists === true) return { existingAccount: true };
+    } catch { /* fall through to the normal signup path */ }
+
     // shouldCreateUser: true → registers the email on first verify
     const { error } = await supabase!.auth.signInWithOtp({ email: key, options: { shouldCreateUser: true } });
     if (error) throw new Error(error.message);

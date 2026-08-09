@@ -313,11 +313,25 @@ export async function getInteractions(userId?: string): Promise<Interactions> {
 }
 
 async function sbToggle(table: string, match: Record<string, string>): Promise<boolean> {
+  // THROWS on a failed write. This used to ignore the insert/delete result,
+  // so a write rejected by RLS (e.g. a session revoked by a sign-out on
+  // another device) returned "liked!" while nothing was stored — the classic
+  // "my like vanished after reload". Callers revert their optimistic UI on
+  // rejection, so the screen tells the truth.
   const q = supabase!.from(table).select("*", { count: "exact", head: true });
   Object.entries(match).forEach(([k, v]) => q.eq(k, v));
-  const { count } = await q;
-  if (count && count > 0) { let d = supabase!.from(table).delete(); Object.entries(match).forEach(([k, v]) => (d = d.eq(k, v))); await d; return false; }
-  await supabase!.from(table).insert(match); return true;
+  const { count, error: countErr } = await q;
+  if (countErr) { console.error(`[social] ${table} read failed:`, countErr.message); throw new Error(countErr.message); }
+  if (count && count > 0) {
+    let d = supabase!.from(table).delete();
+    Object.entries(match).forEach(([k, v]) => (d = d.eq(k, v)));
+    const { error } = await d;
+    if (error) { console.error(`[social] ${table} delete failed:`, error.message); throw new Error(error.message); }
+    return false;
+  }
+  const { error } = await supabase!.from(table).insert(match);
+  if (error) { console.error(`[social] ${table} insert failed:`, error.message); throw new Error(error.message); }
+  return true;
 }
 
 export async function toggleLike(postId: string, userId?: string): Promise<boolean> {
@@ -359,7 +373,8 @@ export async function toggleFollowState(handle: string, userId?: string): Promis
     const { data: prof } = await supabase!.from("profiles").select("is_private")
       .or(`handle.eq.${handle},email.like.${handle}@%`).limit(1);
     const isPrivate = !!prof?.[0]?.is_private;
-    await supabase!.from("follows").insert({ target_handle: handle, follower_id: userId, status: isPrivate ? "requested" : "approved" });
+    const { error: insErr } = await supabase!.from("follows").insert({ target_handle: handle, follower_id: userId, status: isPrivate ? "requested" : "approved" });
+    if (insErr) { console.error("[social] follow insert failed:", insErr.message); throw new Error(insErr.message); }
     return isPrivate ? "requested" : "following";
   }
   const s = getStore(FOLLOWS_KEY); const on = s.has(handle); on ? s.delete(handle) : s.add(handle); setStore(FOLLOWS_KEY, s); return on ? "none" : "following";
@@ -381,6 +396,11 @@ export async function getComments(postId: string): Promise<Comment[]> {
 }
 export async function addComment(postId: string, author: string, text: string, userId?: string): Promise<void> {
   track("comment", { post: postId });
-  if (supabaseEnabled && userId) { await supabase!.from("comments").insert({ post_id: postId, user_id: userId, author, text }); return; }
+  if (supabaseEnabled && userId) {
+    const { error } = await supabase!.from("comments").insert({ post_id: postId, user_id: userId, author, text });
+    // Surface the failure — a comment that silently vanishes reads as data loss.
+    if (error) { console.error("[social] comment insert failed:", error.message); throw new Error(error.message); }
+    return;
+  }
   const all = readComments(); all[postId] = [...(all[postId] || []), { author, text, ts: new Date().toISOString() }]; localStorage.setItem(COMMENTS_KEY, JSON.stringify(all));
 }

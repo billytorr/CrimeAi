@@ -54,6 +54,13 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
   // step 1: email → send the verification code
   const submitEmail = () => run(async () => {
     const r = await startEmailSignup(email);
+    // Already signed up → ask for the password they have, not an email code.
+    // The email field carries over so they only type the password.
+    if (r.existingAccount) {
+      switchMode("login");
+      setNotice("You already have an account — enter your password to log in.");
+      return;
+    }
     setDemoCode(r.demoCode || "");
     setNotice(`We sent a verification code to ${email.trim().toLowerCase()}.`);
     setMode("verify"); setCode("");

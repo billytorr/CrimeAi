@@ -56,16 +56,27 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
   const isFollowed = (h: string) => (h in followOver ? followOver[h] : interactions.follows.has(h));
   const isReposted = (id: string) => (id in repostOver ? repostOver[id] : interactions.reposts.has(id));
 
+  // Optimistic updates REVERT when the write is rejected. These used to
+  // swallow the rejection, so a failed like (revoked session, RLS, network)
+  // stayed lit until the next reload — "it worked, then it didn't". The
+  // write layer now throws on failure; flipping the override back makes the
+  // screen match the database.
   function onLike(p: Post) {
     const next = !isLiked(p.id); likeOver[p.id] = next; likeDelta[p.id] = (likeDelta[p.id] || 0) + (next ? 1 : -1); bump();
-    toggleLike(p.id, account.id).catch(() => {});
+    toggleLike(p.id, account.id).catch(() => { likeOver[p.id] = !next; likeDelta[p.id] = (likeDelta[p.id] || 0) + (next ? -1 : 1); bump(); });
   }
-  function onSave(p: Post) { const next = !isSaved(p.id); saveOver[p.id] = next; bump(); toggleSave(p.id, account.id).catch(() => {}); }
+  function onSave(p: Post) {
+    const next = !isSaved(p.id); saveOver[p.id] = next; bump();
+    toggleSave(p.id, account.id).catch(() => { saveOver[p.id] = !next; bump(); });
+  }
   function onRepost(p: Post) {
     const next = !isReposted(p.id); repostOver[p.id] = next; repostDelta[p.id] = (repostDelta[p.id] || 0) + (next ? 1 : -1); bump();
-    toggleRepost(p.id, account.id).catch(() => {});
+    toggleRepost(p.id, account.id).catch(() => { repostOver[p.id] = !next; repostDelta[p.id] = (repostDelta[p.id] || 0) + (next ? -1 : 1); bump(); });
   }
-  function onFollow(p: Post) { const next = !isFollowed(p.handle); followOver[p.handle] = next; bump(); toggleFollow(p.handle, account.id).catch(() => {}); }
+  function onFollow(p: Post) {
+    const next = !isFollowed(p.handle); followOver[p.handle] = next; bump();
+    toggleFollow(p.handle, account.id).catch(() => { followOver[p.handle] = !next; bump(); });
+  }
   async function onShare(p: Post) {
     const data = { title: "CrimeAI", text: p.text || "Local safety update", url: typeof location !== "undefined" ? location.href : "" };
     try { if (navigator.share) await navigator.share(data); else if (navigator.clipboard) await navigator.clipboard.writeText(`${data.text} — ${data.url}`); } catch {}
