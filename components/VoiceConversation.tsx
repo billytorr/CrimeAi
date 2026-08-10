@@ -186,24 +186,26 @@ export default function VoiceConversation({
 
   async function speak(text: string) {
     setPhaseBoth("speaking"); setCaption(text);
+    setDbg("speak: requesting…");
     try {
       const res = await fetch(apiUrl("/api/crimeai/voice/speak"), {
         method: "POST", headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify({ text }),
       });
       if (!res.ok) {
-        await res.json().catch(() => ({}));
-        setCaption(res.status === 402
-          ? "Voice replies are a Protector feature."
-          : "My voice isn't switched on here yet — I'll keep answering in text.");
-        await pause(1500);
+        const body = await res.json().catch(() => ({} as any));
+        // Surface the exact server reason (e.g. the ElevenLabs error) so a
+        // silent turn is diagnosable instead of invisible.
+        setDbg(`speak FAIL http ${res.status} · ${(body?.error || "").toString().slice(0, 120)}`);
         return;
       }
       const buf = await res.arrayBuffer();
-      setDbg(`http ${res.status} · ${(res.headers.get("Content-Type") || "?")} · ${buf.byteLength}b`);
-      if (!buf.byteLength) return;
-      await playWithWave(buf, res.headers.get("Content-Type") || "audio/mpeg");
-    } catch (e) { setDbg(`speak error: ${(e as Error).message}`); }
+      const ct = res.headers.get("Content-Type") || "?";
+      setDbg(`http ${res.status} · ${ct} · ${buf.byteLength}b`);
+      if (!buf.byteLength) { setDbg((d) => `${d} · EMPTY body`); return; }
+      if (!/audio/i.test(ct)) { setDbg((d) => `${d} · NOT audio`); return; }
+      await playWithWave(buf, ct);
+    } catch (e) { setDbg(`speak threw: ${(e as Error).message}`); }
   }
 
   // Play the reply and drive the sphere. Primary path decodes the audio and
