@@ -6,7 +6,7 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 import { resolveAddress } from "@/lib/geocode";
 import { computeStats, incidentsNear, insideMiamiCoverage, NEIGHBORHOODS } from "@/lib/data";
-import { askCrimeAI, buildContext, fallbackAnswer } from "@/lib/crimeai";
+import { buildContext, fallbackAnswer } from "@/lib/crimeai";
 import { liveIncidentsNear } from "@/lib/ingest/live";
 import { resolveUserId, planLimitFor, clampDays, trimStatsForDepth } from "@/lib/entitlements/request";
 import { enforceConsume } from "@/lib/entitlements/enforce";
@@ -83,7 +83,13 @@ export async function POST(req: NextRequest) {
         loadAiConfig(),
         userId ? buildUserContext(userId) : Promise.resolve(""),
       ]);
-      ({ answer, engine } = await askCrimeAI(question, context, {
+      // Route through the standalone orchestrator seam (Phase 1). It wraps the
+      // same askCrimeAI via the Model Gateway, so behaviour is identical — the
+      // difference is that events fire and a future TORR/hybrid mode can swap
+      // the implementation here without touching this route.
+      const { orchestrator } = await import("@/lib/ai/orchestrator");
+      ({ answer, engine } = await orchestrator().ask({
+        question, context,
         model: cfg.model, temperature: cfg.temperature, maxTokens: cfg.maxTokens,
         system: cfg.systemPrompt, userContext,
       }));

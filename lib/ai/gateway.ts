@@ -1,0 +1,69 @@
+// Model Gateway — the single place capabilities resolve to a provider.
+//
+// TODAY it resolves exactly one thing: the LLM, which wraps the EXISTING
+// lib/crimeai.ts (Anthropic → Ollama → deterministic fallback), so behaviour
+// is byte-for-byte what it is now. Every other capability resolves to an
+// unconfigured stub that reports `configured: false` and throws if called —
+// which is honest, not fake.
+//
+// COMPATIBILITY: this is additive. lib/crimeai.ts is untouched; the gateway
+// calls it. Nothing that imports askCrimeAI directly is affected.
+// ROLLBACK: stop importing the gateway — askCrimeAI still works standalone.
+
+import { askCrimeAI } from "@/lib/crimeai";
+import { providerSelection } from "./config";
+import type {
+  LLMProvider, LLMRequest, LLMResult,
+  STTProvider, TTSProvider, VisionProvider, SearchProvider, ResearchProvider, EmbeddingProvider,
+} from "./providers";
+
+// ── the built-in LLM provider: a thin wrapper over lib/crimeai.ts ──
+const crimeaiLLM: LLMProvider = {
+  name: "crimeai",
+  configured: !!process.env.ANTHROPIC_API_KEY, // Anthropic path; falls back regardless
+  async complete(req: LLMRequest): Promise<LLMResult> {
+    const { answer, engine } = await askCrimeAI(req.question, req.context, {
+      model: req.model, temperature: req.temperature, maxTokens: req.maxTokens,
+      system: req.system, userContext: req.userContext,
+    });
+    return { answer, engine };
+  },
+};
+
+// ── stubs for capabilities with no provider yet ────────────────────
+// They exist so callers and the manifest can ask "is this available?" and get
+// an honest no, rather than the capability simply not existing.
+// async so the rejection surfaces as a rejected promise, matching the real
+// provider signatures — a caller awaiting it gets a catchable error, not a
+// synchronous throw mid-expression.
+const notReady = (cap: string) => async (): Promise<never> => { throw new Error(`${cap} provider not configured`); };
+const stub = <T extends object>(name: string, methods: T): T & { name: string; configured: boolean } =>
+  ({ name: "none", configured: false, ...methods });
+
+export const gateway = {
+  llm(): LLMProvider {
+    // Only "crimeai" is implemented; any other selection falls back to it
+    // rather than breaking, until that provider is built in a later phase.
+    return crimeaiLLM;
+  },
+  stt(): STTProvider { return stub("stt", { transcribe: notReady("STT") }) as STTProvider; },
+  tts(): TTSProvider { return stub("tts", { synthesize: notReady("TTS") }) as TTSProvider; },
+  vision(): VisionProvider { return stub("vision", { analyze: notReady("Vision") }) as VisionProvider; },
+  search(): SearchProvider { return stub("search", { search: notReady("Search") }) as SearchProvider; },
+  research(): ResearchProvider { return stub("research", { research: notReady("Research") }) as ResearchProvider; },
+  embedding(): EmbeddingProvider { return stub("embedding", { embed: notReady("Embedding") }) as EmbeddingProvider; },
+
+  /** What each capability currently resolves to — for /capabilities + the manifest. */
+  status() {
+    const sel = providerSelection();
+    return {
+      llm: { provider: this.llm().name, configured: this.llm().configured, selected: sel.llm },
+      stt: { provider: "none", configured: false, selected: sel.stt },
+      tts: { provider: "none", configured: false, selected: sel.tts },
+      vision: { provider: "none", configured: false, selected: sel.vision },
+      search: { provider: "none", configured: false, selected: sel.search },
+      research: { provider: "none", configured: false, selected: sel.research },
+      embedding: { provider: "none", configured: false, selected: sel.embedding },
+    };
+  },
+};
