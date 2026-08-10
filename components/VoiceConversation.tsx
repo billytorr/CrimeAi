@@ -54,6 +54,7 @@ export default function VoiceConversation({
   const [input, setInput] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [dbg, setDbg] = useState(""); // temporary voice-playback diagnostic
 
   const recRef = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
@@ -199,9 +200,10 @@ export default function VoiceConversation({
         return;
       }
       const buf = await res.arrayBuffer();
+      setDbg(`http ${res.status} · ${(res.headers.get("Content-Type") || "?")} · ${buf.byteLength}b`);
       if (!buf.byteLength) return;
       await playWithWave(buf, res.headers.get("Content-Type") || "audio/mpeg");
-    } catch { /* non-fatal */ }
+    } catch (e) { setDbg(`speak error: ${(e as Error).message}`); }
   }
 
   // Play the reply and drive the sphere. Primary path decodes the audio and
@@ -211,8 +213,12 @@ export default function VoiceConversation({
   // element so sound is never lost (waveform just won't react that turn).
   async function playWithWave(buf: ArrayBuffer, mime: string) {
     const ctx = await ensureCtx();
+    // Chrome/iOS can leave the context suspended; force it running right before
+    // playback and report the outcome so a silent turn is diagnosable.
+    if (ctx.state !== "running") { try { await ctx.resume(); } catch {} }
     try {
       const audioBuf = await ctx.decodeAudioData(buf.slice(0)); // slice: decode detaches the buffer
+      setDbg((d) => `${d} · ctx:${ctx.state} · decoded ${audioBuf.duration.toFixed(1)}s · buffer`);
       const node = ctx.createBufferSource(); node.buffer = audioBuf;
       const analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
       node.connect(analyser); analyser.connect(ctx.destination);
@@ -225,8 +231,9 @@ export default function VoiceConversation({
       });
       analyserRef.current = null;
       try { node.disconnect(); analyser.disconnect(); } catch {}
-    } catch {
+    } catch (e) {
       // decode unsupported — plain element playback guarantees audio
+      setDbg((d) => `${d} · ctx:${ctx.state} · decode FAIL (${(e as Error).name}) · element`);
       const url = URL.createObjectURL(new Blob([buf], { type: mime }));
       const audio = new Audio(url); playingRef.current = audio;
       try {
@@ -307,9 +314,10 @@ export default function VoiceConversation({
       </button>
 
       {/* status line */}
-      <p className="mb-3 min-h-[20px] px-8 text-center text-[13px] text-ink2 line-clamp-2">
+      <p className="mb-1 min-h-[20px] px-8 text-center text-[13px] text-ink2 line-clamp-2">
         {phase === "idle" && !muted ? caption : statusWord}
       </p>
+      {dbg && <p className="mb-2 px-8 text-center text-[10px] text-ink3 break-words">{dbg}</p>}
 
       {/* bottom controls: [ + | Ask CrimeAI ]  [ mic ]  [ ✕ ] */}
       <div className="px-4">
