@@ -29,6 +29,10 @@ export function buildManifest(): CapabilityManifest {
   if (availableTools().some((t) => t.name === "crime.ask") && providers.llm.configured) caps.push("crime_qa");
   caps.push("area_safety_scoring"); // NSS is always available (deterministic)
   if (providers.vision.configured) caps.push("image_analysis");
+  if (providers.stt.configured) caps.push("voice_transcription");
+  if (providers.tts.configured) caps.push("voice_synthesis");
+  if (providers.search.configured) caps.push("web_search");
+  if (providers.research.configured) caps.push("web_research");
 
   const planned = TOOLS.filter((t) => !t.available).map((t) => t.name);
 

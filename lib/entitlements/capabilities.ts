@@ -7,6 +7,8 @@ export const CAPABILITIES = {
   ADDRESS_SEARCH: "address_search",
   AI_ANALYTICAL: "ai_analytical",
   AI_VISION: "ai_vision",     // image/file analysis (Protector)
+  AI_VOICE: "ai_voice",       // voice interaction round-trips (Protector)
+  AI_WEB: "ai_web",           // web search/research (Protector)
   SMS_IMMEDIATE: "sms_immediate",
   CHANNELS: "channels",
   TRUSTED_CIRCLE: "trusted_circle",
@@ -37,6 +39,8 @@ export const CAP_META: Record<Capability, CapMeta> = {
   address_search: { kind: "metered", costPath: false },
   ai_analytical: { kind: "metered", costPath: true }, // expensive inference
   ai_vision: { kind: "metered", costPath: true },     // vision inference (Protector)
+  ai_voice: { kind: "metered", costPath: true },      // STT+TTS minutes (Protector)
+  ai_web: { kind: "metered", costPath: true },        // external search/research (Protector)
   sms_immediate: { kind: "metered", costPath: true }, // per-SMS money
   channels: { kind: "limit", costPath: false },
   trusted_circle: { kind: "limit", costPath: false },

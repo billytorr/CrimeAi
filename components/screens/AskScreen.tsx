@@ -51,6 +51,92 @@ export default function AskScreen({
   const [drawer, setDrawer] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLInputElement>(null);
+  const [recording, setRecording] = useState(false);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  // Voice in: record a short clip, transcribe (Deepgram via /voice/transcribe),
+  // drop the text into the composer and send. Protector-only; the mic is
+  // hidden for free users, and the route declines them anyway.
+  async function toggleMic() {
+    if (recording) { recRef.current?.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      chunksRef.current = [];
+      rec.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecording(false);
+        const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
+        if (!blob.size) return;
+        setLoading(true);
+        try {
+          const res = await fetch(apiUrl("/api/crimeai/voice/transcribe"), {
+            method: "POST",
+            headers: { "Content-Type": blob.type, ...(await authHeaders()) },
+            body: blob,
+          });
+          const data = await res.json();
+          setLoading(false);
+          if (res.ok && data.text) send(data.text);
+          else if (data.upsell) setMessages((m) => [...m, { role: "assistant", text: "Voice is a Protector feature. Upgrade in Settings → Become a Protector to talk to me." }]);
+        } catch { setLoading(false); }
+      };
+      recRef.current = rec; rec.start(); setRecording(true);
+    } catch { /* mic permission denied — silently no-op */ }
+  }
+
+  // Voice out: speak an assistant message (ElevenLabs via /voice/speak).
+  async function speak(text: string) {
+    try {
+      const res = await fetch(apiUrl("/api/crimeai/voice/speak"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) return;
+      const buf = await res.arrayBuffer();
+      const url = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      audio.play();
+    } catch { /* playback failure is non-fatal */ }
+  }
+
+  // Web research: Tavily returns its OWN summarised answer + sources. We show
+  // that, rather than feeding raw pages into CrimeAI's model — which keeps web
+  // content out of the model's context until a prompt-injection guard exists.
+  async function webResearch(q: string) {
+    const question = q.trim();
+    if (!question || loading) return;
+    setMessages((m) => [...m, { role: "user", text: question }]);
+    setInput("");
+    setLoading(true);
+    const tid = await ensureThread(question);
+    try {
+      const res = await fetch(apiUrl("/api/crimeai/web"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+        body: JSON.stringify({ query: question, mode: "research" }),
+      });
+      const data = await res.json();
+      let text: string;
+      if (res.ok) {
+        const sources = (data.sources || []).slice(0, 4).map((s: any) => `• ${s.title} — ${s.url}`).join("\n");
+        text = `${data.summary || "Here's what I found on the web."}${sources ? `\n\nSources:\n${sources}` : ""}\n\n(From a live web search — verify anything important against an official source.)`;
+      } else {
+        text = data.upsell
+          ? "Web search is a Protector feature — I can look things up beyond our local crime data. Upgrade in Settings → Become a Protector."
+          : (data.error || "I couldn't complete that web search.");
+      }
+      setMessages((m) => [...m, { role: "assistant", text }]);
+      if (tid && res.ok) saveMessage(userId, tid, { role: "assistant", content: text });
+    } catch {
+      setMessages((m) => [...m, { role: "assistant", text: "Network error — please try again." }]);
+    } finally { setLoading(false); }
+  }
+  const [webMode, setWebMode] = useState(false);
 
   // Protector image analysis: compress, show it in the thread, send to the
   // vision route (metered ai_vision), render CrimeAI's read. Free users get
@@ -259,15 +345,23 @@ export default function AskScreen({
               className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ink/10 text-ink2 active:scale-95 disabled:opacity-60">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
             </button>
+            <button onClick={toggleMic} aria-label={recording ? "Stop recording" : "Talk to CrimeAI"}
+              className={`grid h-11 w-11 shrink-0 place-items-center rounded-full active:scale-95 ${recording ? "bg-brand text-white animate-pulse" : "border border-ink/10 text-ink2"}`}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"/></svg>
+            </button>
           </>}
+          {isPro && <button onClick={() => setWebMode((v) => !v)} aria-label="Search the web" title="Search the web"
+            className={`grid h-11 w-11 shrink-0 place-items-center rounded-full active:scale-95 ${webMode ? "bg-brand text-white" : "border border-ink/10 text-ink2"}`}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
+          </button>}
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send(input)}
+            onKeyDown={(e) => e.key === "Enter" && (webMode ? webResearch(input) : send(input))}
             placeholder={`Ask about ${loc.neighborhood}…`}
             className="w-full rounded-full border border-ink/10 bg-card px-4 py-3 text-[15px] outline-none placeholder:text-ink3 focus:border-brand/60"
           />
-          <button onClick={() => send(input)} disabled={loading} aria-label="Send"
+          <button onClick={() => (webMode ? webResearch(input) : send(input))} disabled={loading} aria-label="Send"
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand text-white active:scale-95 disabled:opacity-60">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
           </button>

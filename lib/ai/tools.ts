@@ -37,11 +37,11 @@ export const TOOLS: ToolSpec[] = [
     permissions: ["READ"], risk: "read", timeoutMs: 60_000, provider: "crimeai-llm", available: true,
   },
   // ── declared, not yet implemented (later phases) ──
-  { name: "web.search", version: "0", description: "External web search.", permissions: ["READ", "EXTERNAL_WRITE"], risk: "external_write", timeoutMs: 20_000, provider: "none", available: false },
-  { name: "web.research", version: "0", description: "Deep web research/extraction.", permissions: ["READ", "EXTERNAL_WRITE"], risk: "external_write", timeoutMs: 60_000, provider: "none", available: false },
+  { name: "web.search", version: "1.0", description: "External web search for current, non-local information.", permissions: ["READ", "EXTERNAL_WRITE"], risk: "external_write", timeoutMs: 20_000, provider: "brave", available: !!process.env.BRAVE_API_KEY },
+  { name: "web.research", version: "1.0", description: "Deep web research/extraction with source citations.", permissions: ["READ", "EXTERNAL_WRITE"], risk: "external_write", timeoutMs: 60_000, provider: "tavily", available: !!process.env.TAVILY_API_KEY },
   { name: "vision.analyze", version: "1.0", description: "Analyse an uploaded image/document for public-safety relevance.", permissions: ["READ"], risk: "read", timeoutMs: 60_000, provider: "anthropic", available: !!process.env.ANTHROPIC_API_KEY },
-  { name: "voice.transcribe", version: "0", description: "Speech to text.", permissions: ["READ"], risk: "read", timeoutMs: 60_000, provider: "none", available: false },
-  { name: "voice.synthesize", version: "0", description: "Text to speech.", permissions: ["READ"], risk: "read", timeoutMs: 30_000, provider: "none", available: false },
+  { name: "voice.transcribe", version: "1.0", description: "Speech to text.", permissions: ["READ"], risk: "read", timeoutMs: 60_000, provider: "deepgram", available: !!process.env.DEEPGRAM_API_KEY },
+  { name: "voice.synthesize", version: "1.0", description: "Text to speech.", permissions: ["READ"], risk: "read", timeoutMs: 30_000, provider: "elevenlabs", available: !!(process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID) },
 ];
 
 export const availableTools = (): ToolSpec[] => TOOLS.filter((t) => t.available);

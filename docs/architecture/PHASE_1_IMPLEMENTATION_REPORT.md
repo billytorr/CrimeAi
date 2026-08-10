@@ -135,3 +135,36 @@ does — the cost ceiling the prompt requires before a paid AI feature ships.
 
 416 tests pass (17 architecture + vision). Guards green: safety-paths (11),
 scoring boundary. Typecheck clean both apps, mobile bundle builds.
+
+---
+
+# Phases 2 + 3 — Voice + Web (real providers, keys now in Vercel)
+
+## Voice (Phase 2)
+- `lib/ai/voice/deepgram-stt.ts` — Deepgram speech-to-text
+- `lib/ai/voice/elevenlabs-tts.ts` — ElevenLabs text-to-speech (needs key AND voice id)
+- Routes: `/api/crimeai/voice/transcribe` (metered ai_voice, Protector), `/voice/speak` (Protector-gated, not double-metered)
+- UI: mic button records → transcribes → sends; a "Play" speaker on assistant replies
+
+## Web (Phase 3)
+- `lib/ai/web/brave-search.ts` — Brave search
+- `lib/ai/web/tavily-research.ts` — Tavily research (its own summarised answer + sources)
+- Route: `/api/crimeai/web` (metered ai_web, Protector; search=Brave, research=Tavily)
+- UI: globe toggle in the composer → a query runs Tavily research, shown with sources
+
+## Deliberate safety boundary
+Web content is surfaced via **Tavily's own summary**, NOT injected into
+CrimeAI's model context. The Phase 0 audit flagged prompt injection as an
+unhandled P1; feeding raw web pages to the LLM is where that bites. Autonomous
+"CrimeAI reads the open web" is deferred until the injection guard exists.
+
+## Cost caps
+`ai_voice` (200) and `ai_web` (100) are Protector-only metered capabilities
+(`ai-voice-web-limits.sql`), fail-closed like every cost path. ⚠️ ElevenLabs
+minutes can exceed the subscription if uncapped — tune these in Command Center
+against real pricing before scale, and consider Deepgram TTS as the cheaper
+alternative.
+
+Providers unit-tested with mocked fetch (request shaping, response parsing,
+dormant-without-key). 425 tests pass, safety guards green, both apps
+typecheck, mobile bundle builds.

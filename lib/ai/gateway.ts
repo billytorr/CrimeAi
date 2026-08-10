@@ -46,8 +46,20 @@ export const gateway = {
     // rather than breaking, until that provider is built in a later phase.
     return crimeaiLLM;
   },
-  stt(): STTProvider { return stub("stt", { transcribe: notReady("STT") }) as STTProvider; },
-  tts(): TTSProvider { return stub("tts", { synthesize: notReady("TTS") }) as TTSProvider; },
+  stt(): STTProvider {
+    if (process.env.DEEPGRAM_API_KEY) {
+      const { deepgramSTT } = require("./voice/deepgram-stt");
+      return deepgramSTT();
+    }
+    return stub("stt", { transcribe: notReady("STT") }) as STTProvider;
+  },
+  tts(): TTSProvider {
+    if (process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_VOICE_ID) {
+      const { elevenlabsTTS } = require("./voice/elevenlabs-tts");
+      return elevenlabsTTS();
+    }
+    return stub("tts", { synthesize: notReady("TTS") }) as TTSProvider;
+  },
   vision(): VisionProvider {
     // Real provider when Anthropic is configured (it's vision-capable); the
     // honest stub otherwise. No new vendor — same key as the LLM.
@@ -59,8 +71,20 @@ export const gateway = {
     }
     return stub("vision", { analyze: notReady("Vision") }) as VisionProvider;
   },
-  search(): SearchProvider { return stub("search", { search: notReady("Search") }) as SearchProvider; },
-  research(): ResearchProvider { return stub("research", { research: notReady("Research") }) as ResearchProvider; },
+  search(): SearchProvider {
+    if (process.env.BRAVE_API_KEY) {
+      const { braveSearch } = require("./web/brave-search");
+      return braveSearch();
+    }
+    return stub("search", { search: notReady("Search") }) as SearchProvider;
+  },
+  research(): ResearchProvider {
+    if (process.env.TAVILY_API_KEY) {
+      const { tavilyResearch } = require("./web/tavily-research");
+      return tavilyResearch();
+    }
+    return stub("research", { research: notReady("Research") }) as ResearchProvider;
+  },
   embedding(): EmbeddingProvider { return stub("embedding", { embed: notReady("Embedding") }) as EmbeddingProvider; },
 
   /** What each capability currently resolves to — for /capabilities + the manifest. */
@@ -68,11 +92,11 @@ export const gateway = {
     const sel = providerSelection();
     return {
       llm: { provider: this.llm().name, configured: this.llm().configured, selected: sel.llm },
-      stt: { provider: "none", configured: false, selected: sel.stt },
-      tts: { provider: "none", configured: false, selected: sel.tts },
+      stt: { provider: this.stt().name, configured: this.stt().configured, selected: sel.stt },
+      tts: { provider: this.tts().name, configured: this.tts().configured, selected: sel.tts },
       vision: { provider: this.vision().name, configured: this.vision().configured, selected: sel.vision },
-      search: { provider: "none", configured: false, selected: sel.search },
-      research: { provider: "none", configured: false, selected: sel.research },
+      search: { provider: this.search().name, configured: this.search().configured, selected: sel.search },
+      research: { provider: this.research().name, configured: this.research().configured, selected: sel.research },
       embedding: { provider: "none", configured: false, selected: sel.embedding },
     };
   },
