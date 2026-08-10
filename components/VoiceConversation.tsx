@@ -54,7 +54,6 @@ export default function VoiceConversation({
   const [input, setInput] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [dbg, setDbg] = useState(""); // temporary voice-playback diagnostic
 
   const recRef = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
@@ -186,26 +185,23 @@ export default function VoiceConversation({
 
   async function speak(text: string) {
     setPhaseBoth("speaking"); setCaption(text);
-    setDbg("speak: requesting…");
     try {
       const res = await fetch(apiUrl("/api/crimeai/voice/speak"), {
         method: "POST", headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify({ text }),
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({} as any));
-        // Surface the exact server reason (e.g. the ElevenLabs error) so a
-        // silent turn is diagnosable instead of invisible.
-        setDbg(`speak FAIL http ${res.status} · ${(body?.error || "").toString().slice(0, 120)}`);
+        setCaption(res.status === 402
+          ? "Voice replies are a Protector feature."
+          : "My voice isn't switched on right now — I'll keep answering in text.");
+        await pause(1500);
         return;
       }
       const buf = await res.arrayBuffer();
-      const ct = res.headers.get("Content-Type") || "?";
-      setDbg(`http ${res.status} · ${ct} · ${buf.byteLength}b`);
-      if (!buf.byteLength) { setDbg((d) => `${d} · EMPTY body`); return; }
-      if (!/audio/i.test(ct)) { setDbg((d) => `${d} · NOT audio`); return; }
+      const ct = res.headers.get("Content-Type") || "audio/mpeg";
+      if (!buf.byteLength || !/audio/i.test(ct)) return;
       await playWithWave(buf, ct);
-    } catch (e) { setDbg(`speak threw: ${(e as Error).message}`); }
+    } catch { /* non-fatal */ }
   }
 
   // Play the reply and drive the sphere. Primary path decodes the audio and
@@ -220,7 +216,6 @@ export default function VoiceConversation({
     if (ctx.state !== "running") { try { await ctx.resume(); } catch {} }
     try {
       const audioBuf = await ctx.decodeAudioData(buf.slice(0)); // slice: decode detaches the buffer
-      setDbg((d) => `${d} · ctx:${ctx.state} · decoded ${audioBuf.duration.toFixed(1)}s · buffer`);
       const node = ctx.createBufferSource(); node.buffer = audioBuf;
       const analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
       node.connect(analyser); analyser.connect(ctx.destination);
@@ -233,9 +228,8 @@ export default function VoiceConversation({
       });
       analyserRef.current = null;
       try { node.disconnect(); analyser.disconnect(); } catch {}
-    } catch (e) {
+    } catch {
       // decode unsupported — plain element playback guarantees audio
-      setDbg((d) => `${d} · ctx:${ctx.state} · decode FAIL (${(e as Error).name}) · element`);
       const url = URL.createObjectURL(new Blob([buf], { type: mime }));
       const audio = new Audio(url); playingRef.current = audio;
       try {
@@ -316,10 +310,9 @@ export default function VoiceConversation({
       </button>
 
       {/* status line */}
-      <p className="mb-1 min-h-[20px] px-8 text-center text-[13px] text-ink2 line-clamp-2">
+      <p className="mb-3 min-h-[20px] px-8 text-center text-[13px] text-ink2 line-clamp-2">
         {phase === "idle" && !muted ? caption : statusWord}
       </p>
-      {dbg && <p className="mb-2 px-8 text-center text-[10px] text-ink3 break-words">{dbg}</p>}
 
       {/* bottom controls: [ + | Ask CrimeAI ]  [ mic ]  [ ✕ ] */}
       <div className="px-4">
