@@ -1,27 +1,43 @@
 "use client";
 
-// Full-screen voice conversation with CrimeAI — the ChatGPT-style voice mode.
+// Talk to CrimeAI — the full-screen voice experience.
 //
-// The centrepiece is a live red "digital waveform": a canvas equalizer driven
-// by a Web Audio AnalyserNode on CrimeAI's ACTUAL voice while it speaks (and on
-// your voice while you talk). It moves to the real audio — not a canned video —
-// so it always matches what's being said. Futuristic, calm, safe to talk to.
+// Layout (mobile-first, safe-area aware):
+//   TOP     minimal CrimeAI identity + short status
+//   CENTER  CrimeAIVoiceSphere — a red digital particle core that reacts to
+//           CrimeAI's ACTUAL voice (TTS) and, subtly, to yours while listening
+//   BOTTOM  [ + | Ask CrimeAI ]   [ mic mute ]   [ ✕ exit ]
 //
-// Each turn (yours + CrimeAI's) is handed back to the text thread via onTurn,
-// so closing voice mode leaves the whole conversation transcribed in chat.
+// Voice and text are two modes of the SAME conversation: every turn (spoken,
+// typed, or an attached photo) is handed back via onTurn and persisted by the
+// caller. The + menu reuses the shared CrimeAI AttachmentMenu (Camera / Photos
+// / Files only). Language follows the app locale (useLang) → STT. TTS playback
+// runs through one unlocked AudioContext and feeds the sphere's analyser.
 //
-// Protector-only; the caller only mounts this for isPro. Everything degrades
-// gracefully — a failed transcribe/speak returns you to listening, and if
-// CrimeAI's voice isn't switched on we SAY so (instead of going silent) and
-// keep the answer in text.
+// Protector-only (the caller only mounts this for isPro). No settings button,
+// no language/model/voice selectors, no live video or screen share.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { apiUrl, authHeaders } from "@/lib/api";
+import { resizeImage } from "@/lib/photo";
+import { useLang } from "@/components/LanguageProvider";
+import CrimeAIVoiceSphere from "@/components/voice/CrimeAIVoiceSphere";
+import AttachmentMenu from "@/components/chat/AttachmentMenu";
+import AttachmentPreview, { type Attachment } from "@/components/chat/AttachmentPreview";
 import type { ResolvedLocation } from "@/lib/types";
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
 
 export interface VoiceTurn { role: "user" | "assistant"; text: string }
+
+let _aid = 0;
+const nextId = () => `va_${++_aid}`;
+
+// Deepgram-friendly language codes; Haitian Creole isn't supported for STT so
+// we let the provider auto-detect there rather than send an invalid code.
+function sttLang(lang: string): string | undefined {
+  return lang === "es" ? "es" : lang === "pt" ? "pt" : lang === "en" ? "en" : undefined;
+}
 
 export default function VoiceConversation({
   loc, radiusMiles, onTurn, onClose,
@@ -31,32 +47,40 @@ export default function VoiceConversation({
   onTurn: (t: VoiceTurn) => void;
   onClose: () => void;
 }) {
+  const { lang } = useLang();
   const [phase, setPhase] = useState<Phase>("idle");
-  const [caption, setCaption] = useState("Tap the waveform to start talking");
+  const [caption, setCaption] = useState("Tap the sphere to start talking");
+  const [muted, setMuted] = useState(false);
+  const [input, setInput] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const recRef = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const audioCtx = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null); // whichever source is live
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const playingRef = useRef<HTMLAudioElement | null>(null);
+  const stopSpeakRef = useRef<(() => void) | null>(null);
   const active = useRef(true);
+  const mutedRef = useRef(false);
   const phaseRef = useRef<Phase>("idle");
   const setPhaseBoth = (p: Phase) => { phaseRef.current = p; setPhase(p); };
 
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const photosRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
-    active.current = true; // re-arm (StrictMode dev mounts twice)
+    active.current = true;
     const rec = recRef, ctx = audioCtx;
     return () => {
       active.current = false;
-      rec.current?.stop();
+      try { rec.current?.stop(); } catch {}
+      try { playingRef.current?.pause(); } catch {}
       ctx.current?.close().catch(() => {});
     };
   }, []);
 
-  // One AudioContext for the whole session, unlocked on the first user gesture
-  // (tap). iOS/Safari start it suspended and only a gesture-driven resume lets
-  // audio play — the old code created a fresh, suspended context per turn, which
-  // is a common "answered in text but no sound" cause.
   async function ensureCtx(): Promise<AudioContext> {
     if (!audioCtx.current) {
       const Ctx = window.AudioContext || (window as any).webkitAudioContext;
@@ -66,96 +90,9 @@ export default function VoiceConversation({
     return audioCtx.current;
   }
 
-  // ── the living waveform ──────────────────────────────────────────
-  // One persistent RAF loop draws whatever analyser is currently live
-  // (mic while listening, TTS while speaking) and a gentle idle shimmer
-  // otherwise, so the visual always feels alive.
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx2d = canvas.getContext("2d");
-    if (!ctx2d) return;
-
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const BARS = 44;
-    const freq = new Uint8Array(1024);
-    let t = 0;
-    let sizedW = 0, sizedH = 0;
-    let raf = 0;
-    let stopped = false;
-
-    const draw = () => {
-      if (stopped) return;
-      t += 1;
-      // Size from live client dimensions each frame — robust to mount timing,
-      // StrictMode double-mount, and resizes. Re-scale only when it changes.
-      const cssW = canvas.clientWidth, cssH = canvas.clientHeight;
-      if (!cssW || !cssH) { raf = requestAnimationFrame(draw); return; }
-      if (cssW !== sizedW || cssH !== sizedH) {
-        canvas.width = Math.round(cssW * dpr);
-        canvas.height = Math.round(cssH * dpr);
-        ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
-        sizedW = cssW; sizedH = cssH;
-      }
-      ctx2d.clearRect(0, 0, cssW, cssH);
-      const midY = cssH / 2;
-      const gap = 4;
-      const barW = (cssW - gap * (BARS - 1)) / BARS;
-
-      const an = analyserRef.current;
-      let bins: Uint8Array | null = null;
-      if (an) { an.getByteFrequencyData(freq); bins = freq; }
-      const speaking = phaseRef.current === "speaking";
-      const listening = phaseRef.current === "listening";
-
-      for (let i = 0; i < BARS; i++) {
-        let level: number;
-        if (bins) {
-          // sample the low-mid band (where speech energy lives), mirrored
-          const idx = Math.floor((i / BARS) * 120) + 2;
-          level = bins[idx] / 255;
-        } else {
-          level = 0; // idle
-        }
-        // idle / floor shimmer so it always breathes and feels safe
-        const idle = 0.10 + 0.06 * Math.sin(i * 0.5 + t * 0.08) + 0.04 * Math.sin(t * 0.05);
-        const h = Math.max(idle, level * 0.92) * (cssH * 0.9);
-        const x = i * (barW + gap);
-        const y = midY - h / 2;
-
-        const grad = ctx2d.createLinearGradient(0, y, 0, y + h);
-        grad.addColorStop(0, "rgba(255,90,96,0.95)");
-        grad.addColorStop(0.5, "rgba(233,42,52,1)");
-        grad.addColorStop(1, "rgba(160,20,26,0.95)");
-        ctx2d.fillStyle = grad;
-        ctx2d.shadowColor = "rgba(233,42,52,0.85)";
-        ctx2d.shadowBlur = speaking ? 18 : listening ? 12 : 7;
-
-        const r = Math.min(barW / 2, 4);
-        roundRect(ctx2d, x, y, barW, h, r);
-        ctx2d.fill();
-      }
-      ctx2d.shadowBlur = 0;
-      raf = requestAnimationFrame(draw);
-    };
-    raf = requestAnimationFrame(draw);
-    return () => { stopped = true; cancelAnimationFrame(raf); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function roundRect(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-    c.beginPath();
-    c.moveTo(x + r, y);
-    c.arcTo(x + w, y, x + w, y + h, r);
-    c.arcTo(x + w, y + h, x, y + h, r);
-    c.arcTo(x, y + h, x, y, r);
-    c.arcTo(x, y, x + w, y, r);
-    c.closePath();
-  }
-
-  // ── listen: record a window, then transcribe ──
+  // ── listen → transcribe → respond ──
   const startListening = useCallback(async () => {
-    if (!active.current) return;
+    if (!active.current || mutedRef.current) return;
     setPhaseBoth("listening"); setCaption("Listening…");
     try {
       const ctx = await ensureCtx();
@@ -171,8 +108,9 @@ export default function VoiceConversation({
         analyserRef.current = null;
         try { src.disconnect(); } catch {}
         stream.getTracks().forEach((tk) => tk.stop());
+        if (mutedRef.current) { setPhaseBoth("idle"); return; }         // muted mid-capture — drop it
         const blob = new Blob(chunks.current, { type: rec.mimeType || "audio/webm" });
-        if (blob.size < 1200) { startListening(); return; } // too short — keep listening
+        if (blob.size < 1200) { startListening(); return; }             // too short — keep listening
         await handleUtterance(blob);
       };
       rec.start();
@@ -186,18 +124,27 @@ export default function VoiceConversation({
   async function handleUtterance(blob: Blob) {
     setPhaseBoth("thinking"); setCaption("…");
     try {
-      const tr = await fetch(apiUrl("/api/crimeai/voice/transcribe"), {
-        method: "POST", headers: { "Content-Type": blob.type, ...(await authHeaders()) }, body: blob,
-      });
+      const headers: Record<string, string> = { "Content-Type": blob.type, ...(await authHeaders()) };
+      const lc = sttLang(lang); if (lc) headers["x-crimeai-lang"] = lc;
+      const tr = await fetch(apiUrl("/api/crimeai/voice/transcribe"), { method: "POST", headers, body: blob });
       const trData = await tr.json();
       if (!tr.ok || !trData.text) {
         if (trData.upsell) { setCaption("Voice is a Protector feature."); setPhaseBoth("idle"); return; }
-        startListening(); return; // couldn't hear — listen again
+        startListening(); return;
       }
-      const userText = trData.text as string;
-      onTurn({ role: "user", text: userText });
-      setCaption(`"${userText}"`);
+      await respondTo(trData.text as string, true);
+    } catch {
+      setCaption("Something glitched. Tap to keep talking.");
+      setPhaseBoth("idle");
+    }
+  }
 
+  // Shared reply path for spoken OR typed input — keeps one conversation.
+  async function respondTo(userText: string, continueAfter: boolean) {
+    onTurn({ role: "user", text: userText });
+    setCaption(`"${userText}"`);
+    setPhaseBoth("thinking");
+    try {
       const ask = await fetch(apiUrl("/api/crimeai/ask"), {
         method: "POST", headers: { "Content-Type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify({ question: userText, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood, address: loc.query, radiusMiles, days: 30 }),
@@ -205,13 +152,35 @@ export default function VoiceConversation({
       const askData = await ask.json();
       const answer = (askData.answer || "Sorry, I didn't catch that.") as string;
       onTurn({ role: "assistant", text: answer });
-
       await speak(answer);
-      if (active.current) startListening(); // continue the conversation
     } catch {
-      setCaption("Something glitched. Tap to keep talking.");
-      setPhaseBoth("idle");
+      setCaption("Network hiccup — tap to keep talking.");
     }
+    if (continueAfter && active.current && !mutedRef.current) startListening();
+    else setPhaseBoth("idle");
+  }
+
+  // A photo (camera / library) → describe it in the same conversation + speak.
+  async function respondToImage(file: File, continueAfter: boolean) {
+    let dataUrl: string;
+    try { dataUrl = await resizeImage(file, 1024); } catch { return; }
+    onTurn({ role: "user", text: "[Shared a photo]" });
+    setPhaseBoth("thinking"); setCaption("Looking at your photo…");
+    try {
+      const res = await fetch(apiUrl("/api/crimeai/vision"), {
+        method: "POST", headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      const data = await res.json();
+      const answer = res.ok ? (data.answer as string)
+        : data.upsell ? "Reading images is a Protector feature." : (data.error || "I couldn't read that photo.");
+      onTurn({ role: "assistant", text: answer });
+      await speak(answer);
+    } catch {
+      setCaption("Couldn't analyze that photo.");
+    }
+    if (continueAfter && active.current && !mutedRef.current) startListening();
+    else setPhaseBoth("idle");
   }
 
   async function speak(text: string) {
@@ -222,13 +191,11 @@ export default function VoiceConversation({
         body: JSON.stringify({ text }),
       });
       if (!res.ok) {
-        // Surface WHY there's no voice instead of going silent. 402 = plan,
-        // 503 = TTS key not configured in this environment.
         await res.json().catch(() => ({}));
         setCaption(res.status === 402
           ? "Voice replies are a Protector feature."
-          : "My voice isn't switched on here yet — I'll keep answering in text. (Add the ElevenLabs key to enable spoken replies.)");
-        await pause(1600);
+          : "My voice isn't switched on here yet — I'll keep answering in text.");
+        await pause(1500);
         return;
       }
       const buf = await res.arrayBuffer();
@@ -236,59 +203,150 @@ export default function VoiceConversation({
       const url = URL.createObjectURL(new Blob([buf], { type: res.headers.get("Content-Type") || "audio/mpeg" }));
       await playWithWave(url);
       URL.revokeObjectURL(url);
-    } catch {
-      // playback failed — non-fatal, fall through to listen
-    }
+    } catch { /* non-fatal */ }
   }
 
-  // Play the MP3 through the AudioContext so the analyser (and thus the
-  // waveform) reacts to CrimeAI's real voice. Falls back to a plain <audio>
-  // element if the graph can't be built, so sound is never lost.
   async function playWithWave(url: string) {
-    const audio = new Audio(url);
-    audio.preload = "auto";
+    const audio = new Audio(url); audio.preload = "auto"; playingRef.current = audio;
     try {
       const ctx = await ensureCtx();
       const source = ctx.createMediaElementSource(audio);
       const analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
       source.connect(analyser); analyser.connect(ctx.destination);
       analyserRef.current = analyser;
-      await audio.play();
-      await new Promise<void>((resolve) => { audio.onended = () => resolve(); audio.onerror = () => resolve(); });
+      await new Promise<void>((resolve) => {
+        stopSpeakRef.current = () => { try { audio.pause(); } catch {}; resolve(); };
+        audio.onended = () => resolve();
+        audio.onerror = () => resolve();
+        audio.play().catch(() => resolve());
+      });
       analyserRef.current = null;
       try { source.disconnect(); analyser.disconnect(); } catch {}
     } catch {
-      // Web Audio graph failed — at least play the sound directly.
-      try { await audio.play(); await new Promise<void>((r) => { audio.onended = () => r(); audio.onerror = () => r(); }); } catch {}
+      try { await audio.play(); await new Promise<void>((r) => { stopSpeakRef.current = () => { try { audio.pause(); } catch {}; r(); }; audio.onended = () => r(); audio.onerror = () => r(); }); } catch {}
       analyserRef.current = null;
+    } finally {
+      stopSpeakRef.current = null; playingRef.current = null;
     }
   }
 
   function pause(ms: number) { return new Promise<void>((r) => setTimeout(r, ms)); }
 
-  function onTap() {
+  // Tap the sphere: start when idle; interrupt (barge-in) when CrimeAI is
+  // speaking; stop early when listening.
+  function onSphereTap() {
     if (phase === "idle") startListening();
-    else if (phase === "listening") { try { recRef.current?.stop(); } catch {} } // stop early
+    else if (phase === "speaking") { stopSpeakRef.current?.(); startListening(); }
+    else if (phase === "listening") { try { recRef.current?.stop(); } catch {} }
   }
 
+  function toggleMute() {
+    const next = !mutedRef.current;
+    mutedRef.current = next; setMuted(next);
+    if (next) {
+      try { recRef.current?.stop(); } catch {}
+      setPhaseBoth("idle"); setCaption("Muted — tap the mic to talk again");
+    } else {
+      startListening();
+    }
+  }
+
+  // ── composer (type or attach in voice mode) ──
+  function onPicked(file: File | undefined) {
+    if (!file) return;
+    if (file.type.startsWith("image/")) {
+      resizeImage(file, 512).then((thumb) =>
+        setAttachments((a) => [...a, { id: nextId(), kind: "image", name: file.name || "photo", dataUrl: thumb, file }])
+      ).catch(() => setAttachments((a) => [...a, { id: nextId(), kind: "image", name: file.name || "photo", file }]));
+    } // Files that aren't images: vision is image-only today — ignore silently to avoid a dead attachment.
+  }
+
+  async function sendComposer() {
+    const imgs = attachments.filter((a) => a.kind === "image");
+    const text = input.trim();
+    setAttachments([]); setInput("");
+    for (const a of imgs) await respondToImage(a.file, false);
+    if (text) await respondTo(text, false);
+  }
+
+  const canSend = (input.trim().length > 0 || attachments.length > 0) && phase !== "thinking";
+  const statusWord = phase === "listening" ? "Listening" : phase === "thinking" ? "Thinking"
+    : phase === "speaking" ? "Speaking" : muted ? "Muted" : "Tap the sphere to talk";
+
   return (
-    <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-between bg-shell px-6 pb-[calc(env(safe-area-inset-bottom)+2rem)] pt-[calc(env(safe-area-inset-top)+1.5rem)]">
-      <div className="flex w-full items-center justify-between">
-        <span className="text-sm font-semibold text-ink2">Talking with CrimeAI</span>
-        <button onClick={onClose} className="text-sm font-semibold text-ink2">Done</button>
+    <div className="fixed inset-0 z-[1000] flex flex-col bg-shell pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+      {/* header — minimal identity, NO settings/selectors */}
+      <div className="flex items-center justify-center px-6">
+        <div className="flex items-center gap-2">
+          <svg width="20" height="23" viewBox="0 0 24 28" className="text-brand" fill="currentColor" aria-hidden="true">
+            <path d="M12 1L3 4.5v7.5c0 5.4 3.8 10.5 9 12.4 5.2-1.9 9-7 9-12.4V4.5L12 1z" opacity="0.25" />
+            <path d="M12 2.6L4.4 5.5v6.5c0 4.6 3.2 9 7.6 10.6 4.4-1.6 7.6-6 7.6-10.6V5.5L12 2.6z" fill="none" stroke="currentColor" strokeWidth="0.7" />
+          </svg>
+          <span className="text-sm font-bold text-ink">Talk to CrimeAI</span>
+        </div>
       </div>
 
-      {/* the living red waveform */}
-      <button onClick={onTap} className="relative grid w-full max-w-md place-items-center py-8" aria-label="Waveform — tap to talk">
-        <div className="pointer-events-none absolute h-40 w-40 rounded-full bg-brand/25 blur-3xl" />
-        <canvas ref={canvasRef} className="relative h-40 w-full" />
+      {/* center — the living red particle sphere */}
+      <button onClick={onSphereTap} aria-label="CrimeAI voice sphere — tap to talk or interrupt"
+        className="relative flex flex-1 items-center justify-center px-6 outline-none">
+        <div className="aspect-square w-full max-w-[72vw] sm:max-w-sm">
+          <CrimeAIVoiceSphere analyser={analyserRef} phase={phase} />
+        </div>
       </button>
 
-      <div className="min-h-[72px] max-w-md text-center">
-        <p className="text-[15px] leading-relaxed text-ink2">{caption}</p>
-        <p className="mt-3 text-[11px] uppercase tracking-wide text-ink3">
-          {phase === "listening" ? "Listening — tap to send" : phase === "thinking" ? "Thinking" : phase === "speaking" ? "Speaking" : "Tap the waveform to talk"}
-        </p>
+      {/* status line */}
+      <p className="mb-3 min-h-[20px] px-8 text-center text-[13px] text-ink2 line-clamp-2">
+        {phase === "idle" && !muted ? caption : statusWord}
+      </p>
+
+      {/* bottom controls: [ + | Ask CrimeAI ]  [ mic ]  [ ✕ ] */}
+      <div className="px-4">
+        <div className="mx-auto max-w-md">
+          <AttachmentPreview items={attachments} onRemove={(id) => setAttachments((a) => a.filter((x) => x.id !== id))} />
+          <div className="flex items-end gap-2">
+            {/* hidden pickers */}
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { onPicked(e.target.files?.[0]); e.target.value = ""; }} />
+            <input ref={photosRef} type="file" accept="image/*" hidden onChange={(e) => { onPicked(e.target.files?.[0]); e.target.value = ""; }} />
+            <input ref={filesRef} type="file" accept="image/*" hidden onChange={(e) => { onPicked(e.target.files?.[0]); e.target.value = ""; }} />
+
+            {/* composer pill with + attachment menu */}
+            <div className="relative flex flex-1 items-center gap-1 rounded-full border border-ink/10 bg-card px-1.5 py-1">
+              <div className="relative shrink-0">
+                <AttachmentMenu open={menuOpen} onClose={() => setMenuOpen(false)}
+                  onCamera={() => cameraRef.current?.click()} onPhotos={() => photosRef.current?.click()} onFiles={() => filesRef.current?.click()} />
+                <button onClick={() => setMenuOpen((v) => !v)} aria-label="Add attachment" aria-expanded={menuOpen}
+                  className={`grid h-9 w-9 place-items-center rounded-full text-ink2 transition active:scale-95 ${menuOpen ? "rotate-45 bg-ink/10" : ""}`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+                </button>
+              </div>
+              <input value={input} onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && canSend) { e.preventDefault(); sendComposer(); } }}
+                placeholder="Ask CrimeAI" aria-label="Ask CrimeAI text input"
+                className="min-w-0 flex-1 bg-transparent px-1 py-1.5 text-[15px] outline-none placeholder:text-ink3" />
+              {canSend && (
+                <button onClick={sendComposer} aria-label="Send" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-white active:scale-95">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" /></svg>
+                </button>
+              )}
+            </div>
+
+            {/* mic mute/unmute — distinguished by more than colour (slash + border + label state) */}
+            <button onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"} aria-pressed={muted}
+              className={`grid h-12 w-12 shrink-0 place-items-center rounded-full border transition active:scale-95 ${muted ? "border-ink/20 bg-ink/10 text-ink3" : "border-transparent bg-brand text-white"}`}>
+              {muted ? (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 9v3a3 3 0 004.9 2.3M15 12V5a3 3 0 00-5.9-.8M5 10v1a7 7 0 0010.7 6M12 19v3M2 2l20 20" /></svg>
+              ) : (
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="2" width="6" height="11" rx="3" /><path d="M5 10v1a7 7 0 0014 0v-1M12 18v4M8 22h8" /></svg>
+              )}
+            </button>
+
+            {/* exit */}
+            <button onClick={onClose} aria-label="End voice conversation"
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-ink/10 bg-card text-ink2 active:scale-95">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

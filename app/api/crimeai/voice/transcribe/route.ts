@@ -22,7 +22,10 @@ export async function POST(req: NextRequest) {
     if (!stt.configured) return NextResponse.json({ error: "Voice isn't available right now." }, { status: 503 });
     const { emitEvent } = await import("@/lib/ai/events");
     emitEvent("crimeai.tool.invoked", { tool: "voice.transcribe" });
-    const { text } = await stt.transcribe(audio);
+    // Language follows the app locale (sent by the voice UI); provider may also
+    // auto-detect when omitted.
+    const language = req.headers.get("x-crimeai-lang") || undefined;
+    const { text } = await stt.transcribe(audio, language ? { language } : undefined);
     return NextResponse.json({ text });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
