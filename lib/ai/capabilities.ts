@@ -6,6 +6,7 @@
 import { gateway } from "./gateway";
 import { availableTools, TOOLS } from "./tools";
 import { crimeaiMode } from "./config";
+import { agentManifest } from "./agents/registry";
 
 export interface CapabilityManifest {
   system: "crimeai";
@@ -16,6 +17,7 @@ export interface CapabilityManifest {
   providers: ReturnType<typeof gateway.status>;
   tools: { available: string[]; planned: string[] };
   torr: { enabled: boolean; level: number };
+  agents: ReturnType<typeof agentManifest>;
 }
 
 export function buildManifest(): CapabilityManifest {
@@ -49,5 +51,6 @@ export function buildManifest(): CapabilityManifest {
     },
     // TORR maturity level (master prompt §42): 0 = disconnected. Today, always 0.
     torr: { enabled: mode.torrEnabled, level: mode.torrEnabled ? 1 : 0 },
+    agents: agentManifest(),
   };
 }

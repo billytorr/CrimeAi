@@ -195,3 +195,28 @@ The other §16 classes map to existing pieces: Conversation Memory = ai_threads,
 live User data = ai-user-context. Visual/Case/Agent memory are later phases.
 
 432 tests pass (memory extraction + blocklist unit-tested). Guards green.
+
+---
+
+# Phase 6 — Agent standardisation (no vendor)
+
+CrimeAI's capabilities are now discoverable agents (§20), each requesting
+models/tools through the gateway/orchestrator — never infrastructure directly,
+which is what lets TORR delegate to them later without them reaching into the
+DB or vendors.
+
+- `lib/ai/agents/types.ts` — `CrimeAIAgent` (id/name/capabilities/available/execute),
+  `AgentTask` (with taskId for idempotency §34), `AgentResult`.
+- `lib/ai/agents/agents.ts` — three real agents wrapping existing capability:
+  `safety-qa` (grounded Q&A via orchestrator), `vision` (gateway.vision),
+  `web-research` (gateway.research). Each `available()` follows its provider.
+- `lib/ai/agents/registry.ts` — list/available/find + `agentManifest()`.
+- `/api/crimeai/agents` — discovery endpoint (no secrets).
+- Manifest (`/capabilities`) now includes the agent list.
+
+CI-enforced §20: `agents.test.ts` asserts the agents module imports no DB
+client or vendor SDK — it must go through the gateway/orchestrator services.
+
+438 tests pass. Guards green. This completes the phases buildable without a
+live TORR endpoint; Phases 7–10 (TORR adapter → shadow → hybrid → GOS) stay
+disabled until TORR is real, exactly as §40 intends.
