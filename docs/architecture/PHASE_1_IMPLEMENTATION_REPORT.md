@@ -102,3 +102,36 @@ The boundary exists and is disabled. When a real TORR endpoint arrives: a
 mode selection returns a hybrid/torr implementation, and TORR first runs in
 **shadow** (§41). No rewrite of CrimeAI internals is required — which was the
 success condition (§50).
+
+---
+
+# Phase 4 addendum — Vision (real, testable)
+
+Built because Anthropic (already our key) is vision-capable — no new vendor,
+so this is a REAL provider, not a dormant scaffold.
+
+## Added
+- `lib/ai/vision/anthropic-vision.ts` — real vision provider. Domain-scoped
+  system prompt with the same hard rules as the text assistant (no identifying
+  individuals, no race/ethnicity, no guilt/prediction from an image).
+- `app/api/crimeai/vision/route.ts` — metered `ai_vision`, Protector-only,
+  free tier declined with an upsell (402), fails closed on infra error.
+- `ai_vision` capability + `supabase/ai-vision-limits.sql` (free 0, pro 100).
+- Image upload in AskScreen (Protector only) — compresses, sends, renders.
+- Gateway `vision()` returns the real provider when configured; the tool and
+  manifest flip `vision.analyze` / `image_analysis` on accordingly.
+
+## Voice (Phase 2) + Web (Phase 3)
+NOT built as live providers — no Deepgram/ElevenLabs/Brave/Tavily credentials,
+and the prompt forbids fake behaviour. They remain honest unconfigured stubs
+in the gateway (`configured:false`, reject on call) and `available:false`
+tools. Building them is a config-flip + provider file once keys exist, exactly
+like vision was.
+
+## Cost tracking (§25)
+Vision reuses the existing metered-capability system (`enforceConsume`), so
+image analysis draws from a per-user monthly cap the same way `ai_analytical`
+does — the cost ceiling the prompt requires before a paid AI feature ships.
+
+416 tests pass (17 architecture + vision). Guards green: safety-paths (11),
+scoring boundary. Typecheck clean both apps, mobile bundle builds.

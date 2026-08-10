@@ -28,6 +28,7 @@ export function buildManifest(): CapabilityManifest {
   if (availableTools().some((t) => t.name === "crime.lookup")) caps.push("crime_data_lookup");
   if (availableTools().some((t) => t.name === "crime.ask") && providers.llm.configured) caps.push("crime_qa");
   caps.push("area_safety_scoring"); // NSS is always available (deterministic)
+  if (providers.vision.configured) caps.push("image_analysis");
 
   const planned = TOOLS.filter((t) => !t.available).map((t) => t.name);
 

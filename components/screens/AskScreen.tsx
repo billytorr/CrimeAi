@@ -10,6 +10,7 @@ import {
   listThreads, createThread, loadMessages, saveMessage, renameThread, deleteThread,
   titleFrom, type AiThread,
 } from "@/lib/ai-threads";
+import { resizeImage } from "@/lib/photo";
 
 interface Msg { role: "user" | "assistant"; text: string; engine?: string }
 
@@ -49,6 +50,37 @@ export default function AskScreen({
   const [threads, setThreads] = useState<AiThread[]>([]);
   const [drawer, setDrawer] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLInputElement>(null);
+
+  // Protector image analysis: compress, show it in the thread, send to the
+  // vision route (metered ai_vision), render CrimeAI's read. Free users get
+  // the upsell the route returns.
+  async function analyzeImage(file: File) {
+    if (loading) return;
+    let dataUrl: string;
+    try { dataUrl = await resizeImage(file, 1024); }
+    catch { return; }
+    setMessages((m) => [...m, { role: "user", text: "[Shared an image]" }]);
+    setLoading(true);
+    const tid = await ensureThread("Image analysis");
+    try {
+      const res = await fetch(apiUrl("/api/crimeai/vision"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+        body: JSON.stringify({ image: dataUrl, threadId: tid }),
+      });
+      const data = await res.json();
+      const text = res.ok
+        ? data.answer
+        : data.upsell
+          ? "Reading images is a Protector feature — I can look at a photo, a notice, a report and tell you what matters for your safety. Upgrade in Settings → Become a Protector and share it again."
+          : (data.error || "I couldn't read that image.");
+      setMessages((m) => [...m, { role: "assistant", text }]);
+      if (tid && res.ok) saveMessage(userId, tid, { role: "assistant", content: text });
+    } catch {
+      setMessages((m) => [...m, { role: "assistant", text: "Network error — please try again." }]);
+    } finally { setLoading(false); }
+  }
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
 
@@ -221,6 +253,13 @@ export default function AskScreen({
           </div>
         )}
         <div className="flex items-end gap-2">
+          {isPro && <>
+            <input ref={imgRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) analyzeImage(f); e.target.value = ""; }} />
+            <button onClick={() => imgRef.current?.click()} disabled={loading} aria-label="Share an image"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ink/10 text-ink2 active:scale-95 disabled:opacity-60">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+            </button>
+          </>}
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}

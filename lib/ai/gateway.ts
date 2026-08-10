@@ -48,7 +48,17 @@ export const gateway = {
   },
   stt(): STTProvider { return stub("stt", { transcribe: notReady("STT") }) as STTProvider; },
   tts(): TTSProvider { return stub("tts", { synthesize: notReady("TTS") }) as TTSProvider; },
-  vision(): VisionProvider { return stub("vision", { analyze: notReady("Vision") }) as VisionProvider; },
+  vision(): VisionProvider {
+    // Real provider when Anthropic is configured (it's vision-capable); the
+    // honest stub otherwise. No new vendor — same key as the LLM.
+    if (process.env.ANTHROPIC_API_KEY) {
+      // lazy import so the SDK isn't pulled when vision is unused
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { anthropicVision } = require("./vision/anthropic-vision");
+      return anthropicVision();
+    }
+    return stub("vision", { analyze: notReady("Vision") }) as VisionProvider;
+  },
   search(): SearchProvider { return stub("search", { search: notReady("Search") }) as SearchProvider; },
   research(): ResearchProvider { return stub("research", { research: notReady("Research") }) as ResearchProvider; },
   embedding(): EmbeddingProvider { return stub("embedding", { embed: notReady("Embedding") }) as EmbeddingProvider; },
@@ -60,7 +70,7 @@ export const gateway = {
       llm: { provider: this.llm().name, configured: this.llm().configured, selected: sel.llm },
       stt: { provider: "none", configured: false, selected: sel.stt },
       tts: { provider: "none", configured: false, selected: sel.tts },
-      vision: { provider: "none", configured: false, selected: sel.vision },
+      vision: { provider: this.vision().name, configured: this.vision().configured, selected: sel.vision },
       search: { provider: "none", configured: false, selected: sel.search },
       research: { provider: "none", configured: false, selected: sel.research },
       embedding: { provider: "none", configured: false, selected: sel.embedding },

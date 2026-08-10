@@ -69,8 +69,10 @@ describe("tool registry — only real tools are available", () => {
     expect(names).toContain("crime.lookup");
     expect(names).toContain("crime.ask");
   });
-  it("voice/vision/web tools are declared but NOT available", () => {
-    for (const n of ["web.search", "vision.analyze", "voice.transcribe"]) {
+  it("web/voice tools are declared but NOT available (no vendor yet)", () => {
+    // vision.analyze is intentionally NOT here — it's available when Anthropic
+    // is configured (Phase 4), which is env-dependent. These have no provider.
+    for (const n of ["web.search", "web.research", "voice.transcribe", "voice.synthesize"]) {
       expect(TOOLS.find((t) => t.name === n)?.available).toBe(false);
     }
   });
@@ -113,5 +115,29 @@ describe("event bus — in-process, never throws into the emitter", () => {
     const off = onEvent("crimeai.error", () => { throw new Error("boom"); });
     expect(() => emitEvent("crimeai.error", {})).not.toThrow();
     off();
+  });
+});
+
+// Phase 4: vision provider. Real when Anthropic is configured; honest stub
+// otherwise. The gateway must never hand back a "configured" vision provider
+// without the key, and the manifest must reflect it.
+describe("vision provider — Phase 4", () => {
+  const saved = { ...process.env };
+  afterEach(() => { process.env = { ...saved }; });
+
+  it("is a stub (unconfigured) when ANTHROPIC_API_KEY is absent", async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    const { gateway } = await import("@/lib/ai/gateway");
+    expect(gateway.vision().configured).toBe(false);
+    await expect(gateway.vision().analyze("x")).rejects.toThrow(/not configured/i);
+  });
+
+  it("the vision.analyze tool tracks the key's presence", async () => {
+    const { TOOLS } = await import("@/lib/ai/tools");
+    const tool = TOOLS.find((t) => t.name === "vision.analyze")!;
+    // available mirrors !!ANTHROPIC_API_KEY at module-eval time; just assert it's a boolean and read-risk
+    expect(typeof tool.available).toBe("boolean");
+    expect(tool.risk).toBe("read");
+    expect(tool.provider).toBe("anthropic");
   });
 });

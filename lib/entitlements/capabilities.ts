@@ -6,6 +6,7 @@ export const CAPABILITIES = {
   ALERT_RADIUS: "alert_radius",
   ADDRESS_SEARCH: "address_search",
   AI_ANALYTICAL: "ai_analytical",
+  AI_VISION: "ai_vision",     // image/file analysis (Protector)
   SMS_IMMEDIATE: "sms_immediate",
   CHANNELS: "channels",
   TRUSTED_CIRCLE: "trusted_circle",
@@ -35,6 +36,7 @@ export const CAP_META: Record<Capability, CapMeta> = {
   alert_radius: { kind: "limit", costPath: false },
   address_search: { kind: "metered", costPath: false },
   ai_analytical: { kind: "metered", costPath: true }, // expensive inference
+  ai_vision: { kind: "metered", costPath: true },     // vision inference (Protector)
   sms_immediate: { kind: "metered", costPath: true }, // per-SMS money
   channels: { kind: "limit", costPath: false },
   trusted_circle: { kind: "limit", costPath: false },
