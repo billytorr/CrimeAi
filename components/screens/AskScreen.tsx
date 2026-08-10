@@ -11,6 +11,7 @@ import {
   titleFrom, type AiThread,
 } from "@/lib/ai-threads";
 import { resizeImage } from "@/lib/photo";
+import VoiceConversation, { type VoiceTurn } from "@/components/VoiceConversation";
 
 interface Msg { role: "user" | "assistant"; text: string; engine?: string }
 
@@ -40,7 +41,7 @@ export default function AskScreen({
 
   const greeting: Msg = {
     role: "assistant",
-    text: `Hi${first ? " " + first : ""} — I'm CrimeAI. I'm watching ${loc.neighborhood} for you. Ask me anything about safety around here. I answer with real, cited data and I'll always tell you what I can't see.`,
+    text: `Hey${first ? " " + first : ""} — I'm CrimeAI. Think of me as your lookout around ${loc.neighborhood}, here whenever you want a second set of eyes. What's on your mind today?`,
   };
 
   const [messages, setMessages] = useState<Msg[]>([greeting]);
@@ -137,6 +138,7 @@ export default function AskScreen({
     } finally { setLoading(false); }
   }
   const [webMode, setWebMode] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   // Protector image analysis: compress, show it in the thread, send to the
   // vision route (metered ai_vision), render CrimeAI's read. Free users get
@@ -269,8 +271,21 @@ export default function AskScreen({
 
   const lastEngine = messages.filter((m) => m.engine).slice(-1)[0]?.engine;
 
+  const voiceLoc = loc;
   return (
     <div className="flex h-full flex-col">
+      {voiceOpen && (
+        <VoiceConversation
+          loc={voiceLoc}
+          radiusMiles={profile.alerts.radiusMiles}
+          onTurn={(t: VoiceTurn) => {
+            // every voice turn lands in the text thread + is persisted
+            setMessages((m) => [...m, { role: t.role, text: t.text }]);
+            (async () => { const tid = await ensureThread(t.text); if (tid) saveMessage(userId, tid, { role: t.role, content: t.text }); })();
+          }}
+          onClose={() => setVoiceOpen(false)}
+        />
+      )}
       {/* header */}
       <div className="safe-top flex items-center gap-3 border-b border-ink/10 bg-shell/95 px-5 pb-3 pt-4 backdrop-blur">
         <Logo size={38} />
@@ -345,9 +360,11 @@ export default function AskScreen({
               className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ink/10 text-ink2 active:scale-95 disabled:opacity-60">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
             </button>
-            <button onClick={toggleMic} aria-label={recording ? "Stop recording" : "Talk to CrimeAI"}
+            <button onClick={toggleMic} aria-label={recording ? "Stop dictation" : "Dictate to text"} title="Speak to type"
               className={`grid h-11 w-11 shrink-0 place-items-center rounded-full active:scale-95 ${recording ? "bg-brand text-white animate-pulse" : "border border-ink/10 text-ink2"}`}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4"/></svg>
+              {/* waveform-to-text, deliberately NOT a mic — distinct from the
+                  shield voice-conversation button on the far right */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 9v6M8 5v14M12 8v8M16 6v12M20 10v4"/></svg>
             </button>
           </>}
           {isPro && <button onClick={() => setWebMode((v) => !v)} aria-label="Search the web" title="Search the web"
@@ -365,6 +382,12 @@ export default function AskScreen({
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand text-white active:scale-95 disabled:opacity-60">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
           </button>
+          {isPro && (
+            <button onClick={() => setVoiceOpen(true)} aria-label="Voice conversation" title="Talk with CrimeAI"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand/10 text-brand active:scale-95">
+              <svg width="20" height="22" viewBox="0 0 24 28" fill="currentColor"><path d="M12 1L3 4.5v7.5c0 5.4 3.8 10.5 9 12.4 5.2-1.9 9-7 9-12.4V4.5L12 1z" opacity="0.2"/><path d="M8 11v3M12 8.5v8M16 11v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+            </button>
+          )}
         </div>
       </div>
 
