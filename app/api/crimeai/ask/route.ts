@@ -24,7 +24,7 @@ import type { ResolvedLocation } from "@/lib/types";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { question, address, lat, lon, neighborhood, radiusMiles = 1, days: reqDays = 30 } = body || {};
+    const { question, address, lat, lon, neighborhood, radiusMiles = 1, days: reqDays = 30, voice = false } = body || {};
     if (!question || typeof question !== "string") {
       return NextResponse.json({ error: "question is required" }, { status: 400 });
     }
@@ -91,10 +91,17 @@ export async function POST(req: NextRequest) {
       // Phase 5 memory: ask the model to optionally emit a <remember> tag —
       // no extra API call. We parse it out below, persist it, strip it.
       const { MEMORY_INSTRUCTION, extractMemory, saveMemory } = await import("@/lib/ai/memory/user-memory");
+      // Voice mode is a live spoken conversation — optimise for latency: a fast
+      // model, a tight token cap, and a spoken-length brevity instruction, so
+      // there's far less to generate AND far less for TTS to synthesise. Text
+      // chat keeps the full Command Center config. CRIMEAI_VOICE_MODEL overrides.
+      const voiceBrevity = "\n\nYou are speaking OUT LOUD in a live voice conversation. Reply in ONE or TWO short, natural spoken sentences — no lists, no headings, no read-aloud statistics unless asked. Warm, direct, to the point.";
       ({ answer, engine } = await orchestrator().ask({
         question, context,
-        model: cfg.model, temperature: cfg.temperature, maxTokens: cfg.maxTokens,
-        system: (cfg.systemPrompt || "") + MEMORY_INSTRUCTION, userContext,
+        model: voice ? (process.env.CRIMEAI_VOICE_MODEL || "claude-haiku-4-5-20251001") : cfg.model,
+        temperature: cfg.temperature,
+        maxTokens: voice ? 220 : cfg.maxTokens,
+        system: (cfg.systemPrompt || "") + (voice ? voiceBrevity : MEMORY_INSTRUCTION), userContext,
       }));
       const mem = extractMemory(answer);
       answer = mem.cleaned;

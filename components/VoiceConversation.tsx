@@ -103,8 +103,11 @@ export default function VoiceConversation({
       analyserRef.current = analyser;
 
       const rec = new MediaRecorder(stream); recRef.current = rec; chunks.current = [];
+      let vad: ReturnType<typeof setInterval> | null = null;
+      const stopVad = () => { if (vad) { clearInterval(vad); vad = null; } };
       rec.ondataavailable = (e) => { if (e.data.size) chunks.current.push(e.data); };
       rec.onstop = async () => {
+        stopVad();
         analyserRef.current = null;
         try { src.disconnect(); } catch {}
         stream.getTracks().forEach((tk) => tk.stop());
@@ -114,7 +117,28 @@ export default function VoiceConversation({
         await handleUtterance(blob);
       };
       rec.start();
-      setTimeout(() => { try { rec.state === "recording" && rec.stop(); } catch {} }, 6000);
+
+      // Voice-activity auto-stop: end the turn shortly after they stop talking
+      // instead of a fixed window, so CrimeAI replies feel immediate. Hard cap
+      // as a safety net; tapping the sphere still stops early.
+      const td = new Uint8Array(analyser.fftSize);
+      const t0 = performance.now();
+      let lastLoud = t0, heard = false;
+      const SPEAK = 0.02, SILENCE_MS = 800, MIN_MS = 500, MAX_MS = 15000;
+      vad = setInterval(() => {
+        const r = recRef.current;
+        if (!r || r.state !== "recording") { stopVad(); return; }
+        analyser.getByteTimeDomainData(td);
+        let sum = 0; for (let i = 0; i < td.length; i++) { const v = (td[i] - 128) / 128; sum += v * v; }
+        const rms = Math.sqrt(sum / td.length);
+        const now = performance.now();
+        if (rms > SPEAK) { lastLoud = now; heard = true; }
+        const elapsed = now - t0;
+        if (elapsed > MAX_MS || (heard && elapsed > MIN_MS && now - lastLoud > SILENCE_MS)) {
+          stopVad();
+          try { r.stop(); } catch {}
+        }
+      }, 90);
     } catch {
       setCaption("I couldn't reach your mic. Tap to try again.");
       setPhaseBoth("idle");
@@ -147,7 +171,7 @@ export default function VoiceConversation({
     try {
       const ask = await fetch(apiUrl("/api/crimeai/ask"), {
         method: "POST", headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-        body: JSON.stringify({ question: userText, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood, address: loc.query, radiusMiles, days: 30 }),
+        body: JSON.stringify({ question: userText, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood, address: loc.query, radiusMiles, days: 30, voice: true }),
       });
       const askData = await ask.json();
       const answer = (askData.answer || "Sorry, I didn't catch that.") as string;
