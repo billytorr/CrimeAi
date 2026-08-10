@@ -200,33 +200,45 @@ export default function VoiceConversation({
       }
       const buf = await res.arrayBuffer();
       if (!buf.byteLength) return;
-      const url = URL.createObjectURL(new Blob([buf], { type: res.headers.get("Content-Type") || "audio/mpeg" }));
-      await playWithWave(url);
-      URL.revokeObjectURL(url);
+      await playWithWave(buf, res.headers.get("Content-Type") || "audio/mpeg");
     } catch { /* non-fatal */ }
   }
 
-  async function playWithWave(url: string) {
-    const audio = new Audio(url); audio.preload = "auto"; playingRef.current = audio;
+  // Play the reply and drive the sphere. Primary path decodes the audio and
+  // plays it through an AudioBufferSourceNode — this is the pattern that works
+  // reliably on iOS Safari/WebView (MediaElementSource is silent there) and
+  // still feeds the analyser. If decoding fails, fall back to a plain <audio>
+  // element so sound is never lost (waveform just won't react that turn).
+  async function playWithWave(buf: ArrayBuffer, mime: string) {
+    const ctx = await ensureCtx();
     try {
-      const ctx = await ensureCtx();
-      const source = ctx.createMediaElementSource(audio);
+      const audioBuf = await ctx.decodeAudioData(buf.slice(0)); // slice: decode detaches the buffer
+      const node = ctx.createBufferSource(); node.buffer = audioBuf;
       const analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.8;
-      source.connect(analyser); analyser.connect(ctx.destination);
+      node.connect(analyser); analyser.connect(ctx.destination);
       analyserRef.current = analyser;
       await new Promise<void>((resolve) => {
-        stopSpeakRef.current = () => { try { audio.pause(); } catch {}; resolve(); };
-        audio.onended = () => resolve();
-        audio.onerror = () => resolve();
-        audio.play().catch(() => resolve());
+        let done = false; const finish = () => { if (!done) { done = true; resolve(); } };
+        stopSpeakRef.current = () => { try { node.stop(); } catch {} finish(); };
+        node.onended = () => finish();
+        node.start();
       });
       analyserRef.current = null;
-      try { source.disconnect(); analyser.disconnect(); } catch {}
+      try { node.disconnect(); analyser.disconnect(); } catch {}
     } catch {
-      try { await audio.play(); await new Promise<void>((r) => { stopSpeakRef.current = () => { try { audio.pause(); } catch {}; r(); }; audio.onended = () => r(); audio.onerror = () => r(); }); } catch {}
-      analyserRef.current = null;
+      // decode unsupported — plain element playback guarantees audio
+      const url = URL.createObjectURL(new Blob([buf], { type: mime }));
+      const audio = new Audio(url); playingRef.current = audio;
+      try {
+        await new Promise<void>((r) => {
+          let done = false; const finish = () => { if (!done) { done = true; r(); } };
+          stopSpeakRef.current = () => { try { audio.pause(); } catch {} finish(); };
+          audio.onended = () => finish(); audio.onerror = () => finish();
+          audio.play().catch(() => finish());
+        });
+      } finally { URL.revokeObjectURL(url); }
     } finally {
-      stopSpeakRef.current = null; playingRef.current = null;
+      stopSpeakRef.current = null; playingRef.current = null; analyserRef.current = null;
     }
   }
 
