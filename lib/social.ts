@@ -292,6 +292,20 @@ export async function updatePost(id: string, patch: Partial<Post>, userId?: stri
   if (i >= 0) { all[i] = { ...all[i], ...patch }; localStorage.setItem(POSTS_KEY, JSON.stringify(all)); }
 }
 
+// Delete a post you own. Postgres RLS restricts deletes to the owner; the
+// extra user_id match is defence in depth so a stale/forged id can't wipe
+// someone else's post. THROWS on failure so the UI can revert its optimistic
+// removal.
+export async function deletePost(id: string, userId?: string): Promise<void> {
+  if (supabaseEnabled && userId) {
+    const { error } = await supabase!.from("posts").delete().eq("id", id).eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const all = readMine().filter((p) => p.id !== id);
+  localStorage.setItem(POSTS_KEY, JSON.stringify(all));
+}
+
 export async function getInteractions(userId?: string): Promise<Interactions> {
   if (supabaseEnabled && userId) {
     const [l, s, f, rp] = await Promise.all([

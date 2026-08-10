@@ -122,3 +122,5 @@ select proname from pg_proc
 
 A missing table surfaces in the app as a generic failure, so check here first
 when a feature "just doesn't work" on one environment but not another.
+
+- `post-owner-edit.sql` — lets a user edit/delete their OWN posts (owner RLS on public.posts). Required for the post ⋮ Edit/Delete menu.

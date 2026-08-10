@@ -9,11 +9,12 @@ import { apiUrl, authHeaders } from "@/lib/api";
 import type { Account } from "@/lib/auth";
 import {
   toggleLike, toggleSave, toggleFollow, toggleRepost, getComments, addComment, timeAgoShort, gradientFor, getProfileDirectory,
+  updatePost, deletePost,
   type Post, type Comment, type Interactions, type ProfileLite,
 } from "@/lib/social";
 import Avatar from "@/components/Avatar";
 import MessageThread from "@/components/MessageThread";
-import { useOpenProfile, useAskAbout } from "@/lib/profileContext";
+import { useOpenProfile } from "@/lib/profileContext";
 import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, SoundOn, SoundOff } from "@/components/Icons";
 
 import { catColor } from "@/lib/categories";
@@ -40,8 +41,25 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
     blockUser(account.id, p.handle).catch(() => {});
   }
   const [messaging, setMessaging] = useState<Post | null>(null);
+  const [editing, setEditing] = useState<Post | null>(null);
+  const [confirmDel, setConfirmDel] = useState<Post | null>(null);
   const openProfile = useOpenProfile();
-  const askAbout = useAskAbout();
+  // own-post optimistic overrides: hide deleted, show edited text immediately
+  const [deleted] = useState<Set<string>>(new Set());
+  const [textOver] = useState<Record<string, string>>({});
+
+  async function onDelete(p: Post) {
+    setConfirmDel(null);
+    deleted.add(p.id); bump();
+    try { await deletePost(p.id, account.id); }
+    catch { deleted.delete(p.id); bump(); } // write rejected — bring it back
+  }
+  async function onEditSave(p: Post, text: string) {
+    const t = text.trim(); if (!t) return;
+    textOver[p.id] = t; setEditing(null); bump();
+    try { await updatePost(p.id, { text: t }, account.id); }
+    catch { delete textOver[p.id]; bump(); } // revert on failure
+  }
   // optimistic local overrides
   const [likeOver] = useState<Record<string, boolean>>({});
   const [saveOver] = useState<Record<string, boolean>>({});
@@ -100,7 +118,8 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
   return (
     <>
       <div className="divide-y divide-ink/5">
-        {posts.filter((p) => !hidden.has(p.handle) || p.mine).map((p) => {
+        {posts.filter((p) => (!hidden.has(p.handle) || p.mine) && !deleted.has(p.id)).map((p0) => {
+          const p = textOver[p0.id] !== undefined ? { ...p0, text: textOver[p0.id] } : p0;
           const v = view(p);
           if (p.kind === "reel" || p.kind === "live") return <ReelCard key={p.id} {...v} />;
           if (p.kind === "news") return <NewsCard key={p.id} {...v} />;
@@ -117,27 +136,75 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
       {menuPost && (
         <PostMenuSheet
           post={menuPost}
-          onAsk={() => { askAbout({ id: menuPost.id, text: menuPost.text }); setMenuPost(null); }}
+          isOwn={!!menuPost.mine}
+          onEdit={() => { setEditing(menuPost); setMenuPost(null); }}
+          onDelete={() => { setConfirmDel(menuPost); setMenuPost(null); }}
           onReport={() => { setReporting(menuPost); setMenuPost(null); }}
           onBlock={() => doBlock(menuPost)}
           onClose={() => setMenuPost(null)}
         />
       )}
+      {editing && <EditPostSheet post={editing} onSave={(t) => onEditSave(editing, t)} onClose={() => setEditing(null)} />}
+      {confirmDel && <ConfirmDeleteSheet onConfirm={() => onDelete(confirmDel)} onClose={() => setConfirmDel(null)} />}
       {reporting && <ReportSheet post={reporting} account={account} onClose={() => setReporting(null)} />}
     </>
   );
 }
 
-// ⋮ menu — the user-facing safety controls the app stores require:
-// report the post, or block the account entirely.
-function PostMenuSheet({ post, onAsk, onReport, onBlock, onClose }: { post: Post; onAsk: () => void; onReport: () => void; onBlock: () => void; onClose: () => void }) {
+// ⋮ menu — your OWN posts get Edit / Delete; everyone else's get the safety
+// controls the app stores require: report the post, or block the account.
+function PostMenuSheet({ post, isOwn, onEdit, onDelete, onReport, onBlock, onClose }: { post: Post; isOwn: boolean; onEdit: () => void; onDelete: () => void; onReport: () => void; onBlock: () => void; onClose: () => void }) {
   return (
     <div className="fade-in fixed inset-0 z-[1400] flex flex-col justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60" />
       <div className="sheet-in safe-bottom relative rounded-t-3xl border-t border-ink/10 bg-card p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/20" />
-        <button onClick={onReport} className="w-full rounded-xl border border-ink/10 bg-shell py-3.5 text-sm font-semibold text-red-400 active:scale-[0.99]">Report post</button>
-        <button onClick={onBlock} className="mt-2 w-full rounded-xl border border-ink/10 bg-shell py-3.5 text-sm font-semibold text-red-400 active:scale-[0.99]">Block @{post.handle}</button>
+        {isOwn ? (
+          <>
+            <button onClick={onEdit} className="w-full rounded-xl border border-ink/10 bg-shell py-3.5 text-sm font-semibold text-ink active:scale-[0.99]">Edit post</button>
+            <button onClick={onDelete} className="mt-2 w-full rounded-xl border border-ink/10 bg-shell py-3.5 text-sm font-semibold text-red-400 active:scale-[0.99]">Delete post</button>
+          </>
+        ) : (
+          <>
+            <button onClick={onReport} className="w-full rounded-xl border border-ink/10 bg-shell py-3.5 text-sm font-semibold text-red-400 active:scale-[0.99]">Report post</button>
+            <button onClick={onBlock} className="mt-2 w-full rounded-xl border border-ink/10 bg-shell py-3.5 text-sm font-semibold text-red-400 active:scale-[0.99]">Block @{post.handle}</button>
+          </>
+        )}
+        <button onClick={onClose} className="mt-2 w-full rounded-xl py-3 text-sm font-medium text-ink2">Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+// Edit your own post's text.
+function EditPostSheet({ post, onSave, onClose }: { post: Post; onSave: (text: string) => void; onClose: () => void }) {
+  const [text, setText] = useState(post.text || "");
+  return (
+    <div className="fade-in fixed inset-0 z-[1400] flex flex-col justify-end" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60" />
+      <div className="sheet-in safe-bottom relative rounded-t-3xl border-t border-ink/10 bg-card p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/20" />
+        <p className="mb-2 text-sm font-semibold text-ink">Edit post</p>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} autoFocus
+          className="w-full resize-none rounded-xl border border-ink/10 bg-shell p-3 text-sm text-ink outline-none focus:border-brand/60" />
+        <div className="mt-3 flex gap-2">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-ink/10 py-3 text-sm font-medium text-ink2 active:scale-[0.99]">Cancel</button>
+          <button onClick={() => onSave(text)} disabled={!text.trim()} className="flex-1 rounded-xl bg-brand py-3 text-sm font-semibold text-white active:scale-[0.99] disabled:opacity-50">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDeleteSheet({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div className="fade-in fixed inset-0 z-[1400] flex flex-col justify-end" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60" />
+      <div className="sheet-in safe-bottom relative rounded-t-3xl border-t border-ink/10 bg-card p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-ink/20" />
+        <p className="mb-1 text-center text-sm font-semibold text-ink">Delete this post?</p>
+        <p className="mb-4 text-center text-xs text-ink3">This can&apos;t be undone.</p>
+        <button onClick={onConfirm} className="w-full rounded-xl bg-red-500 py-3.5 text-sm font-semibold text-white active:scale-[0.99]">Delete post</button>
         <button onClick={onClose} className="mt-2 w-full rounded-xl py-3 text-sm font-medium text-ink2">Cancel</button>
       </div>
     </div>
@@ -233,7 +300,11 @@ function Head({ post, me, followed, onFollow, onMessage, onMenu, pro }: { post: 
         </button>
         <div className="flex items-center gap-1 text-[11px] text-ink3"><Pin size={11} /> {post.neighborhood} · {timeAgoShort(post.createdAt)}</div>
       </div>
-      {!post.mine && (
+      {post.mine ? (
+        <button onClick={onMenu} aria-label="Post options" className="px-0.5 text-ink3 active:scale-95">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+        </button>
+      ) : (
         <div className="flex items-center gap-1.5">
           <button onClick={onMessage} aria-label="Message" className="grid h-8 w-8 place-items-center rounded-full border border-ink/15 text-ink2 active:scale-95"><Mail size={15} /></button>
           <button onClick={onFollow} className={`rounded-full px-3 py-1 text-xs font-semibold ${followed ? "border border-ink/15 text-ink2" : "bg-brand/15 text-brand"}`}>{followed ? "Following" : "Follow"}</button>
@@ -431,7 +502,7 @@ function ReelCard(v: V) {
             <span className="text-[11px] text-white/70">· {timeAgoShort(post.createdAt)}</span>
             {!post.mine && <button onClick={v.onMessage} aria-label="Message" className="ml-1 grid h-7 w-7 place-items-center rounded-full border border-white/40 text-white active:scale-95"><Mail size={13} /></button>}
             {!post.mine && <button onClick={v.onFollow} className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${v.followed ? "border border-white/30 text-white/80" : "bg-white text-black"}`}>{v.followed ? "Following" : "Follow"}</button>}
-            {!post.mine && <button onClick={v.onMenu} aria-label="Post options" className="px-0.5 text-white/80"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>}
+            <button onClick={v.onMenu} aria-label="Post options" className={`px-0.5 text-white/80 ${post.mine ? "ml-1" : ""}`}><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg></button>
           </div>
           <div className="mt-2 max-w-[80%]"><PostText text={post.text} className="text-sm leading-snug text-white/95" light /></div>
           {post.tags && <div className="mt-1 flex flex-wrap gap-1.5">{post.tags.map((t) => <span key={t} className="text-xs text-brand">#{t}</span>)}</div>}
