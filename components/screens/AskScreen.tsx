@@ -12,6 +12,7 @@ import {
 } from "@/lib/ai-threads";
 import { resizeImage } from "@/lib/photo";
 import VoiceConversation, { type VoiceTurn } from "@/components/VoiceConversation";
+import ChatComposer from "@/components/chat/ChatComposer";
 
 interface Msg { role: "user" | "assistant"; text: string; engine?: string }
 
@@ -51,7 +52,6 @@ export default function AskScreen({
   const [threads, setThreads] = useState<AiThread[]>([]);
   const [drawer, setDrawer] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLInputElement>(null);
   const [recording, setRecording] = useState(false);
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -80,7 +80,9 @@ export default function AskScreen({
           });
           const data = await res.json();
           setLoading(false);
-          if (res.ok && data.text) send(data.text);
+          // Speak-to-type: drop the transcript into the composer so they can
+          // read/edit before sending (ChatGPT-style dictation), not auto-send.
+          if (res.ok && data.text) setInput((prev) => (prev ? prev.trimEnd() + " " : "") + data.text);
           else if (data.upsell) setMessages((m) => [...m, { role: "assistant", text: "Voice is a Protector feature. Upgrade in Settings → Become a Protector to talk to me." }]);
         } catch { setLoading(false); }
       };
@@ -168,6 +170,16 @@ export default function AskScreen({
     } catch {
       setMessages((m) => [...m, { role: "assistant", text: "Network error — please try again." }]);
     } finally { setLoading(false); }
+  }
+
+  // A staged non-image attachment (e.g. a PDF/doc). The vision route reads
+  // images today, so we're honest about it rather than silently dropping it.
+  function attachUnsupported(file: File) {
+    setMessages((m) => [
+      ...m,
+      { role: "user", text: `[Shared a file: ${file.name}]` },
+      { role: "assistant", text: "I can read photos and images right now — share a picture and I'll tell you what matters for your safety. Document reading (PDFs, notices) is coming soon." },
+    ]);
   }
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
@@ -347,49 +359,27 @@ export default function AskScreen({
       )}
 
       {/* input */}
-      <div className="border-t border-ink/10 bg-shell/95 px-4 py-3 backdrop-blur">
-        {lastEngine && (
-          <div className="mb-1.5 px-1 text-[10px] text-ink3">
-            Grounded answer · engine: {ENGINE_LABEL[lastEngine] || lastEngine} · informational only, call 911 in an emergency
-          </div>
-        )}
-        <div className="flex items-end gap-2">
-          {isPro && <>
-            <input ref={imgRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) analyzeImage(f); e.target.value = ""; }} />
-            <button onClick={() => imgRef.current?.click()} disabled={loading} aria-label="Share an image"
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ink/10 text-ink2 active:scale-95 disabled:opacity-60">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
-            </button>
-            <button onClick={toggleMic} aria-label={recording ? "Stop dictation" : "Dictate to text"} title="Speak to type"
-              className={`grid h-11 w-11 shrink-0 place-items-center rounded-full active:scale-95 ${recording ? "bg-brand text-white animate-pulse" : "border border-ink/10 text-ink2"}`}>
-              {/* waveform-to-text, deliberately NOT a mic — distinct from the
-                  shield voice-conversation button on the far right */}
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 9v6M8 5v14M12 8v8M16 6v12M20 10v4"/></svg>
-            </button>
-          </>}
-          {isPro && <button onClick={() => setWebMode((v) => !v)} aria-label="Search the web" title="Search the web"
-            className={`grid h-11 w-11 shrink-0 place-items-center rounded-full active:scale-95 ${webMode ? "bg-brand text-white" : "border border-ink/10 text-ink2"}`}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
-          </button>}
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (webMode ? webResearch(input) : send(input))}
-            placeholder={`Ask about ${loc.neighborhood}…`}
-            className="w-full rounded-full border border-ink/10 bg-card px-4 py-3 text-[15px] outline-none placeholder:text-ink3 focus:border-brand/60"
-          />
-          <button onClick={() => (webMode ? webResearch(input) : send(input))} disabled={loading} aria-label="Send"
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand text-white active:scale-95 disabled:opacity-60">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
-          </button>
-          {isPro && (
-            <button onClick={() => setVoiceOpen(true)} aria-label="Voice conversation" title="Talk with CrimeAI"
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand/10 text-brand active:scale-95">
-              <svg width="20" height="22" viewBox="0 0 24 28" fill="currentColor"><path d="M12 1L3 4.5v7.5c0 5.4 3.8 10.5 9 12.4 5.2-1.9 9-7 9-12.4V4.5L12 1z" opacity="0.2"/><path d="M8 11v3M12 8.5v8M16 11v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
-            </button>
-          )}
+      {lastEngine && (
+        <div className="border-t border-ink/10 bg-shell/95 px-5 pt-1.5 text-[10px] text-ink3 backdrop-blur">
+          Grounded answer · engine: {ENGINE_LABEL[lastEngine] || lastEngine} · informational only, call 911 in an emergency
         </div>
-      </div>
+      )}
+      <ChatComposer
+        value={input}
+        onChange={setInput}
+        onSend={(t) => send(t)}
+        onWebResearch={webResearch}
+        onAttachImage={analyzeImage}
+        onAttachUnsupported={attachUnsupported}
+        onToggleMic={toggleMic}
+        onVoiceMode={() => setVoiceOpen(true)}
+        isPro={isPro}
+        loading={loading}
+        recording={recording}
+        webMode={webMode}
+        onToggleWeb={() => setWebMode((v) => !v)}
+        placeholder={`Ask about ${loc.neighborhood}…`}
+      />
 
       {/* conversations drawer (Protector) */}
       {drawer && (
