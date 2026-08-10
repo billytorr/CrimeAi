@@ -274,7 +274,7 @@ export default function VoiceConversation({
     : phase === "speaking" ? "Speaking" : muted ? "Muted" : "Tap the sphere to talk";
 
   return (
-    <div className="fixed inset-0 z-[1000] flex flex-col bg-shell pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)]">
+    <div className="fixed inset-0 z-[1300] flex flex-col bg-shell pt-[calc(env(safe-area-inset-top)+1rem)] pb-[calc(env(safe-area-inset-bottom)+1rem)]">
       {/* header — minimal identity, NO settings/selectors */}
       <div className="flex items-center justify-center px-6">
         <div className="flex items-center gap-2">
