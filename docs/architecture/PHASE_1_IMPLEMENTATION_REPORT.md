@@ -168,3 +168,30 @@ alternative.
 Providers unit-tested with mocked fetch (request shaping, response parsing,
 dormant-without-key). 425 tests pass, safety guards green, both apps
 typecheck, mobile bundle builds.
+
+---
+
+# Phase 5 — Memory (no vendor)
+
+Durable per-user memory (§16 User Memory) — CrimeAI remembers facts across
+conversations, the ChatGPT-memory behaviour, built on the threads already
+shipped.
+
+- `supabase/ai-memory.sql` — `crimeai_user_memory`, own-row RLS, 50-fact cap
+  (rolling window), dedupe. No biometric/ID/payment/address — refused by both
+  the blocklist and convention.
+- `lib/ai/memory/user-memory.ts` — get/save/forget, `isStorableFact` blocklist,
+  `memoryContext` recall block, `extractMemory` tag parser.
+- Recall: folded into `buildUserContext`, so every answer is informed by what
+  CrimeAI remembers.
+- Capture: the ask route appends a memory instruction; the model may emit one
+  `<remember>…</remember>` tag, parsed and saved server-side, stripped from the
+  reply. **Zero extra API calls** — no added cost, no injection surface.
+- Control: Settings → "What CrimeAI remembers" lists every fact with one-tap
+  Forget. Transparency + deletion is a privacy requirement, not a nicety.
+- `/api/me/memory` GET/POST/DELETE.
+
+The other §16 classes map to existing pieces: Conversation Memory = ai_threads,
+live User data = ai-user-context. Visual/Case/Agent memory are later phases.
+
+432 tests pass (memory extraction + blocklist unit-tested). Guards green.

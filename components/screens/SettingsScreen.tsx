@@ -126,6 +126,9 @@ export default function SettingsScreen({
           </p>
         </Section>
 
+        {/* what CrimeAI remembers about you — transparency + control */}
+        <MemorySection />
+
         {/* ID verification — the way back for anyone who skipped onboarding */}
         <VerificationSection />
 
@@ -584,6 +587,45 @@ function LanguagePicker() {
       </div>
       <p className="mt-2.5 text-[11px] leading-relaxed text-ink3">{t("Choose the language for the whole app. It follows your device by default.")}</p>
     </div>
+  );
+}
+
+// What CrimeAI remembers about you (Phase 5 memory). Full transparency and
+// one-tap forget — a user must be able to see and delete anything the
+// assistant has stored, which is a privacy requirement, not just a nicety.
+function MemorySection() {
+  const [items, setItems] = useState<{ id: string; fact: string }[] | null>(null);
+  useEffect(() => {
+    authHeaders().then((h) => {
+      if (!h.Authorization) { setItems([]); return; }
+      fetch(apiUrl("/api/me/memory"), { headers: h })
+        .then((r) => (r.ok ? r.json() : { memory: [] }))
+        .then((d) => setItems(d.memory || []))
+        .catch(() => setItems([]));
+    });
+  }, []);
+  async function forget(id: string) {
+    setItems((xs) => (xs || []).filter((x) => x.id !== id));
+    const h = await authHeaders();
+    fetch(apiUrl("/api/me/memory"), { method: "DELETE", headers: { "Content-Type": "application/json", ...h }, body: JSON.stringify({ id }) }).catch(() => {});
+  }
+  if (items === null) return null;
+  return (
+    <Section title="What CrimeAI remembers">
+      {items.length === 0 ? (
+        <p className="text-xs leading-relaxed text-ink3">CrimeAI hasn&apos;t saved anything about you yet. As you chat, it may remember durable things — a concern, a routine, a place you care about — to give better answers. You can delete anything here any time.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {items.map((m) => (
+            <div key={m.id} className="flex items-start justify-between gap-2 rounded-xl border border-ink/10 bg-shell px-3 py-2.5">
+              <span className="text-xs text-ink2">{m.fact}</span>
+              <button onClick={() => forget(m.id)} className="shrink-0 text-[11px] font-semibold text-danger">Forget</button>
+            </div>
+          ))}
+          <p className="mt-1 text-[11px] text-ink3">Memory never includes sensitive details, and it&apos;s never used to profile anyone else.</p>
+        </div>
+      )}
+    </Section>
   );
 }
 

@@ -93,6 +93,7 @@ Added late; the likeliest to be missing on any given environment.
 | `ai-config.sql` | CrimeAI assistant config (model, system prompt, temperature, per-tier limits) — managed in Command Center → Assistant | none |
 | `ai-voice-web-limits.sql` | Protector voice + web meters (ai_voice/ai_web: free 0, pro 200/100) | none |
 | `ai-vision-limits.sql` | Protector image-analysis meter (ai_vision: free 0, pro 100) | none |
+| `ai-memory.sql` | CrimeAI durable user memory (crimeai_user_memory) — remembers facts across chats, own-row RLS, 50-cap, blocklist | none |
 | `ai-threads.sql` | CrimeAI conversation threads (ai_threads + ai_messages) — persistence for the chat, multi-thread drawer for Protectors | none |
 | `notifications.sql` | in-app Activity feed: `notifications` table + triggers on likes/comments/follows/corroborations/tier changes, `mark_notifications_read()`, `unread_notification_count()` | none |
 | `sources-tricounty.sql` | registers NWS alert feeds for Miami-Dade/Broward/Palm Beach (enabled) + Miami-Dade jail bookings | none |

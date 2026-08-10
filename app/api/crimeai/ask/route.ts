@@ -88,11 +88,17 @@ export async function POST(req: NextRequest) {
       // difference is that events fire and a future TORR/hybrid mode can swap
       // the implementation here without touching this route.
       const { orchestrator } = await import("@/lib/ai/orchestrator");
+      // Phase 5 memory: ask the model to optionally emit a <remember> tag —
+      // no extra API call. We parse it out below, persist it, strip it.
+      const { MEMORY_INSTRUCTION, extractMemory, saveMemory } = await import("@/lib/ai/memory/user-memory");
       ({ answer, engine } = await orchestrator().ask({
         question, context,
         model: cfg.model, temperature: cfg.temperature, maxTokens: cfg.maxTokens,
-        system: cfg.systemPrompt, userContext,
+        system: (cfg.systemPrompt || "") + MEMORY_INSTRUCTION, userContext,
       }));
+      const mem = extractMemory(answer);
+      answer = mem.cleaned;
+      if (mem.fact && userId) { saveMemory(userId, mem.fact, "assistant").catch(() => {}); }
       if (Number.isFinite(meter.remaining)) ai.remaining = meter.remaining;
     } else {
       answer = fallbackAnswer(question, context);
