@@ -180,8 +180,8 @@ export default function ChatComposer({
           </button>
         ) : (
           <button onClick={onVoiceMode} aria-label="Voice conversation" title="Talk with CrimeAI"
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand/12 text-brand transition active:scale-95">
-            <svg width="28" height="32" viewBox="0 0 24 28" fill="currentColor"><path d="M12 1L3 4.5v7.5c0 5.4 3.8 10.5 9 12.4 5.2-1.9 9-7 9-12.4V4.5L12 1z" opacity="0.2" /><path d="M8 11v3M12 8.5v8M16 11v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
+            className="grid h-12 w-12 shrink-0 place-items-center self-stretch rounded-full bg-brand/12 text-brand transition active:scale-95">
+            <svg width="34" height="40" viewBox="0 0 24 28" fill="currentColor"><path d="M12 1L3 4.5v7.5c0 5.4 3.8 10.5 9 12.4 5.2-1.9 9-7 9-12.4V4.5L12 1z" opacity="0.2" /><path d="M8 11v3M12 8.5v8M16 11v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>
           </button>
         )}
       </div>
