@@ -17,6 +17,7 @@ export interface Post {
   thread?: string[]; tags?: string[]; source?: string; createdAt: string;
   likes: number; comments: number; shares: number; reposts?: number; mine?: boolean;
   isLive?: boolean; viewers?: number; // live streams
+  url?: string; description?: string; // live news layer (external article link + blurb)
 }
 export interface LocalUser { name: string; handle: string; color: string; neighborhood: string; verified: boolean; followers: number; following: number; bio: string; email: string; phone: string }
 export interface Comment { author: string; text: string; ts: string; photo?: string }

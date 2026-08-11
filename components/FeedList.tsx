@@ -14,6 +14,7 @@ import {
 } from "@/lib/social";
 import Avatar from "@/components/Avatar";
 import MessageThread from "@/components/MessageThread";
+import NewsArticle, { type ArticleLite } from "@/components/NewsArticle";
 import { useOpenProfile } from "@/lib/profileContext";
 import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, SoundOn, SoundOff } from "@/components/Icons";
 
@@ -43,6 +44,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
   const [messaging, setMessaging] = useState<Post | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
   const [confirmDel, setConfirmDel] = useState<Post | null>(null);
+  const [article, setArticle] = useState<ArticleLite | null>(null);
   const openProfile = useOpenProfile();
   // own-post optimistic overrides: hide deleted, show edited text immediately
   const [deleted] = useState<Set<string>>(new Set());
@@ -113,6 +115,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
     repostCount: (p.reposts || 0) + (repostDelta[p.id] || 0),
     onLike: () => onLike(p), onSave: () => onSave(p), onFollow: () => onFollow(p), onComment: () => setCommenting(p), onShare: () => onShare(p), onRepost: () => onRepost(p),
     onMessage: () => setMessaging(p), onOpenProfile: () => openProfile(p.handle, p.id), onMenu: () => setMenuPost(p), pro: !!dir.get(p.handle)?.pro,
+    onOpenArticle: () => { if (p.url) setArticle({ title: p.text, description: p.description, url: p.url, image: p.media?.url, source: p.source }); },
   });
 
   return (
@@ -147,6 +150,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
       {editing && <EditPostSheet post={editing} onSave={(t) => onEditSave(editing, t)} onClose={() => setEditing(null)} />}
       {confirmDel && <ConfirmDeleteSheet onConfirm={() => onDelete(confirmDel)} onClose={() => setConfirmDel(null)} />}
       {reporting && <ReportSheet post={reporting} account={account} onClose={() => setReporting(null)} />}
+      {article && <NewsArticle article={article} onClose={() => setArticle(null)} />}
     </>
   );
 }
@@ -249,6 +253,7 @@ type V = {
   post: Post; me?: { photo?: string; name: string }; liked: boolean; saved: boolean; followed: boolean; reposted: boolean;
   likeCount: number; commentCount: number; repostCount: number;
   onLike: () => void; onSave: () => void; onFollow: () => void; onComment: () => void; onShare: () => void; onMessage: () => void; onOpenProfile: () => void; onRepost: () => void; onMenu: () => void; pro: boolean;
+  onOpenArticle: () => void;
 };
 
 // "I saw this too" — community corroboration (Phase 9). Advances the
@@ -525,23 +530,29 @@ function Count({ children }: { children: React.ReactNode }) { return <span class
 
 function NewsCard(v: V) {
   const { post } = v;
+  const live = !!post.url; // live-news layer articles open the CrimeAI reader
   return (
     <article className="px-5 py-4">
-      <div className="flex gap-3 rounded-2xl border border-ink/10 bg-card/60 p-3.5">
-        {post.media?.type === "image" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={post.media.url} alt="" className="h-20 w-20 shrink-0 rounded-xl object-cover" />
-        ) : (
-          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl text-ink/90" style={{ background: gradientFor(post.id) }}><Newspaper size={28} /></div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-[11px] text-blu"><span className="rounded bg-blu/15 px-1.5 py-0.5 font-semibold">NEWS</span><span className="text-ink2">{post.source} · {timeAgoShort(post.createdAt)}</span></div>
-          <PostText text={post.text} className="mt-1 text-sm font-medium leading-snug text-ink" />
-          <div className="mt-1.5 flex items-center gap-4 text-xs text-ink2">
-            <button onClick={v.onLike} className={`flex items-center gap-1 ${v.liked ? "text-red-400" : ""}`}><Heart size={16} filled={v.liked} /> {v.likeCount}</button>
-            <button onClick={v.onComment} className="flex items-center gap-1"><CommentIcon size={16} /> {v.commentCount}</button>
-            <button onClick={v.onShare} className="flex items-center gap-1"><Share size={15} /> {post.shares}</button>
+      <div className="rounded-2xl border border-ink/10 bg-card/60 p-3.5">
+        <button onClick={live ? v.onOpenArticle : undefined} className={`flex w-full gap-3 text-left ${live ? "active:scale-[0.99]" : ""}`}>
+          {post.media?.type === "image" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={post.media.url} alt="" className="h-20 w-20 shrink-0 rounded-xl object-cover" />
+          ) : (
+            <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl text-ink/90" style={{ background: gradientFor(post.id) }}><Newspaper size={28} /></div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-[11px] text-blu"><span className="rounded bg-blu/15 px-1.5 py-0.5 font-semibold">NEWS</span><span className="text-ink2">{post.source} · {timeAgoShort(post.createdAt)}</span></div>
+            <PostText text={post.text} className="mt-1 text-sm font-semibold leading-snug text-ink" />
+            {live && post.description && <p className="mt-1 line-clamp-2 text-xs leading-snug text-ink2">{post.description}</p>}
+            {live && <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-brand">Read CrimeAI summary
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></span>}
           </div>
+        </button>
+        <div className="mt-2 flex items-center gap-4 pl-[92px] text-xs text-ink2">
+          <button onClick={v.onLike} className={`flex items-center gap-1 ${v.liked ? "text-red-400" : ""}`}><Heart size={16} filled={v.liked} /> {v.likeCount}</button>
+          <button onClick={v.onComment} className="flex items-center gap-1"><CommentIcon size={16} /> {v.commentCount}</button>
+          <button onClick={v.onShare} className="flex items-center gap-1"><Share size={15} /> {post.shares}</button>
         </div>
       </div>
     </article>
