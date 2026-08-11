@@ -130,7 +130,6 @@ export default function NewsArticle({ v, account, onClose }: { v: NewsView; acco
         {/* comments, inline on the page */}
         <div className="mt-5">
           <p className="mb-3 text-xs font-bold uppercase tracking-wide text-ink3">Comments</p>
-          {comments.length === 0 && <p className="text-sm text-ink3">No comments yet — start the conversation.</p>}
           <div className="space-y-3">
             {comments.map((c, i) => (
               <div key={i} className="flex gap-2.5">
@@ -142,26 +141,34 @@ export default function NewsArticle({ v, account, onClose }: { v: NewsView; acco
               </div>
             ))}
           </div>
+          {comments.length === 0 && <p className="text-sm text-ink3">No comments yet — start the conversation.</p>}
+
+          {/* add-a-comment field, part of the comments section (not a floating bar) */}
+          {postId ? (
+            <div className="mt-4 flex items-center gap-2">
+              <Avatar photo={account.profile?.photo} name={account.name} color="#1b7f3a" size={30} />
+              <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitComment()}
+                placeholder="Add a comment…"
+                className="min-w-0 flex-1 rounded-full border border-ink/10 bg-card px-4 py-2 text-sm outline-none placeholder:text-ink3 focus:border-brand/60" />
+              <button onClick={submitComment} disabled={!draft.trim()} aria-label="Post comment"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand text-white active:scale-95 disabled:opacity-40"><Send size={16} /></button>
+            </div>
+          ) : threadReady ? (
+            <p className="mt-3 text-xs text-ink3">Comments aren&apos;t available for this article yet.</p>
+          ) : null}
         </div>
 
-        <p className="mt-4 px-1 text-[11px] leading-relaxed text-ink3">
+        <p className="mt-5 px-1 text-[11px] leading-relaxed text-ink3">
           Summarized by CrimeAI — read the full article for complete, verified details.
         </p>
       </div>
 
-      {/* comment composer + read full article */}
-      <div className="safe-bottom border-t border-ink/10 px-4 pb-3 pt-2.5">
-        <div className="mb-2 flex items-center gap-2">
-          <input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitComment()}
-            placeholder={postId ? "Add a comment…" : threadReady ? "Comments unavailable right now" : "Loading…"} disabled={!postId}
-            className="min-w-0 flex-1 rounded-full border border-ink/10 bg-card px-4 py-2.5 text-sm outline-none placeholder:text-ink3 focus:border-brand/60 disabled:opacity-60" />
-          <button onClick={submitComment} disabled={!draft.trim() || !postId} aria-label="Send comment"
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-white active:scale-95 disabled:opacity-40"><Send size={17} /></button>
-        </div>
+      {/* read full article */}
+      <div className="safe-bottom border-t border-ink/10 px-5 pb-4 pt-3">
         <button onClick={() => openInApp(url)}
-          className="flex w-full items-center justify-center gap-2 rounded-full border border-brand/40 py-2.5 text-sm font-semibold text-brand active:scale-[0.99]">
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-brand py-3.5 text-sm font-semibold text-white active:scale-[0.99]">
           Read full article
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7M7 7h10v10" /></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17L17 7M7 7h10v10" /></svg>
         </button>
       </div>
     </div>
