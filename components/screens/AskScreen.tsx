@@ -360,7 +360,7 @@ export default function AskScreen({
 
       {/* input */}
       {lastEngine && (
-        <div className="border-t border-ink/10 bg-shell/95 px-5 pt-1.5 text-[10px] text-ink3 backdrop-blur">
+        <div className="bg-shell/95 px-5 pt-1.5 text-[10px] text-ink3 backdrop-blur">
           Grounded answer · engine: {ENGINE_LABEL[lastEngine] || lastEngine} · informational only, call 911 in an emergency
         </div>
       )}

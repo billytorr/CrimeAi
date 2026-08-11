@@ -95,7 +95,7 @@ export default function ChatComposer({
   }
 
   return (
-    <div className="safe-bottom border-t border-ink/10 bg-shell/95 px-3 pb-2 pt-2.5 backdrop-blur">
+    <div className="safe-bottom bg-shell/95 px-3 pb-2 pt-2.5 backdrop-blur">
       {/* staged attachment previews */}
       <div className="px-1">
         <AttachmentPreview items={attachments} onRemove={removeAttachment} />
