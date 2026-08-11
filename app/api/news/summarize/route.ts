@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     } catch { /* site blocked or slow — fall back to Brave data */ }
   }
 
-  const fallback = (description || title) as string;
+  const fallback = stripMarkdown((description || title) as string);
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ summary: fallback, image, engine: "none" });
   try {
     const Anthropic = (await import("@anthropic-ai/sdk")).default;
@@ -48,14 +48,29 @@ export async function POST(req: NextRequest) {
     const msg = await client.messages.create({
       model: process.env.CRIMEAI_VOICE_MODEL || "claude-haiku-4-5-20251001",
       max_tokens: 320,
-      temperature: 0.3,
+      temperature: 0.4,
       system:
-        "You are CrimeAI. Summarize this local news article for a resident in 2–4 short, clear sentences focused on what it means for their safety and any practical takeaway. Warm and direct. Do NOT invent facts beyond what's provided — if detail is thin, say what's known and suggest reading the full article.",
+        "You are CrimeAI, talking to a neighbor. In 2–4 short, natural sentences, tell them what this local news means for their safety and what to do about it. Sound like a real person giving a friend a heads-up — warm, calm, human. Begin IMMEDIATELY with your first real sentence: no title, no label, no heading, no 'Summary:' prefix. Plain text only — no markdown, no hashtags (#), no asterisks, no bullets, no bold. Just talk. Don't invent facts beyond what's provided.",
       messages: [{ role: "user", content: `HEADLINE: ${title}\nSOURCE: ${source || "(unknown)"}\nCONTEXT: ${context || "(none provided)"}` }],
     });
-    const summary = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
-    return NextResponse.json({ summary: summary || fallback, image, engine: "anthropic" });
+    const raw = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
+    return NextResponse.json({ summary: stripMarkdown(raw) || fallback, image, engine: "anthropic" });
   } catch {
     return NextResponse.json({ summary: fallback, image, engine: "fallback" });
   }
+}
+
+// Belt-and-suspenders: even with the plain-text instruction, strip any stray
+// markdown so the reader never shows a literal "#" heading or "**bold**".
+function stripMarkdown(s: string): string {
+  return s
+    .replace(/^#{1,6}\s*/gm, "")     // headings
+    .replace(/\*\*?|__?/g, "")        // bold/italic
+    .replace(/`+/g, "")               // code ticks
+    .replace(/^\s*[-*•]\s+/gm, "")    // bullets
+    // drop a leading title/label line (short, no sentence punctuation) that
+    // Haiku sometimes adds despite instructions — e.g. "Safety Summary: …"
+    .replace(/^\s*[^.!?\n]{1,70}\n+(?=[A-Z0-9])/, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }

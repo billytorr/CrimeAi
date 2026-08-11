@@ -130,7 +130,10 @@ export interface Interactions { likes: Set<string>; saves: Set<string>; follows:
 // ── public async API ─────────────────────────────────────────
 export async function getFeed(userId?: string): Promise<Post[]> {
   if (supabaseEnabled) {
-    const { data } = await supabase!.from("posts").select("*").order("created_at", { ascending: false }).limit(200);
+    // Exclude kind='news' — news is rendered from the live layer (lib/news);
+    // the only DB news rows are @crimeai comment-holders, which would otherwise
+    // duplicate the live cards.
+    const { data } = await supabase!.from("posts").select("*").neq("kind", "news").order("created_at", { ascending: false }).limit(200);
     return (data || []).map((r) => ({ ...rowToPost(r), mine: !!userId && r.user_id === userId }));
   }
   const local = readMine();

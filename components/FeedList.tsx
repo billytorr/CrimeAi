@@ -150,7 +150,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
       {editing && <EditPostSheet post={editing} onSave={(t) => onEditSave(editing, t)} onClose={() => setEditing(null)} />}
       {confirmDel && <ConfirmDeleteSheet onConfirm={() => onDelete(confirmDel)} onClose={() => setConfirmDel(null)} />}
       {reporting && <ReportSheet post={reporting} account={account} onClose={() => setReporting(null)} />}
-      {articlePost && <NewsArticle v={view(articlePost)} onClose={() => setArticlePost(null)} />}
+      {articlePost && <NewsArticle v={view(articlePost)} account={account} onClose={() => setArticlePost(null)} />}
     </>
   );
 }

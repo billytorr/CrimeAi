@@ -59,6 +59,23 @@ export function prefetchDetails(articles: Article[], n = 8): void {
   articles.slice(0, n).forEach((a) => { if (a.url && !detailCache.has(a.url)) getArticleDetail(a).catch(() => {}); });
 }
 
+// Materialize (or fetch) the real @crimeai-owned post for an article so its
+// comments/likes persist. Returns the deterministic post id, or null if it
+// couldn't be created (reader then hides the comment box gracefully).
+export async function ensureThreadPost(a: { url: string; title: string; image?: string | null; source?: string; neighborhood?: string }): Promise<string | null> {
+  try {
+    const res = await fetch(apiUrl("/api/news/thread"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify(a),
+    });
+    const d = await res.json();
+    return d.postId || null;
+  } catch {
+    return null;
+  }
+}
+
 // Article → feed-shaped news Post (live only). timeAgoShort needs a date, so
 // use Brave's ISO page_age when present, otherwise treat it as just-fetched.
 export function articleToPost(a: Article, neighborhood: string): Post {
