@@ -124,3 +124,5 @@ A missing table surfaces in the app as a generic failure, so check here first
 when a feature "just doesn't work" on one environment but not another.
 
 - `post-owner-edit.sql` — lets a user edit/delete their OWN posts (owner RLS on public.posts). Required for the post ⋮ Edit/Delete menu.
+
+- `verify-engagement.sql` — diagnostic: proves every like/comment is backed by a real account (run before/after personas.sql).
