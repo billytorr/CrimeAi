@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Account } from "@/lib/auth";
 import { getFeed, getInteractions, trendingScore, rankForYou, type Post, type Interactions } from "@/lib/social";
-import { fetchLocalNews, articleToPost } from "@/lib/news";
+import { fetchLocalNews, articleToPost, prefetchDetails } from "@/lib/news";
 import { milesBetween } from "@/lib/data";
 import FeedList from "@/components/FeedList";
 import { SosPill } from "@/components/SOS";
@@ -38,7 +38,7 @@ export default function FeedScreen({ account, onCompose, onSos, onSearch, refres
     let cancel = false;
     (async () => {
       const arts = await fetchLocalNews({ neighborhood: p.location.neighborhood, city: p.location.city, state: p.location.state });
-      if (!cancel) setNews(arts.map((a) => articleToPost(a, p.location.neighborhood)));
+      if (!cancel) { setNews(arts.map((a) => articleToPost(a, p.location.neighborhood))); prefetchDetails(arts); }
     })();
     return () => { cancel = true; };
   }, [p.location.neighborhood, p.location.city, p.location.state, refreshKey]);

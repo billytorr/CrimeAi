@@ -26,6 +26,39 @@ export async function fetchLocalNews(loc: { neighborhood?: string; city?: string
   }
 }
 
+// ── article detail (CrimeAI summary + hi-res image), cached so the reader
+// opens instantly. FeedScreen prefetches the top articles right after the news
+// loads, so by the time a user taps one the summary is already waiting.
+export interface Detail { summary: string; image: string | null }
+const detailCache = new Map<string, Detail>();
+
+export function cachedDetail(url: string): Detail | null {
+  return detailCache.get(url) || null;
+}
+
+export async function getArticleDetail(a: { url: string; title: string; description?: string; source?: string }): Promise<Detail> {
+  const hit = detailCache.get(a.url);
+  if (hit) return hit;
+  try {
+    const res = await fetch(apiUrl("/api/news/summarize"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+      body: JSON.stringify({ title: a.title, description: a.description, source: a.source, url: a.url }),
+    });
+    const d = await res.json();
+    const out: Detail = { summary: d.summary || a.description || "", image: d.image || null };
+    detailCache.set(a.url, out);
+    return out;
+  } catch {
+    return { summary: a.description || "", image: null };
+  }
+}
+
+// Fire-and-forget: warm the cache for the first few articles (throttled).
+export function prefetchDetails(articles: Article[], n = 8): void {
+  articles.slice(0, n).forEach((a) => { if (a.url && !detailCache.has(a.url)) getArticleDetail(a).catch(() => {}); });
+}
+
 // Article → feed-shaped news Post (live only). timeAgoShort needs a date, so
 // use Brave's ISO page_age when present, otherwise treat it as just-fetched.
 export function articleToPost(a: Article, neighborhood: string): Post {

@@ -14,7 +14,7 @@ import {
 } from "@/lib/social";
 import Avatar from "@/components/Avatar";
 import MessageThread from "@/components/MessageThread";
-import NewsArticle, { type ArticleLite } from "@/components/NewsArticle";
+import NewsArticle from "@/components/NewsArticle";
 import { useOpenProfile } from "@/lib/profileContext";
 import { Heart, Comment as CommentIcon, Share, Bookmark, Report, Thread as ThreadIcon, Film, Newspaper, Pin, Verified, Send, Close, Mail, Eye, Repost as RepostIcon, SoundOn, SoundOff } from "@/components/Icons";
 
@@ -44,7 +44,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
   const [messaging, setMessaging] = useState<Post | null>(null);
   const [editing, setEditing] = useState<Post | null>(null);
   const [confirmDel, setConfirmDel] = useState<Post | null>(null);
-  const [article, setArticle] = useState<ArticleLite | null>(null);
+  const [articlePost, setArticlePost] = useState<Post | null>(null);
   const openProfile = useOpenProfile();
   // own-post optimistic overrides: hide deleted, show edited text immediately
   const [deleted] = useState<Set<string>>(new Set());
@@ -115,7 +115,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
     repostCount: (p.reposts || 0) + (repostDelta[p.id] || 0),
     onLike: () => onLike(p), onSave: () => onSave(p), onFollow: () => onFollow(p), onComment: () => setCommenting(p), onShare: () => onShare(p), onRepost: () => onRepost(p),
     onMessage: () => setMessaging(p), onOpenProfile: () => openProfile(p.handle, p.id), onMenu: () => setMenuPost(p), pro: !!dir.get(p.handle)?.pro,
-    onOpenArticle: () => { if (p.url) setArticle({ title: p.text, description: p.description, url: p.url, image: p.media?.url, source: p.source }); },
+    onOpenArticle: () => { if (p.url) setArticlePost(p); },
   });
 
   return (
@@ -150,7 +150,7 @@ export default function FeedList({ posts, account, interactions, emptyText }: { 
       {editing && <EditPostSheet post={editing} onSave={(t) => onEditSave(editing, t)} onClose={() => setEditing(null)} />}
       {confirmDel && <ConfirmDeleteSheet onConfirm={() => onDelete(confirmDel)} onClose={() => setConfirmDel(null)} />}
       {reporting && <ReportSheet post={reporting} account={account} onClose={() => setReporting(null)} />}
-      {article && <NewsArticle article={article} onClose={() => setArticle(null)} />}
+      {articlePost && <NewsArticle v={view(articlePost)} onClose={() => setArticlePost(null)} />}
     </>
   );
 }
@@ -543,8 +543,7 @@ function NewsCard(v: V) {
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-[11px] text-blu"><span className="rounded bg-blu/15 px-1.5 py-0.5 font-semibold">NEWS</span><span className="text-ink2">{post.source} · {timeAgoShort(post.createdAt)}</span></div>
-            <PostText text={post.text} className="mt-1 text-sm font-semibold leading-snug text-ink" />
-            {live && post.description && <p className="mt-1 line-clamp-2 text-xs leading-snug text-ink2">{post.description}</p>}
+            <PostText text={post.text} className="mt-1 line-clamp-3 text-sm font-semibold leading-snug text-ink" />
             {live && <span className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-brand">Read CrimeAI summary
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg></span>}
           </div>
