@@ -1,8 +1,8 @@
 "use client";
 
 import { apiUrl, authHeaders } from "@/lib/api";
-import { useEffect, useState } from "react";
-import type { Account, Profile } from "@/lib/auth";
+import { useEffect, useRef, useState } from "react";
+import { getCurrentAccount, type Account, type Profile } from "@/lib/auth";
 import type { AreaStats } from "@/lib/types";
 import BottomNav, { Tab } from "@/components/BottomNav";
 import SosSheets, { SosFab } from "@/components/SOS";
@@ -39,6 +39,53 @@ export default function AppShell({
 
   useEffect(() => { track("app_open", {}); }, []);
   useEffect(() => { track("tab_view", { tab }); }, [tab]);
+
+  // ── entitlement refresh (App Store remediation Phase 4.2/4.4) ──
+  // "confirming": after external checkout the crimeai://checkout-return deep
+  // link fires and we poll the server entitlement with backoff for up to 60s
+  // (the webhook may still be in flight). If it doesn't land in time we show
+  // a manual-refresh state — a paying user is never left at a locked paywall.
+  // Foreground: the plan also re-checks on app resume.
+  const [confirming, setConfirming] = useState<null | "polling" | "manual">(null);
+  const pollGen = useRef(0);
+
+  async function refreshPlan(): Promise<boolean> {
+    const acct = await getCurrentAccount().catch(() => null);
+    if (acct?.profile && acct.profile.plan !== profile.plan) setProfile(acct.profile);
+    return acct?.profile?.plan === "pro";
+  }
+
+  async function confirmPayment() {
+    const gen = ++pollGen.current;
+    setConfirming("polling");
+    const started = Date.now();
+    let delay = 2000;
+    while (pollGen.current === gen && Date.now() - started < 60_000) {
+      if (await refreshPlan()) { if (pollGen.current === gen) setConfirming(null); return; }
+      await new Promise((r) => setTimeout(r, delay));
+      delay = Math.min(delay * 1.5, 8000);
+    }
+    if (pollGen.current === gen) setConfirming("manual");
+  }
+
+  useEffect(() => {
+    const onReturn = () => { confirmPayment(); };
+    let eventName = "crimeai:checkout-return";
+    import("@/lib/native/deepLinks").then((m) => { eventName = m.CHECKOUT_RETURN_EVENT; window.addEventListener(eventName, onReturn); }).catch(() => {});
+    let resumeHandle: { remove: () => void } | null = null;
+    import("@capacitor/core").then(({ Capacitor }) => {
+      if (!Capacitor.isNativePlatform()) return;
+      import("@capacitor/app").then(({ App }) => {
+        App.addListener("resume", () => { refreshPlan(); }).then((h) => { resumeHandle = h; });
+      });
+    }).catch(() => {});
+    return () => {
+      pollGen.current++;
+      window.removeEventListener(eventName, onReturn);
+      resumeHandle?.remove();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Refresh this device's push token on launch — WITHOUT prompting. The
   // permission prompt itself is asked once, in onboarding, right after the
@@ -119,6 +166,19 @@ export default function AppShell({
         {profile.sosEnabled !== false && (tab === "map" || tab === "ask" || tab === "inbox") && <SosFab onClick={() => setSosOpen(true)} />}
         <SosSheets open={sosOpen} onClose={() => setSosOpen(false)} profile={profile} />
       </div>
+      {/* payment-confirmation state after checkout return */}
+      {confirming === "polling" && (
+        <div className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+10px)] z-[1500] mx-auto w-fit rounded-full border border-ink/10 bg-card px-4 py-2 text-xs font-medium text-ink shadow-lg">
+          Confirming your payment…
+        </div>
+      )}
+      {confirming === "manual" && (
+        <div className="fixed inset-x-4 top-[calc(env(safe-area-inset-top)+10px)] z-[1500] mx-auto flex max-w-sm items-center gap-3 rounded-2xl border border-ink/10 bg-card px-4 py-3 shadow-lg">
+          <p className="min-w-0 flex-1 text-xs text-ink2">Still confirming your payment — it can take a minute to land.</p>
+          <button onClick={() => confirmPayment()} className="shrink-0 rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white">Refresh</button>
+          <button onClick={() => setConfirming(null)} aria-label="Dismiss" className="shrink-0 text-ink3">✕</button>
+        </div>
+      )}
       <BottomNav active={tab} onChange={setTab} inboxDot />
       {/* Full-screen overlays (cover the bottom nav too). Search is a plain
           overlay — closing it reveals the exact tab it was opened over, so

@@ -34,11 +34,20 @@ export async function GET(req: NextRequest) {
     const { serverDb } = await import("@/lib/payments/serverdb");
     const db = serverDb(true);
     const { data } = await db.from("tier_subscriptions")
-      .select("plan_id, status, current_period_start, grace_until, price_id")
+      .select("plan_id, status, current_period_start, current_period_end, grace_until, price_id, cancel_at_period_end")
       .eq("user_id", userId).maybeSingle();
     return { sub: data };
   })();
   const plan = EntitlementService.effectivePlan(sub ?? null);
 
-  return NextResponse.json({ plan, enforced, caps });
+  return NextResponse.json({
+    plan, enforced, caps,
+    // Subscription facts for the in-app manage screen (App Store remediation
+    // Phase 4). Server-authoritative — populated by webhooks/reconcile only.
+    tier: plan,
+    status: sub?.status ?? "none",
+    renews_at: sub?.current_period_end ?? null,
+    cancel_at_period_end: !!sub?.cancel_at_period_end,
+    source: "authorize_net",
+  });
 }

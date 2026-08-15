@@ -302,14 +302,17 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
       });
       const d = await r.json();
       // Send them to the PRICING page rather than straight into checkout:
-      // choosing the plan and the interval belongs in the browser, next to
-      // the price. "_blank" is what Capacitor hands to the DEVICE'S browser
-      // instead of an in-app webview — required for an external purchase, and
-      // it's where a customer can actually see the domain and the padlock.
+      // choosing the plan and interval belongs next to the price. The page
+      // opens in the IN-APP browser (SFSafariViewController on iOS / Custom
+      // Tabs on Android — the API Apple's review letter recommends): the URL
+      // and certificate are visible, and the user never leaves the app shell.
+      // `app=1` tells the success page to deep-link back via
+      // crimeai://checkout-return so entitlement refreshes immediately.
       if (r.ok && d.token) {
         const payBase = process.env.NEXT_PUBLIC_PAY_BASE || "https://pay.publicsafetycrimecenter.com";
         const current = profile.plan === "pro" ? "pro" : "free";
-        window.open(`${payBase}/crimeai/pricing?t=${encodeURIComponent(d.token)}&current=${current}`, "_blank");
+        const { openInApp } = await import("@/lib/inappbrowser");
+        await openInApp(`${payBase}/crimeai/pricing?t=${encodeURIComponent(d.token)}&current=${current}&app=1`);
       } else alert(d.error || "Couldn't start checkout. Try again in a moment.");
     } catch {
       alert("Couldn't start checkout. Check your connection and try again.");
@@ -331,27 +334,7 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
             />
             <p className="mt-1.5 text-[11px] text-ink3">Off hides the shield from your profile (for you and visitors). Your plan and benefits are unchanged.</p>
           </div>
-          <button
-            onClick={async () => {
-              try {
-                const r = await fetch(apiUrl("/api/pay/portal"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }) });
-                const d = await r.json();
-                if (r.ok && d.url) window.open(d.url, "_blank");
-                else if (r.ok && d.message) {
-                  // Authorize.Net has no hosted subscriber portal, so there is
-                  // nothing to redirect to. Show the plan facts and how to
-                  // cancel rather than a bare error.
-                  const renews = d.renewsAt ? new Date(d.renewsAt).toLocaleDateString() : null;
-                  alert([d.card ? `Paying with ${d.card}` : null, renews ? `Renews ${renews}` : null, "", d.message]
-                    .filter((x) => x !== null).join("\n"));
-                }
-                else alert(d.error || "Contact support to manage your subscription.");
-              } catch { alert("Contact support to manage your subscription."); }
-            }}
-            className="mt-2 text-xs font-medium text-brand"
-          >
-            Manage subscription
-          </button>
+          <ManageSubscription userId={userId} />
         </div>
       </div>
     );
@@ -383,14 +366,98 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
         {busy ? "Opening…" : "Compare plans →"}
       </button>
       <p className="mt-2 text-[11px] text-ink3">
-        Opens publicsafetycrimecenter.com in your browser, where you can compare plans and subscribe securely.
+        Opens our secure checkout on publicsafetycrimecenter.com — right inside the app, with the address and certificate visible.
       </p>
+      <button
+        onClick={async () => {
+          // "Restore access": reviewers (and real users) test a fresh install
+          // with an already-paid account — force a server re-check so a web
+          // purchase unlocks here without waiting for the next app launch.
+          if (busy) return;
+          setBusy(true);
+          try {
+            const { getCurrentAccount } = await import("@/lib/auth");
+            const acct = await getCurrentAccount();
+            if (acct?.profile?.plan === "pro") onProfile(acct.profile);
+            else alert("No active Protector subscription found for this account. If you just paid, give it a few seconds and try again.");
+          } catch { alert("Couldn't check your subscription. Check your connection and try again."); }
+          finally { setBusy(false); }
+        }}
+        className="mt-2 w-full text-center text-xs font-medium text-ink2 underline-offset-2 active:underline"
+      >
+        Already a Protector? Restore access
+      </button>
     </div>
   );
 }
 
 // Saved places (home, work, school…) — backed by /api/locations, where the
 // plan's limit is enforced atomically server-side. UI shows the limit only.
+// In-app subscription management (App Store remediation Phase 4.5): plan,
+// renewal date, status — and a NATIVE two-step cancel that calls our backend,
+// which calls the Authorize.Net ARB cancel. The user is never sent to a web
+// page to cancel. Cancellation is end-of-period: access continues until the
+// paid period runs out.
+function ManageSubscription({ userId }: { userId: string }) {
+  const [renewsAt, setRenewsAt] = useState<string | null>(null);
+  const [cancelled, setCancelled] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const h = await authHeaders();
+        const r = await fetch(apiUrl("/api/me/entitlements"), { headers: h });
+        const d = await r.json();
+        if (r.ok) { setRenewsAt(d.renews_at || null); setCancelled(!!d.cancel_at_period_end); }
+      } catch { /* facts are cosmetic; cancel still works without them */ }
+    })();
+  }, [userId]);
+
+  async function doCancel() {
+    setBusy(true); setErr("");
+    try {
+      const h = await authHeaders();
+      const r = await fetch(apiUrl("/api/pay/cancel"), { method: "POST", headers: h });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Couldn't cancel — please try again.");
+      setCancelled(true); setConfirming(false);
+      if (d.accessUntil) setRenewsAt(d.accessUntil);
+    } catch (e) { setErr((e as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  const date = renewsAt ? new Date(renewsAt).toLocaleDateString() : null;
+
+  if (cancelled) {
+    return (
+      <p className="mt-2 text-[11px] text-ink3">
+        Subscription cancelled — you keep Protector{date ? ` until ${date}` : " until the end of the paid period"}. No further charges.
+      </p>
+    );
+  }
+  if (confirming) {
+    return (
+      <div className="mt-2 space-y-2">
+        <p className="text-xs text-ink2">Cancel Protector? You keep all benefits{date ? ` until ${date}` : " until the end of the paid period"}, then move to the free plan. No further charges.</p>
+        {err && <p className="text-xs text-red-400">{err}</p>}
+        <div className="flex gap-2">
+          <button onClick={() => setConfirming(false)} className="flex-1 rounded-xl border border-ink/15 py-2.5 text-sm font-medium text-ink2">Keep Protector</button>
+          <button onClick={doCancel} disabled={busy} className="flex-1 rounded-xl bg-red-600 py-2.5 text-sm font-bold text-white disabled:opacity-50">{busy ? "Cancelling…" : "Confirm cancel"}</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-2 flex items-center gap-4">
+      {date && <span className="text-[11px] text-ink3">Renews {date}</span>}
+      <button onClick={() => setConfirming(true)} className="text-xs font-medium text-ink2 underline-offset-2 active:underline">Cancel subscription</button>
+    </div>
+  );
+}
+
 function SavedPlaces({ limitHint }: { limitHint: number | null }) {
   const [locs, setLocs] = useState<{ id: string; label: string; address: string }[]>([]);
   const [limit, setLimit] = useState<number | null>(limitHint);

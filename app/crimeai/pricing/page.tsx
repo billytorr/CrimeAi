@@ -76,7 +76,10 @@ function Pricing() {
       });
       const d = await r.json();
       if (!r.ok || !d.token) throw new Error(d.error || "Could not start checkout.");
-      window.location.href = `/crimeai/pricing/checkout?t=${encodeURIComponent(d.token)}`;
+      // `app=1` rides along when the page was opened from the native app's
+      // in-app browser, so the success screen can deep-link back into the app.
+      const fromApp = params.get("app") === "1" ? "&app=1" : "";
+      window.location.href = `/crimeai/pricing/checkout?t=${encodeURIComponent(d.token)}${fromApp}`;
     } catch (e) {
       setError((e as Error).message);
       setBusy(null);

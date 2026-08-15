@@ -27,6 +27,7 @@ interface Validated {
 function Checkout() {
   const params = useSearchParams();
   const token = params.get("t") || "";
+  const fromApp = params.get("app") === "1";
   const [info, setInfo] = useState<Validated | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
   const [card, setCard] = useState({ number: "", exp: "", cvv: "", name: "", zip: "" });
@@ -92,7 +93,7 @@ function Checkout() {
               : d.error || "Could not complete checkout.");
           }
           setDone(true);
-          if (d.returnTo) setTimeout(() => { window.location.href = d.returnTo; }, 2200);
+          if (d.returnTo && !fromApp) setTimeout(() => { window.location.href = d.returnTo; }, 2200);
         } catch (e) {
           setError((e as Error).message);
         } finally { setBusy(false); }
@@ -133,7 +134,7 @@ function Checkout() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Could not complete checkout.");
       setDone(true);
-      if (d.returnTo) setTimeout(() => { window.location.href = d.returnTo; }, 2200);
+      if (d.returnTo && !fromApp) setTimeout(() => { window.location.href = d.returnTo; }, 2200);
     } catch (e) {
       setError((e as Error).message);
     } finally { setBusy(false); }
@@ -154,7 +155,17 @@ function Checkout() {
       <div className="mt-8 rounded-2xl border border-green-500/30 bg-green-500/10 p-6 text-center">
         <p className="text-base font-semibold text-green-500">You&apos;re a Protector 🛡️</p>
         <p className="mt-2 text-xs text-ink2">Your red Protector badge is now active. Taking you back to CrimeAI…</p>
+        {fromApp && (
+          // Opened from the native app's in-app browser: bounce back via the
+          // crimeai:// deep link so the app closes this sheet and confirms the
+          // entitlement immediately. Auto-attempt + a manual button fallback.
+          <a href="crimeai://checkout-return"
+            className="mt-4 inline-block rounded-full bg-brand px-6 py-2.5 text-sm font-bold text-white">
+            Return to CrimeAI
+          </a>
+        )}
       </div>
+      {fromApp && <AutoReturn />}
     </Shell>
   );
 
@@ -240,4 +251,14 @@ function Field({ label, value, onChange, placeholder, type = "text", inputMode }
 
 export default function CheckoutPage() {
   return <Suspense fallback={<p className="py-16 text-center text-sm text-ink3">Loading…</p>}><Checkout /></Suspense>;
+}
+
+// Fires the crimeai:// return link shortly after success renders — the manual
+// button above stays as the fallback if the OS swallows the auto-attempt.
+function AutoReturn() {
+  useEffect(() => {
+    const t = setTimeout(() => { window.location.href = "crimeai://checkout-return"; }, 1200);
+    return () => clearTimeout(t);
+  }, []);
+  return null;
 }
