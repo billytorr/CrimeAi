@@ -1,0 +1,17 @@
+{
+  "name": "pscc-storefront",
+  "version": "1.0.0",
+  "description": "CrimeAI in-repo Capacitor plugin: App Store storefront country via StoreKit 2 (PaymentRegionPolicy input)",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "keywords": ["capacitor", "plugin", "native"],
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    }
+  },
+  "files": ["ios/", "Package.swift", "index.js", "index.d.ts"],
+  "peerDependencies": {
+    "@capacitor/core": ">=7.0.0"
+  }
+}

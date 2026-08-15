@@ -12,6 +12,7 @@ import { Alert, Car, Eye, Chevron, Logout, Pin, Sun, Moon, ProBadge, Home as Hom
 import { supabase, supabaseEnabled } from "@/lib/supabase";
 import { accountHandle } from "@/lib/auth";
 import { apiUrl, authHeaders } from "@/lib/api";
+import { usePaymentRegion } from "@/lib/pay/regionPolicy";
 import { CATEGORIES } from "@/lib/categories";
 import { useLang, useT } from "@/components/LanguageProvider";
 import { LANGS } from "@/lib/i18n";
@@ -268,6 +269,7 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
   const [price, setPrice] = useState("");
   const [busy, setBusy] = useState(false);
   const isPro = profile.plan === "pro";
+  const region = usePaymentRegion();
 
   useEffect(() => {
     if (!supabaseEnabled) return;
@@ -354,6 +356,11 @@ function ProtectorPanel({ profile, userId, email, onProfile }: { profile: Profil
       </div>
     );
   }
+
+  // PaymentRegionPolicy (Guideline 3.1.1(a)): outside an allowed storefront
+  // the ENTIRE pitch — prices, CTA, checkout link — must not render. The free
+  // tier stays fully usable; this panel simply doesn't exist there.
+  if (region !== "allowed") return null;
 
   // Settings makes the PITCH; the pricing page makes the comparison. Keeping
   // the full chart in both places meant two plan pickers to maintain and two
