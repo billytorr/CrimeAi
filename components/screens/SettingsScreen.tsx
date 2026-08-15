@@ -488,7 +488,17 @@ function DeleteAccount({ onDeleted }: { onDeleted: () => void }) {
   if (!confirming) {
     return (
       <>
-        <p className="mb-2 text-xs leading-relaxed text-ink3">Permanently delete your CrimeAI account — your profile, posts, reports, comments, likes, follows and messages are erased. This cannot be undone.</p>
+        {/* Plain language, per Apple 5.1.1(v): what's deleted, what's kept and
+            why, and what happens to a paid subscription. */}
+        <p className="mb-1.5 text-xs leading-relaxed text-ink3">
+          <span className="font-semibold text-ink2">What's deleted:</span> your account, profile, posts, reports, comments, likes, follows, messages, saved places, alert settings and safety scores — permanently.
+        </p>
+        <p className="mb-1.5 text-xs leading-relaxed text-ink3">
+          <span className="font-semibold text-ink2">What's kept:</span> identity-verification and legal-consent records, only where the law requires us to retain them.
+        </p>
+        <p className="mb-2 text-xs leading-relaxed text-ink3">
+          <span className="font-semibold text-ink2">Protector subscription:</span> if you have one, it's cancelled as part of deletion — no further charges. This cannot be undone.
+        </p>
         <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-red-500/30 bg-red-500/10 py-3 text-sm font-semibold text-red-400 active:scale-[0.99]">Delete account</button>
       </>
     );

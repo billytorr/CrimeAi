@@ -60,7 +60,12 @@ export async function deleteMyAccount(): Promise<void> {
     }
     return;
   }
-  const { error } = await supabase!.rpc("delete_my_account");
-  if (error) throw new Error(error.message);
+  // Server route (not the RPC): it cancels any Authorize.Net ARB subscription
+  // BEFORE deleting, so a deleted account can never keep getting charged. If
+  // the cancel fails the server refuses to delete and we surface why.
+  const { apiUrl, authHeaders } = await import("./api");
+  const res = await fetch(apiUrl("/api/me/delete"), { method: "POST", headers: { ...(await authHeaders()) } });
+  const data = await res.json().catch(() => ({} as any));
+  if (!res.ok) throw new Error(data?.error || "Couldn't delete your account — please try again.");
   await supabase!.auth.signOut().catch(() => {});
 }
