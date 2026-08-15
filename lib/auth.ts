@@ -196,6 +196,23 @@ export async function resendSignupCode(email: string): Promise<{ demoCode?: stri
 // button flow is demonstrable with zero configuration.
 export async function ssoLogin(provider: "google" | "apple"): Promise<Account | null> {
   if (supabaseEnabled) {
+    // Native iOS shell: NO browser handoff (App Store Guideline 4). Apple
+    // sign-in presents the native ASAuthorization sheet in-app and exchanges
+    // the identity token directly with Supabase. Google isn't offered on the
+    // native iOS build (the button is hidden there), so this path is
+    // Apple-only by construction.
+    const { isNativePlatform } = await import("./native/appleAuth");
+    if (provider === "apple" && isNativePlatform()) {
+      const { nativeAppleSignIn } = await import("./native/appleAuth");
+      const { identityToken, rawNonce, fullName } = await nativeAppleSignIn();
+      const { error } = await supabase!.auth.signInWithIdToken({ provider: "apple", token: identityToken, nonce: rawNonce });
+      if (error) throw new Error(error.message);
+      // Apple only sends the name on the FIRST authorization — persist it now
+      // or it's lost forever.
+      if (fullName) { await supabase!.auth.updateUser({ data: { name: fullName } }).catch(() => {}); }
+      return getCurrentAccount();
+    }
+    // Web: the standard OAuth redirect (the browser IS the platform there).
     const { error } = await supabase!.auth.signInWithOAuth({
       provider,
       options: { redirectTo: typeof window !== "undefined" ? window.location.origin : undefined },

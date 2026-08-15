@@ -21,6 +21,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.1",
     "@aparajita/capacitor-biometric-auth": "^10.0.0",
+    "@capacitor-community/apple-sign-in": "^7.1.0",
     "@capacitor/android": "^8.4.2",
     "@capacitor/browser": "^8.0.4",
     "@capacitor/cli": "^8.4.2",
