@@ -1,6 +1,7 @@
 "use client";
 
 import { apiUrl, authHeaders } from "@/lib/api";
+import { usePaymentRegion } from "@/lib/pay/regionPolicy";
 import { bandFor } from "@/lib/scoring/bands";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account, Profile } from "@/lib/auth";
@@ -38,6 +39,10 @@ export default function AskScreen({
   const loc = profile.location;
   const first = (name || "").split(" ")[0];
   const isPro = profile.plan === "pro";
+  // Upgrade steering ("Become a Protector") may only render where the
+  // PaymentRegionPolicy allows purchase UI (Guideline 3.1.1(a)); elsewhere the
+  // feature-gate messages state the limit without selling.
+  const canUpsell = usePaymentRegion() === "allowed";
   const userId = account.id;
 
   const greeting: Msg = {
@@ -83,7 +88,7 @@ export default function AskScreen({
           // Speak-to-type: drop the transcript into the composer so they can
           // read/edit before sending (ChatGPT-style dictation), not auto-send.
           if (res.ok && data.text) setInput((prev) => (prev ? prev.trimEnd() + " " : "") + data.text);
-          else if (data.upsell) setMessages((m) => [...m, { role: "assistant", text: "Voice is a Protector feature. Upgrade in Settings → Become a Protector to talk to me." }]);
+          else if (data.upsell) setMessages((m) => [...m, { role: "assistant", text: (canUpsell ? "Voice is a Protector feature. Upgrade in Settings → Become a Protector to talk to me." : "Voice isn't included in your current plan.") }]);
         } catch { setLoading(false); }
       };
       recRef.current = rec; rec.start(); setRecording(true);
@@ -130,7 +135,7 @@ export default function AskScreen({
         text = `${data.summary || "Here's what I found on the web."}${sources ? `\n\nSources:\n${sources}` : ""}\n\n(From a live web search — verify anything important against an official source.)`;
       } else {
         text = data.upsell
-          ? "Web search is a Protector feature — I can look things up beyond our local crime data. Upgrade in Settings → Become a Protector."
+          ? (canUpsell ? "Web search is a Protector feature — I can look things up beyond our local crime data. Upgrade in Settings → Become a Protector." : "Web search isn't included in your current plan.")
           : (data.error || "I couldn't complete that web search.");
       }
       setMessages((m) => [...m, { role: "assistant", text }]);
@@ -163,7 +168,7 @@ export default function AskScreen({
       const text = res.ok
         ? data.answer
         : data.upsell
-          ? "Reading images is a Protector feature — I can look at a photo, a notice, a report and tell you what matters for your safety. Upgrade in Settings → Become a Protector and share it again."
+          ? (canUpsell ? "Reading images is a Protector feature — I can look at a photo, a notice, a report and tell you what matters for your safety. Upgrade in Settings → Become a Protector and share it again." : "Reading images isn't included in your current plan.")
           : (data.error || "I couldn't read that image.");
       setMessages((m) => [...m, { role: "assistant", text }]);
       if (tid && res.ok) saveMessage(userId, tid, { role: "assistant", content: text });
@@ -251,7 +256,9 @@ export default function AskScreen({
       const data = await res.json();
       let text = data.answer || data.error || "Sorry, I couldn't answer that.";
       if (data.ai?.limited) {
-        text += "\n\n— You've used this month's free AI analysis, so this answer comes straight from the live data. Protectors get a much larger monthly AI allowance (Settings → Become a Protector).";
+        text += (canUpsell
+          ? "\n\n— You've used this month's free AI analysis, so this answer comes straight from the live data. Protectors get a much larger monthly AI allowance (Settings → Become a Protector)."
+          : "\n\n— You've used this month's free AI analysis, so this answer comes straight from the live data.");
       }
       setMessages((m) => [...m, { role: "assistant", text, engine: data.engine }]);
       if (tid) saveMessage(userId, tid, { role: "assistant", content: text, engine: data.engine });
