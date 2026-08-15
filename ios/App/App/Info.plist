@@ -63,5 +63,16 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.pscc.crimeai</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>crimeai</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

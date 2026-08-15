@@ -212,6 +212,22 @@ export async function ssoLogin(provider: "google" | "apple"): Promise<Account | 
       if (fullName) { await supabase!.auth.updateUser({ data: { name: fullName } }).catch(() => {}); }
       return getCurrentAccount();
     }
+    // Native Google: OAuth page opens in the IN-APP browser (SFSafariViewController
+    // on iOS / Custom Tabs on Android — the pattern Apple's review letter
+    // explicitly endorses: URL + certificate visible, user never leaves the
+    // app shell). Supabase redirects to crimeai://auth-callback, the deep-link
+    // listener (lib/native/deepLinks) installs the session and closes the sheet.
+    if (provider === "google" && isNativePlatform()) {
+      const { data, error } = await supabase!.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: "crimeai://auth-callback", skipBrowserRedirect: true },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.url) throw new Error("Couldn't start Google sign-in.");
+      const { openInApp } = await import("./inappbrowser");
+      await openInApp(data.url);
+      return null; // session arrives via the deep link → "crimeai:authed" event
+    }
     // Web: the standard OAuth redirect (the browser IS the platform there).
     const { error } = await supabase!.auth.signInWithOAuth({
       provider,

@@ -16,12 +16,6 @@ type Mode = "signup" | "verify" | "credentials" | "login" | "forgot" | "reset" |
 export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
   const tr = useT();
   const [mode, setMode] = useState<Mode>("signup");
-  // Native iOS build offers Email + Apple only (Guideline 4: Google's OAuth
-  // would hand off to the browser). Google stays available on web/Android.
-  const [nativeIOS, setNativeIOS] = useState(false);
-  useEffect(() => {
-    import("@/lib/native/appleAuth").then((m) => setNativeIOS(m.isNativeIOS())).catch(() => {});
-  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -174,7 +168,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
             <p className="text-center text-[11px] leading-relaxed text-ink3">
               We&apos;ll email you a code to confirm it&apos;s you. You&apos;ll pick a username and password next.
             </p>
-            <SsoButtons busy={busy} onPick={sso} hideGoogle={nativeIOS} />
+            <SsoButtons busy={busy} onPick={sso} />
           </>
         )}
 
@@ -187,7 +181,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
             <button onClick={() => switchMode("forgot")} className="w-full py-1 text-center text-sm font-medium text-brand">
               Forgot password?
             </button>
-            <SsoButtons busy={busy} onPick={sso} hideGoogle={nativeIOS} />
+            <SsoButtons busy={busy} onPick={sso} />
           </>
         )}
 
@@ -281,7 +275,7 @@ export default function AuthScreen({ onAuthed }: { onAuthed: () => void }) {
   );
 }
 
-function SsoButtons({ busy, onPick, hideGoogle }: { busy: boolean; onPick: (p: "google" | "apple") => void; hideGoogle?: boolean }) {
+function SsoButtons({ busy, onPick }: { busy: boolean; onPick: (p: "google" | "apple") => void }) {
   return (
     <div className="pt-1">
       <div className="flex items-center gap-3 py-2">
@@ -290,13 +284,11 @@ function SsoButtons({ busy, onPick, hideGoogle }: { busy: boolean; onPick: (p: "
         <span className="h-px flex-1 bg-ink/10" />
       </div>
       <div className="flex gap-3">
-        {!hideGoogle && (
-          <button onClick={() => onPick("google")} disabled={busy} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-ink/10 bg-shell py-3 text-sm font-semibold text-ink transition active:scale-[0.99] disabled:opacity-60">
-            <GoogleG /> Google
-          </button>
-        )}
+        <button onClick={() => onPick("google")} disabled={busy} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-ink/10 bg-shell py-3 text-sm font-semibold text-ink transition active:scale-[0.99] disabled:opacity-60">
+          <GoogleG /> Google
+        </button>
         <button onClick={() => onPick("apple")} disabled={busy} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-ink/10 bg-shell py-3 text-sm font-semibold text-ink transition active:scale-[0.99] disabled:opacity-60">
-          <AppleMark /> {hideGoogle ? "Sign in with Apple" : "Apple"}
+          <AppleMark /> Apple
         </button>
       </div>
     </div>

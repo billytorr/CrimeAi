@@ -41,6 +41,22 @@ export default function Page() {
     return () => clearTimeout(t);
   }, []);
 
+  // Native deep links (crimeai://): the in-app-browser OAuth return installs a
+  // session and fires "crimeai:authed" — re-read the account so the shell
+  // advances past the auth screen without a reload. No-op on web.
+  useEffect(() => {
+    let onAuthed: (() => void) | null = null;
+    import("@/lib/native/deepLinks").then((m) => {
+      m.initDeepLinks();
+      onAuthed = () => refresh();
+      window.addEventListener(m.AUTHED_EVENT, onAuthed);
+    }).catch(() => {});
+    return () => {
+      if (onAuthed) import("@/lib/native/deepLinks").then((m) => window.removeEventListener(m.AUTHED_EVENT, onAuthed!)).catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // loading finished + minimum shown → fade the splash out, then unmount
   const splashFading = stage !== "loading" && minElapsed;
   useEffect(() => {
