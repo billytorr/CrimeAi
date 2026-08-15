@@ -19,17 +19,17 @@ file is idempotent — safe to re-run. Full ordered list + descriptions live in
 
 ```bash
 # copy each, paste into SQL Editor, Run:
-cat ~/Desktop/Crime_AI/supabase/ai-config.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/ai-threads.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/ai-vision-limits.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/ai-voice-web-limits.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/ai-memory.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/notifications.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/verification.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/official-account.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/account-exists.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/sources-tricounty.sql | pbcopy
-cat ~/Desktop/Crime_AI/supabase/pricing-plans.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/ai-config.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/ai-threads.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/ai-vision-limits.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/ai-voice-web-limits.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/ai-memory.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/notifications.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/verification.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/official-account.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/account-exists.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/sources-tricounty.sql | pbcopy
+cat "/Volumes/BlackSeed SSD/Projects/CrimeAI"/supabase/pricing-plans.sql | pbcopy
 ```
 
 ### Paste-once self-check
