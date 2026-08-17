@@ -67,7 +67,19 @@ export async function POST(req: NextRequest) {
       pool: poolFor(live, loc.lat, loc.lon),
     });
 
-    const context = buildContext(loc, stats, recent, radiusMiles, days);
+    let context = buildContext(loc, stats, recent, radiusMiles, days);
+
+    // Legal-rights companion: when the question touches the law or a police
+    // encounter, add the LAW CONTEXT — settled constitutional/SCOTUS rights +
+    // a verified state layer + LIVE official-source retrieval for the user's
+    // jurisdiction (so cited law is current and repealed law is flagged).
+    // Cheap no-op for non-legal questions. County comes from the tri-county
+    // gazetteer when the user is in the launch market.
+    const { buildLawContext } = await import("@/lib/law");
+    const { nearestCity } = await import("@/lib/gazetteer");
+    const near = nearestCity(loc.lat, loc.lon);
+    const law = await buildLawContext(question, { state: loc.state || undefined, county: near?.county, city: loc.city || near?.name || undefined }, { timeoutMs: voice ? 3500 : 6000 });
+    if (law.used) context = `${context}\n\n${law.context}`;
 
     // COST GATE: only signed-in users within their metered allowance reach the
     // LLM. Everyone else gets the grounded deterministic answer at zero cost.
@@ -101,7 +113,7 @@ export async function POST(req: NextRequest) {
         model: voice ? (process.env.CRIMEAI_VOICE_MODEL || "claude-haiku-4-5-20251001") : cfg.model,
         temperature: cfg.temperature,
         maxTokens: voice ? 220 : cfg.maxTokens,
-        system: (cfg.systemPrompt || "") + (voice ? voiceBrevity : MEMORY_INSTRUCTION), userContext,
+        system: (cfg.systemPrompt || "") + (voice ? voiceBrevity : MEMORY_INSTRUCTION) + (law.used ? "\n\n" + (await import("@/lib/law")).LAW_INSTRUCTION : ""), userContext,
       }));
       const mem = extractMemory(answer);
       answer = mem.cleaned;
