@@ -14,6 +14,7 @@ import {
 import { resizeImage } from "@/lib/photo";
 import VoiceConversation, { type VoiceTurn } from "@/components/VoiceConversation";
 import ChatComposer from "@/components/chat/ChatComposer";
+import KnowYourRights from "@/components/KnowYourRights";
 
 interface Msg { role: "user" | "assistant"; text: string; engine?: string }
 
@@ -146,6 +147,7 @@ export default function AskScreen({
   }
   const [webMode, setWebMode] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [rightsOpen, setRightsOpen] = useState(false);
 
   // Protector image analysis: compress, show it in the thread, send to the
   // vision route (metered ai_vision), render CrimeAI's read. Free users get
@@ -293,6 +295,12 @@ export default function AskScreen({
   const voiceLoc = loc;
   return (
     <div className="flex h-full flex-col">
+      {rightsOpen && (
+        <KnowYourRights
+          onClose={() => setRightsOpen(false)}
+          onAskCrimeAI={(q) => { setRightsOpen(false); send(q); }}
+        />
+      )}
       {voiceOpen && (
         <VoiceConversation
           loc={voiceLoc}
@@ -315,6 +323,13 @@ export default function AskScreen({
             Watching {loc.neighborhood}
           </div>
         </div>
+        {/* Know Your Rights — one tap, every user (rights are never gated).
+            The quick card for a police encounter: what to say, what applies. */}
+        <button onClick={() => setRightsOpen(true)} aria-label="Know your rights"
+          className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 text-xs font-bold text-brand active:scale-95">
+          <svg width="15" height="17" viewBox="0 0 24 28" fill="currentColor"><path d="M12 1L3 4.5v7.5c0 5.4 3.8 10.5 9 12.4 5.2-1.9 9-7 9-12.4V4.5L12 1z" opacity="0.25"/><path d="M12 2.6L4.4 5.5v6.5c0 4.6 3.2 9 7.6 10.6 4.4-1.6 7.6-6 7.6-10.6V5.5L12 2.6z" fill="none" stroke="currentColor" strokeWidth="1.2"/><path d="M12 8v6M12 16.5v.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+          Rights
+        </button>
         {/* Protectors get the ChatGPT-style threads menu here; free keeps the
             Safety Score chip. Billy: nav icon top-right replaces Safe Score. */}
         {isPro ? (
