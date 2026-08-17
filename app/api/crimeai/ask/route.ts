@@ -24,7 +24,7 @@ import type { ResolvedLocation } from "@/lib/types";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { question, address, lat, lon, neighborhood, radiusMiles = 1, days: reqDays = 30, voice = false } = body || {};
+    const { question, address, lat, lon, neighborhood, radiusMiles = 1, days: reqDays = 30, voice = false, situation = null } = body || {};
     if (!question || typeof question !== "string") {
       return NextResponse.json({ error: "question is required" }, { status: 400 });
     }
@@ -77,9 +77,15 @@ export async function POST(req: NextRequest) {
     // gazetteer when the user is in the launch market.
     const { buildLawContext } = await import("@/lib/law");
     const { nearestCity } = await import("@/lib/gazetteer");
+    const { situationById, situationInstruction } = await import("@/lib/law/situations");
     const near = nearestCity(loc.lat, loc.lon);
-    const law = await buildLawContext(question, { state: loc.state || undefined, county: near?.county, city: loc.city || near?.name || undefined }, { timeoutMs: voice ? 3500 : 6000 });
+    // An active know-your-rights situation (pill in the chat / voice) forces
+    // legal mode on and adds the guided-intake flow for that situation.
+    const sit = typeof situation === "string" ? situationById(situation) : undefined;
+    const lawQuestion = sit ? `${sit.focus} ${question}` : question;
+    const law = await buildLawContext(lawQuestion, { state: loc.state || undefined, county: near?.county, city: loc.city || near?.name || undefined }, { timeoutMs: voice ? 3500 : 6000, force: !!sit });
     if (law.used) context = `${context}\n\n${law.context}`;
+    const flowInstruction = sit ? "\n\n" + situationInstruction(sit, !!voice) : "";
 
     // COST GATE: only signed-in users within their metered allowance reach the
     // LLM. Everyone else gets the grounded deterministic answer at zero cost.
@@ -113,14 +119,17 @@ export async function POST(req: NextRequest) {
         model: voice ? (process.env.CRIMEAI_VOICE_MODEL || "claude-haiku-4-5-20251001") : cfg.model,
         temperature: cfg.temperature,
         maxTokens: voice ? 220 : cfg.maxTokens,
-        system: (cfg.systemPrompt || "") + (voice ? voiceBrevity : MEMORY_INSTRUCTION) + (law.used ? "\n\n" + (await import("@/lib/law")).LAW_INSTRUCTION : ""), userContext,
+        system: (cfg.systemPrompt || "") + (voice ? voiceBrevity : MEMORY_INSTRUCTION) + (law.used ? "\n\n" + (await import("@/lib/law")).LAW_INSTRUCTION : "") + flowInstruction, userContext,
       }));
       const mem = extractMemory(answer);
       answer = mem.cleaned;
       if (mem.fact && userId) { saveMemory(userId, mem.fact, "assistant").catch(() => {}); }
       if (Number.isFinite(meter.remaining)) ai.remaining = meter.remaining;
     } else {
-      answer = fallbackAnswer(question, context);
+      // In a know-your-rights situation the no-LLM fallback must still be
+      // RIGHTS guidance, never a crime-stats dump — someone mid-stop needs
+      // what to say and do, not incident counts.
+      answer = sit ? (await import("@/lib/law/situations")).fallbackForSituation(sit) : fallbackAnswer(question, context);
       engine = "fallback";
       ai = { limited: !!userId, remaining: 0 }; // anonymous isn't "limited", just ungrounded from LLM
     }

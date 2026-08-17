@@ -14,7 +14,7 @@ import {
 import { resizeImage } from "@/lib/photo";
 import VoiceConversation, { type VoiceTurn } from "@/components/VoiceConversation";
 import ChatComposer from "@/components/chat/ChatComposer";
-import KnowYourRights from "@/components/KnowYourRights";
+import { SITUATIONS, situationById } from "@/lib/law/situations";
 
 interface Msg { role: "user" | "assistant"; text: string; engine?: string }
 
@@ -147,7 +147,10 @@ export default function AskScreen({
   }
   const [webMode, setWebMode] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
-  const [rightsOpen, setRightsOpen] = useState(false);
+  // Active know-your-rights situation. Set by a pill above the composer; it
+  // stays on for the rest of the thread (every follow-up runs the guided flow)
+  // until the user clears it or starts a new chat. Voice mode inherits it.
+  const [situation, setSituation] = useState<string | null>(null);
 
   // Protector image analysis: compress, show it in the thread, send to the
   // vision route (metered ai_vision), render CrimeAI's read. Free users get
@@ -236,7 +239,7 @@ export default function AskScreen({
     return id;
   }
 
-  async function send(q: string, forceThread?: string | null) {
+  async function send(q: string, forceThread?: string | null, forceSituation?: string | null) {
     const question = q.trim();
     if (!question || loading) return;
     setMessages((m) => [...m, { role: "user", text: question }]);
@@ -245,6 +248,7 @@ export default function AskScreen({
 
     const tid = forceThread ?? (await ensureThread(question));
     if (tid) saveMessage(userId, tid, { role: "user", content: question });
+    const sit = forceSituation !== undefined ? forceSituation : situation;
 
     try {
       const res = await fetch(apiUrl("/api/crimeai/ask"), {
@@ -253,6 +257,7 @@ export default function AskScreen({
         body: JSON.stringify({
           question, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood,
           address: loc.query, radiusMiles: profile.alerts.radiusMiles, days: 30,
+          ...(sit ? { situation: sit } : {}),
         }),
       });
       const data = await res.json();
@@ -275,6 +280,16 @@ export default function AskScreen({
     setThreadId(null);
     setMessages([greeting]);
     setDrawer(false);
+    setSituation(null);
+  }
+
+  // A situation pill: sets the flow for the thread and sends its opener as the
+  // user's first message — CrimeAI leads with the first move, then asks.
+  function startSituation(id: string) {
+    const s = situationById(id);
+    if (!s) return;
+    setSituation(id);
+    send(s.opener, undefined, id);
   }
 
   async function openThread(t: AiThread) {
@@ -295,12 +310,6 @@ export default function AskScreen({
   const voiceLoc = loc;
   return (
     <div className="flex h-full flex-col">
-      {rightsOpen && (
-        <KnowYourRights
-          onClose={() => setRightsOpen(false)}
-          onAskCrimeAI={(q) => { setRightsOpen(false); send(q); }}
-        />
-      )}
       {voiceOpen && (
         <VoiceConversation
           loc={voiceLoc}
@@ -311,6 +320,8 @@ export default function AskScreen({
             (async () => { const tid = await ensureThread(t.text); if (tid) saveMessage(userId, tid, { role: t.role, content: t.text }); })();
           }}
           onClose={() => setVoiceOpen(false)}
+          situation={situation}
+          onSituationChange={setSituation}
         />
       )}
       {/* header */}
@@ -323,13 +334,6 @@ export default function AskScreen({
             Watching {loc.neighborhood}
           </div>
         </div>
-        {/* Know Your Rights — one tap, every user (rights are never gated).
-            The quick card for a police encounter: what to say, what applies. */}
-        <button onClick={() => setRightsOpen(true)} aria-label="Know your rights"
-          className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 text-xs font-bold text-brand active:scale-95">
-          <svg width="15" height="17" viewBox="0 0 24 28" fill="currentColor"><path d="M12 1L3 4.5v7.5c0 5.4 3.8 10.5 9 12.4 5.2-1.9 9-7 9-12.4V4.5L12 1z" opacity="0.25"/><path d="M12 2.6L4.4 5.5v6.5c0 4.6 3.2 9 7.6 10.6 4.4-1.6 7.6-6 7.6-10.6V5.5L12 2.6z" fill="none" stroke="currentColor" strokeWidth="1.2"/><path d="M12 8v6M12 16.5v.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-          Rights
-        </button>
         {/* Protectors get the ChatGPT-style threads menu here; free keeps the
             Safety Score chip. Billy: nav icon top-right replaces Safe Score. */}
         {isPro ? (
@@ -369,14 +373,34 @@ export default function AskScreen({
         <div ref={endRef} />
       </div>
 
-      {/* starters */}
-      {messages.length <= 1 && (
-        <div className="flex gap-2 overflow-x-auto px-5 pb-2.5">
-          {STARTERS.map((s) => (
-            <button key={s} onClick={() => send(s)} className="shrink-0 rounded-full border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs text-ink2 active:scale-95">
-              {s}
-            </button>
-          ))}
+      {/* situation pills — know-your-rights flows, IN the conversation.
+          Shown on a fresh thread; tapping one starts a guided intake. */}
+      {messages.length <= 1 && !situation && (
+        <div className="px-5 pb-2.5">
+          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-brand">Dealing with police? Tap your situation</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {SITUATIONS.map((s) => (
+              <button key={s.id} onClick={() => startSituation(s.id)}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
+                <span aria-hidden>{s.emoji}</span>{s.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
+            {STARTERS.map((s) => (
+              <button key={s} onClick={() => send(s)} className="shrink-0 rounded-full border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs text-ink2 active:scale-95">
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {situation && (
+        <div className="mx-5 mb-2 flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs">
+          <span aria-hidden>{situationById(situation)?.emoji}</span>
+          <span className="min-w-0 flex-1 truncate font-semibold text-brand">Guiding you: {situationById(situation)?.label}</span>
+          <a href="tel:911" className="shrink-0 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-bold text-white">911</a>
+          <button onClick={() => setSituation(null)} aria-label="End guided flow" className="shrink-0 text-ink3">✕</button>
         </div>
       )}
 

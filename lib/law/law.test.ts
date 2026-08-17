@@ -88,3 +88,28 @@ describe("legal-rights companion — persona guardrails", () => {
     expect(LAW_INSTRUCTION).toMatch(/I do not consent to a search/);
   });
 });
+
+import { SITUATIONS, situationById, situationInstruction } from "./situations";
+describe("legal-rights companion — guided situations", () => {
+  it("every situation has an opener, a first move, ordered intake questions, and a legal focus", () => {
+    expect(SITUATIONS.length).toBeGreaterThanOrEqual(5);
+    for (const s of SITUATIONS) {
+      expect(s.opener.length).toBeGreaterThan(10);
+      expect(s.firstMove.length).toBeGreaterThan(20);
+      expect(s.intake.length).toBeGreaterThanOrEqual(3);
+      expect(s.focus.length).toBeGreaterThan(20);
+    }
+    expect(situationById("pulled_over")?.label).toBe("Pulled over");
+    expect(situationById("nope")).toBeUndefined();
+  });
+  it("the flow instruction leads with the first move, gathers 1–2 questions at a time, and keeps the safety script", () => {
+    const s = situationById("arrested")!;
+    const txt = situationInstruction(s, false);
+    expect(txt).toContain(s.firstMove);
+    expect(txt).toMatch(/ONE or TWO short questions at a time/);
+    expect(txt).toMatch(/comply physically, assert verbally/);
+    expect(txt).toMatch(/911/);
+    expect(txt).not.toMatch(/VOICE:/);
+    expect(situationInstruction(s, true)).toMatch(/VOICE: this is spoken aloud/);
+  });
+});

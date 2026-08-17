@@ -25,6 +25,7 @@ import CrimeAIVoiceSphere from "@/components/voice/CrimeAIVoiceSphere";
 import AttachmentMenu from "@/components/chat/AttachmentMenu";
 import AttachmentPreview, { type Attachment } from "@/components/chat/AttachmentPreview";
 import type { ResolvedLocation } from "@/lib/types";
+import { SITUATIONS } from "@/lib/law/situations";
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
 
@@ -40,14 +41,19 @@ function sttLang(lang: string): string | undefined {
 }
 
 export default function VoiceConversation({
-  loc, radiusMiles, onTurn, onClose,
+  loc, radiusMiles, onTurn, onClose, situation: initialSituation = null, onSituationChange,
 }: {
   loc: ResolvedLocation;
   radiusMiles: number;
   onTurn: (t: VoiceTurn) => void;
   onClose: () => void;
+  situation?: string | null;                       // active know-your-rights flow (inherited from the thread)
+  onSituationChange?: (id: string | null) => void; // keeps the text thread in sync
 }) {
   const { lang } = useLang();
+  const [situation, setSituationState] = useState<string | null>(initialSituation);
+  const situationRef = useRef<string | null>(initialSituation);
+  const setSituation = (id: string | null) => { situationRef.current = id; setSituationState(id); onSituationChange?.(id); };
   const [phase, setPhase] = useState<Phase>("idle");
   const [caption, setCaption] = useState("Tap the sphere to start talking");
   const [muted, setMuted] = useState(false);
@@ -171,7 +177,7 @@ export default function VoiceConversation({
     try {
       const ask = await fetch(apiUrl("/api/crimeai/ask"), {
         method: "POST", headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-        body: JSON.stringify({ question: userText, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood, address: loc.query, radiusMiles, days: 30, voice: true }),
+        body: JSON.stringify({ question: userText, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood, address: loc.query, radiusMiles, days: 30, voice: true, ...(situationRef.current ? { situation: situationRef.current } : {}) }),
       });
       const askData = await ask.json();
       const answer = (askData.answer || "Sorry, I didn't catch that.") as string;
@@ -337,6 +343,29 @@ export default function VoiceConversation({
       <p className="mb-3 min-h-[20px] px-8 text-center text-[13px] text-ink2 line-clamp-2">
         {phase === "idle" && !muted ? caption : statusWord}
       </p>
+
+      {/* know-your-rights situations — same guided flows as text, spoken.
+          Pills before the first turn; a banner (with 911) once one is active. */}
+      {situation ? (
+        <div className="mx-4 mb-3 flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs">
+          <span aria-hidden>{SITUATIONS.find((s) => s.id === situation)?.emoji}</span>
+          <span className="min-w-0 flex-1 truncate font-semibold text-brand">Guiding you: {SITUATIONS.find((s) => s.id === situation)?.label}</span>
+          <a href="tel:911" className="shrink-0 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-bold text-white">911</a>
+          <button onClick={() => setSituation(null)} aria-label="End guided flow" className="shrink-0 text-ink3">✕</button>
+        </div>
+      ) : phase === "idle" && (
+        <div className="mb-3 px-4">
+          <p className="mb-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-brand">Dealing with police? Tap your situation</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {SITUATIONS.map((s) => (
+              <button key={s.id} onClick={() => { setSituation(s.id); respondTo(s.opener, true); }}
+                className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
+                <span aria-hidden>{s.emoji}</span>{s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* bottom controls: [ + | Ask CrimeAI ]  [ mic ]  [ ✕ ] */}
       <div className="px-4">

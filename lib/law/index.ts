@@ -35,8 +35,8 @@ export interface LawContextResult { context: string; used: boolean; sources: str
 // Build the LAW CONTEXT block. Cheap when the question isn't legal (returns
 // nothing). Live retrieval is time-boxed and best-effort — the baked-in
 // foundation always answers even if search is slow/unavailable.
-export async function buildLawContext(question: string, j: Jurisdiction, opts: { live?: boolean; timeoutMs?: number } = {}): Promise<LawContextResult> {
-  if (!looksLegal(question)) return { context: "", used: false, sources: [] };
+export async function buildLawContext(question: string, j: Jurisdiction, opts: { live?: boolean; timeoutMs?: number; force?: boolean } = {}): Promise<LawContextResult> {
+  if (!opts.force && !looksLegal(question)) return { context: "", used: false, sources: [] };
 
   const baked = matchKnowledge(question, j.state, 5);
   let liveBlock = "";
