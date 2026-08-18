@@ -24,7 +24,7 @@ import type { ResolvedLocation } from "@/lib/types";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { question, address, lat, lon, neighborhood, radiusMiles = 1, days: reqDays = 30, voice = false, situation = null } = body || {};
+    const { question, address, lat, lon, neighborhood, radiusMiles = 1, days: reqDays = 30, voice = false, situation = null, agency = null } = body || {};
     if (!question || typeof question !== "string") {
       return NextResponse.json({ error: "question is required" }, { status: 400 });
     }
@@ -85,7 +85,8 @@ export async function POST(req: NextRequest) {
     const lawQuestion = sit ? `${sit.focus} ${question}` : question;
     const law = await buildLawContext(lawQuestion, { state: loc.state || undefined, county: near?.county, city: loc.city || near?.name || undefined }, { timeoutMs: voice ? 3500 : 6000, force: !!sit });
     if (law.used) context = `${context}\n\n${law.context}`;
-    const flowInstruction = sit ? "\n\n" + situationInstruction(sit, !!voice) : "";
+    const ag = ["police","fbi","ice","unknown"].includes(agency) ? agency : null;
+    const flowInstruction = sit ? "\n\n" + situationInstruction(sit, !!voice, ag) : "";
 
     // COST GATE: only signed-in users within their metered allowance reach the
     // LLM. Everyone else gets the grounded deterministic answer at zero cost.
@@ -129,7 +130,7 @@ export async function POST(req: NextRequest) {
       // In a know-your-rights situation the no-LLM fallback must still be
       // RIGHTS guidance, never a crime-stats dump — someone mid-stop needs
       // what to say and do, not incident counts.
-      answer = sit ? (await import("@/lib/law/situations")).fallbackForSituation(sit) : fallbackAnswer(question, context);
+      answer = sit ? (await import("@/lib/law/situations")).fallbackForSituation(sit, ag) : fallbackAnswer(question, context);
       engine = "fallback";
       ai = { limited: !!userId, remaining: 0 }; // anonymous isn't "limited", just ungrounded from LLM
     }

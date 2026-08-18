@@ -14,9 +14,13 @@ import {
 import { resizeImage } from "@/lib/photo";
 import VoiceConversation, { type VoiceTurn } from "@/components/VoiceConversation";
 import ChatComposer from "@/components/chat/ChatComposer";
-import { SITUATIONS, situationById } from "@/lib/law/situations";
+import { situationById, POLICE_SITUATIONS, GENERAL_SITUATIONS, AGENCIES, KYR_INTRO, AGENCY_PROMPT, type Agency } from "@/lib/law/situations";
 
-interface Msg { role: "user" | "assistant"; text: string; engine?: string }
+// A message can also be an interactive CARD rendered inline in the thread —
+// used by the Know Your Rights flow (situations, then agency) so the user
+// picks options IN the conversation, never on a separate page.
+type CardKind = "kyr_situations" | "kyr_agency";
+interface Msg { role: "user" | "assistant"; text: string; engine?: string; card?: CardKind; done?: boolean }
 
 const STARTERS = [
   "Is it safe to walk here tonight?",
@@ -151,6 +155,7 @@ export default function AskScreen({
   // stays on for the rest of the thread (every follow-up runs the guided flow)
   // until the user clears it or starts a new chat. Voice mode inherits it.
   const [situation, setSituation] = useState<string | null>(null);
+  const [agency, setAgency] = useState<Agency | null>(null);
 
   // Protector image analysis: compress, show it in the thread, send to the
   // vision route (metered ai_vision), render CrimeAI's read. Free users get
@@ -239,7 +244,7 @@ export default function AskScreen({
     return id;
   }
 
-  async function send(q: string, forceThread?: string | null, forceSituation?: string | null) {
+  async function send(q: string, forceThread?: string | null, forceSituation?: string | null, forceAgency?: Agency | null) {
     const question = q.trim();
     if (!question || loading) return;
     setMessages((m) => [...m, { role: "user", text: question }]);
@@ -249,6 +254,7 @@ export default function AskScreen({
     const tid = forceThread ?? (await ensureThread(question));
     if (tid) saveMessage(userId, tid, { role: "user", content: question });
     const sit = forceSituation !== undefined ? forceSituation : situation;
+    const ag = forceAgency !== undefined ? forceAgency : agency;
 
     try {
       const res = await fetch(apiUrl("/api/crimeai/ask"), {
@@ -258,6 +264,7 @@ export default function AskScreen({
           question, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood,
           address: loc.query, radiusMiles: profile.alerts.radiusMiles, days: 30,
           ...(sit ? { situation: sit } : {}),
+          ...(ag ? { agency: ag } : {}),
         }),
       });
       const data = await res.json();
@@ -281,15 +288,39 @@ export default function AskScreen({
     setMessages([greeting]);
     setDrawer(false);
     setSituation(null);
+    setAgency(null);
   }
 
-  // A situation pill: sets the flow for the thread and sends its opener as the
-  // user's first message — CrimeAI leads with the first move, then asks.
-  function startSituation(id: string) {
+  // ── Know Your Rights flow (from the + menu), entirely IN the conversation ──
+  // 1) an inline CARD listing the police-encounter situations
+  // 2) tapping one posts it as the user's message and shows the AGENCY card
+  //    ("Police, FBI, ICE, or not sure?") — the right questions to ask differ
+  // 3) tapping an agency starts the guided flow with that context
+  function openKnowYourRights() {
+    setMessages((m) => [...m, { role: "assistant", text: KYR_INTRO, card: "kyr_situations" }]);
+  }
+  function pickSituation(id: string, msgIndex: number) {
     const s = situationById(id);
     if (!s) return;
     setSituation(id);
-    send(s.opener, undefined, id);
+    setMessages((m) => m.map((x, i) => (i === msgIndex ? { ...x, done: true } : x)).concat(
+      { role: "user", text: s.opener },
+      { role: "assistant", text: AGENCY_PROMPT, card: "kyr_agency" },
+    ));
+  }
+  function pickAgency(a: Agency, msgIndex: number) {
+    setAgency(a);
+    const label = AGENCIES.find((x) => x.id === a)?.label || a;
+    setMessages((m) => m.map((x, i) => (i === msgIndex ? { ...x, done: true } : x)));
+    // now the model runs the guided flow with situation + agency context
+    send(`I'm dealing with: ${label}.`, undefined, situation, a);
+  }
+  // General (non-police) situation pill above the composer
+  function startGeneral(id: string) {
+    const s = situationById(id);
+    if (!s) return;
+    setSituation(id);
+    send(s.opener, undefined, id, null);
   }
 
   async function openThread(t: AiThread) {
@@ -322,6 +353,8 @@ export default function AskScreen({
           onClose={() => setVoiceOpen(false)}
           situation={situation}
           onSituationChange={setSituation}
+          agency={agency}
+          onAgencyChange={setAgency}
         />
       )}
       {/* header */}
@@ -359,6 +392,26 @@ export default function AskScreen({
               m.role === "user" ? "rounded-br-md bg-brand text-white" : "rounded-bl-md border border-ink/10 bg-card text-ink"
             }`}>
               {m.text}
+              {m.card === "kyr_situations" && !m.done && (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {POLICE_SITUATIONS.map((s) => (
+                    <button key={s.id} onClick={() => pickSituation(s.id, i)}
+                      className="flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
+                      <span aria-hidden>{s.emoji}</span>{s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {m.card === "kyr_agency" && !m.done && (
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {AGENCIES.map((a) => (
+                    <button key={a.id} onClick={() => pickAgency(a.id, i)}
+                      className="flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
+                      <span aria-hidden>{a.emoji}</span>{a.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -380,14 +433,14 @@ export default function AskScreen({
       {situation ? (
         <div className="mx-5 mb-2 flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs">
           <span aria-hidden>{situationById(situation)?.emoji}</span>
-          <span className="min-w-0 flex-1 truncate font-semibold text-brand">Guiding you: {situationById(situation)?.label}</span>
+          <span className="min-w-0 flex-1 truncate font-semibold text-brand">Guiding you: {situationById(situation)?.label}{agency ? ` · ${AGENCIES.find((a) => a.id === agency)?.label}` : ""}</span>
           <a href="tel:911" className="shrink-0 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-bold text-white">911</a>
-          <button onClick={() => setSituation(null)} aria-label="End guided flow" className="shrink-0 text-ink3">✕</button>
+          <button onClick={() => { setSituation(null); setAgency(null); }} aria-label="End guided flow" className="shrink-0 text-ink3">✕</button>
         </div>
       ) : (
         <PillRail>
-          {SITUATIONS.map((s) => (
-            <button key={s.id} onClick={() => startSituation(s.id)}
+          {GENERAL_SITUATIONS.map((s) => (
+            <button key={s.id} onClick={() => startGeneral(s.id)}
               className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
               <span aria-hidden>{s.emoji}</span>{s.label}
             </button>
@@ -415,6 +468,7 @@ export default function AskScreen({
         onAttachUnsupported={attachUnsupported}
         onToggleMic={toggleMic}
         onVoiceMode={() => setVoiceOpen(true)}
+        onKnowYourRights={openKnowYourRights}
         isPro={isPro}
         loading={loading}
         recording={recording}

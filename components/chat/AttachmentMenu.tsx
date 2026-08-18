@@ -1,9 +1,15 @@
 "use client";
 
-// The "+" attachment menu — floats above the composer. CrimeAI tokens only.
-// Exactly three actions: Camera, Photos, Files. Nothing else.
+// The "+" menu — floats above the composer. CrimeAI tokens only.
+// Exactly four actions: Camera, Photos, Files, Know Your Rights. Nothing else.
 import { useEffect, useRef } from "react";
 import { Camera, Image as ImageIcon } from "@/components/Icons";
+
+function ShieldGlyph() {
+  return (
+    <svg width="19" height="21" viewBox="0 0 24 28" fill="currentColor"><path d="M12 1L3 4.5v7.5c0 5.4 3.8 10.5 9 12.4 5.2-1.9 9-7 9-12.4V4.5L12 1z" opacity="0.25"/><path d="M12 2.6L4.4 5.5v6.5c0 4.6 3.2 9 7.6 10.6 4.4-1.6 7.6-6 7.6-10.6V5.5L12 2.6z" fill="none" stroke="currentColor" strokeWidth="1.2"/><path d="M12 8v6M12 16.5v.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+  );
+}
 
 function FileGlyph() {
   return (
@@ -16,12 +22,13 @@ function FileGlyph() {
 export interface AttachmentMenuProps {
   open: boolean;
   onClose: () => void;
-  onCamera: () => void;
-  onPhotos: () => void;
-  onFiles: () => void;
+  onCamera?: () => void;
+  onPhotos?: () => void;
+  onFiles?: () => void;
+  onKnowYourRights?: () => void; // starts the in-conversation rights flow
 }
 
-export default function AttachmentMenu({ open, onClose, onCamera, onPhotos, onFiles }: AttachmentMenuProps) {
+export default function AttachmentMenu({ open, onClose, onCamera, onPhotos, onFiles, onKnowYourRights }: AttachmentMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   // close on outside click + Escape
@@ -36,10 +43,12 @@ export default function AttachmentMenu({ open, onClose, onCamera, onPhotos, onFi
 
   if (!open) return null;
 
-  const rows: [() => void, React.ReactNode, string, string][] = [
-    [onCamera, <Camera size={19} key="c" />, "Camera", "Take a photo"],
-    [onPhotos, <ImageIcon size={19} key="p" />, "Photos", "Choose from your library"],
-    [onFiles, <FileGlyph key="f" />, "Files", "Attach a document"],
+  type Row = [() => void, React.ReactNode, string, string];
+  const rows: Row[] = [
+    ...(onCamera ? [[onCamera, <Camera size={19} key="c" />, "Camera", "Take a photo"] as Row] : []),
+    ...(onPhotos ? [[onPhotos, <ImageIcon size={19} key="p" />, "Photos", "Choose from your library"] as Row] : []),
+    ...(onFiles ? [[onFiles, <FileGlyph key="f" />, "Files", "Attach a document"] as Row] : []),
+    ...(onKnowYourRights ? [[onKnowYourRights, <ShieldGlyph key="k" />, "Know Your Rights", "Police, FBI, ICE — what to say"] as Row] : []),
   ];
 
   return (

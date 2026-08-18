@@ -89,7 +89,7 @@ describe("legal-rights companion — persona guardrails", () => {
   });
 });
 
-import { SITUATIONS, situationById, situationInstruction } from "./situations";
+import { SITUATIONS, situationById, situationInstruction, POLICE_SITUATIONS, GENERAL_SITUATIONS, AGENCIES, agencyGuidance, STRESS_PROTOCOL, fallbackForSituation } from "./situations";
 describe("legal-rights companion — guided situations", () => {
   it("every situation has an opener, a first move, ordered intake questions, and a legal focus", () => {
     expect(SITUATIONS.length).toBeGreaterThanOrEqual(5);
@@ -106,10 +106,50 @@ describe("legal-rights companion — guided situations", () => {
     const s = situationById("arrested")!;
     const txt = situationInstruction(s, false);
     expect(txt).toContain(s.firstMove);
-    expect(txt).toMatch(/ONE or TWO short questions at a time/);
+    expect(txt).toMatch(/ONE question at a time/);
     expect(txt).toMatch(/comply physically, assert verbally/);
     expect(txt).toMatch(/911/);
     expect(txt).not.toMatch(/VOICE:/);
     expect(situationInstruction(s, true)).toMatch(/VOICE: this is spoken aloud/);
+  });
+});
+
+describe("legal-rights companion — agency + stress protocol", () => {
+  it("splits police-encounter situations from general ones", () => {
+    expect(POLICE_SITUATIONS.length).toBe(5);
+    expect(GENERAL_SITUATIONS.map((s) => s.id)).toContain("know_rights");
+    expect(POLICE_SITUATIONS.every((s) => s.police)).toBe(true);
+  });
+  it("agency guidance carries the tactically-correct question for each agency", () => {
+    expect(AGENCIES.map((a) => a.id)).toEqual(["police", "fbi", "ice", "unknown"]);
+    expect(agencyGuidance("police")).toMatch(/Am I being detained, or am I free to go/);
+    expect(agencyGuidance("fbi")).toMatch(/18 U\.S\.C\. § 1001/);           // lying to feds is a felony
+    expect(agencyGuidance("fbi")).toMatch(/give me your card/i);
+    expect(agencyGuidance("ice")).toMatch(/signed by a JUDGE/);               // administrative ≠ judicial warrant
+    expect(agencyGuidance("ice")).toMatch(/I-200/);
+    expect(agencyGuidance("unknown")).toMatch(/marked police car/i);
+  });
+  it("flow instruction asks WHO before advising when agency unknown, and includes the stress protocol", () => {
+    const s = situationById("police_at_door")!;
+    const noAgency = situationInstruction(s, false, null);
+    expect(noAgency).toMatch(/police, FBI\/federal agents, ICE\/immigration, or not sure/);
+    expect(noAgency).toContain(STRESS_PROTOCOL);
+    const ice = situationInstruction(s, false, "ice");
+    expect(ice).toMatch(/signed by a JUDGE/);
+    expect(ice).not.toMatch(/ask exactly one question: are they dealing/);
+  });
+  it("stress protocol encodes the human-psychology rules", () => {
+    expect(STRESS_PROTOCOL).toMatch(/Steady first/);
+    expect(STRESS_PROTOCOL).toMatch(/Never say .calm down./);
+    expect(STRESS_PROTOCOL).toMatch(/One thing at a time/);
+    expect(STRESS_PROTOCOL).toMatch(/WORDS TO REPEAT/);
+    expect(STRESS_PROTOCOL).toMatch(/Never predict outcomes/);
+  });
+  it("no-LLM fallback is agency-aware rights guidance, opening with a steadying line", () => {
+    const s = situationById("police_at_door")!;
+    const out = fallbackForSituation(s, "ice");
+    expect(out).toMatch(/^Okay\. Take one breath/);
+    expect(out).toMatch(/signed by a JUDGE/);
+    expect(fallbackForSituation(s, "fbi")).toMatch(/lying to them is a felony/);
   });
 });

@@ -26,6 +26,7 @@ export interface ChatComposerProps {
   onAttachUnsupported: (file: File) => void;
   onToggleMic: () => void;
   onVoiceMode: () => void;
+  onKnowYourRights?: () => void;
   isPro: boolean;
   loading: boolean;
   recording: boolean;
@@ -36,7 +37,7 @@ export interface ChatComposerProps {
 
 export default function ChatComposer({
   value, onChange, onSend, onWebResearch, onAttachImage, onAttachUnsupported,
-  onToggleMic, onVoiceMode, isPro, loading, recording, webMode, onToggleWeb, placeholder,
+  onToggleMic, onVoiceMode, onKnowYourRights, isPro, loading, recording, webMode, onToggleWeb, placeholder,
 }: ChatComposerProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -116,15 +117,18 @@ export default function ChatComposer({
         <input ref={filesRef} type="file" accept="image/*,application/pdf,.txt,.doc,.docx" hidden
           onChange={(e) => { onPicked(e.target.files?.[0]); e.target.value = ""; }} />
 
-        {/* "+" attachment button + floating menu (Pro only) */}
-        {isPro && (
+        {/* "+" button + floating menu. Attachments (Camera/Photos/Files) are
+            Protector; Know Your Rights is for EVERYONE — rights are never
+            gated — so free users get the + with just that entry. */}
+        {(isPro || onKnowYourRights) && (
           <div className="relative shrink-0">
             <AttachmentMenu
               open={menuOpen}
               onClose={() => setMenuOpen(false)}
-              onCamera={() => cameraRef.current?.click()}
-              onPhotos={() => photosRef.current?.click()}
-              onFiles={() => filesRef.current?.click()}
+              onCamera={isPro ? () => cameraRef.current?.click() : undefined}
+              onPhotos={isPro ? () => photosRef.current?.click() : undefined}
+              onFiles={isPro ? () => filesRef.current?.click() : undefined}
+              onKnowYourRights={onKnowYourRights}
             />
             <button
               onClick={() => setMenuOpen((v) => !v)}

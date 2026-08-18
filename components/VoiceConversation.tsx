@@ -25,7 +25,7 @@ import CrimeAIVoiceSphere from "@/components/voice/CrimeAIVoiceSphere";
 import AttachmentMenu from "@/components/chat/AttachmentMenu";
 import AttachmentPreview, { type Attachment } from "@/components/chat/AttachmentPreview";
 import type { ResolvedLocation } from "@/lib/types";
-import { SITUATIONS } from "@/lib/law/situations";
+import { SITUATIONS, POLICE_SITUATIONS, GENERAL_SITUATIONS, AGENCIES, KYR_INTRO, AGENCY_PROMPT, type Agency } from "@/lib/law/situations";
 
 type Phase = "idle" | "listening" | "thinking" | "speaking";
 
@@ -41,7 +41,7 @@ function sttLang(lang: string): string | undefined {
 }
 
 export default function VoiceConversation({
-  loc, radiusMiles, onTurn, onClose, situation: initialSituation = null, onSituationChange,
+  loc, radiusMiles, onTurn, onClose, situation: initialSituation = null, onSituationChange, agency: initialAgency = null, onAgencyChange,
 }: {
   loc: ResolvedLocation;
   radiusMiles: number;
@@ -49,11 +49,18 @@ export default function VoiceConversation({
   onClose: () => void;
   situation?: string | null;                       // active know-your-rights flow (inherited from the thread)
   onSituationChange?: (id: string | null) => void; // keeps the text thread in sync
+  agency?: Agency | null;
+  onAgencyChange?: (a: Agency | null) => void;
 }) {
   const { lang } = useLang();
   const [situation, setSituationState] = useState<string | null>(initialSituation);
   const situationRef = useRef<string | null>(initialSituation);
   const setSituation = (id: string | null) => { situationRef.current = id; setSituationState(id); onSituationChange?.(id); };
+  const [agency, setAgencyState] = useState<Agency | null>(initialAgency);
+  const agencyRef = useRef<Agency | null>(initialAgency);
+  const setAgency = (a: Agency | null) => { agencyRef.current = a; setAgencyState(a); onAgencyChange?.(a); };
+  // voice KYR flow stage: pick situation → pick agency → guided flow
+  const [kyrStage, setKyrStage] = useState<null | "situations" | "agency">(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [caption, setCaption] = useState("Tap the sphere to start talking");
   const [muted, setMuted] = useState(false);
@@ -177,7 +184,7 @@ export default function VoiceConversation({
     try {
       const ask = await fetch(apiUrl("/api/crimeai/ask"), {
         method: "POST", headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-        body: JSON.stringify({ question: userText, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood, address: loc.query, radiusMiles, days: 30, voice: true, ...(situationRef.current ? { situation: situationRef.current } : {}) }),
+        body: JSON.stringify({ question: userText, lat: loc.lat, lon: loc.lon, neighborhood: loc.neighborhood, address: loc.query, radiusMiles, days: 30, voice: true, ...(situationRef.current ? { situation: situationRef.current } : {}), ...(agencyRef.current ? { agency: agencyRef.current } : {}) }),
       });
       const askData = await ask.json();
       const answer = (askData.answer || "Sorry, I didn't catch that.") as string;
@@ -344,23 +351,54 @@ export default function VoiceConversation({
         {phase === "idle" && !muted ? caption : statusWord}
       </p>
 
-      {/* know-your-rights situations — same guided flows as text, spoken.
-          Pills before the first turn; a banner (with 911) once one is active. */}
+      {/* know-your-rights — the same guided flow as text, spoken. Stage 1:
+          situations. Stage 2: "Police, FBI, ICE, or not sure?" (changes the
+          right questions to ask). Then the guided conversation. A banner with
+          911 while a situation is active. General (non-police) starters stay as
+          pills before the first turn. */}
       {situation ? (
         <div className="mx-4 mb-3 flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs">
           <span aria-hidden>{SITUATIONS.find((s) => s.id === situation)?.emoji}</span>
-          <span className="min-w-0 flex-1 truncate font-semibold text-brand">Guiding you: {SITUATIONS.find((s) => s.id === situation)?.label}</span>
+          <span className="min-w-0 flex-1 truncate font-semibold text-brand">Guiding you: {SITUATIONS.find((s) => s.id === situation)?.label}{agency ? ` · ${AGENCIES.find((a) => a.id === agency)?.label}` : ""}</span>
           <a href="tel:911" className="shrink-0 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-bold text-white">911</a>
-          <button onClick={() => setSituation(null)} aria-label="End guided flow" className="shrink-0 text-ink3">✕</button>
+          <button onClick={() => { setSituation(null); setAgency(null); setKyrStage(null); }} aria-label="End guided flow" className="shrink-0 text-ink3">✕</button>
+        </div>
+      ) : kyrStage === "situations" ? (
+        <div className="mb-3 px-4">
+          <p className="mb-1.5 text-center text-[12px] text-ink2">{KYR_INTRO}</p>
+          <div className="hscroll gap-2 pb-1">
+            {POLICE_SITUATIONS.map((s) => (
+              <button key={s.id} onClick={() => { setSituation(s.id); onTurn({ role: "user", text: s.opener }); setKyrStage("agency"); speak(AGENCY_PROMPT); }}
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
+                <span aria-hidden>{s.emoji}</span>{s.label}
+              </button>
+            ))}
+          </div>
         </div>
       ) : phase === "idle" && (
         <div className="mb-3 px-4">
-          <p className="mb-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-brand">Dealing with police? Tap your situation</p>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {SITUATIONS.map((s) => (
+          <div className="hscroll gap-2 pb-1">
+            <button onClick={() => { setKyrStage("situations"); speak(KYR_INTRO); }}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white active:scale-95">
+              🛡️ Know Your Rights
+            </button>
+            {GENERAL_SITUATIONS.map((s) => (
               <button key={s.id} onClick={() => { setSituation(s.id); respondTo(s.opener, true); }}
-                className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
                 <span aria-hidden>{s.emoji}</span>{s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {situation && kyrStage === "agency" && !agency && (
+        <div className="mb-3 px-4">
+          <p className="mb-1.5 text-center text-[12px] text-ink2">{AGENCY_PROMPT}</p>
+          <div className="hscroll gap-2 pb-1">
+            {AGENCIES.map((a) => (
+              <button key={a.id} onClick={() => { setAgency(a.id); setKyrStage(null); respondTo(`I'm dealing with: ${a.label}.`, true); }}
+                className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
+                <span aria-hidden>{a.emoji}</span>{a.label}
               </button>
             ))}
           </div>
