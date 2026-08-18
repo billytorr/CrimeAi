@@ -374,34 +374,30 @@ export default function AskScreen({
       </div>
 
       {/* situation pills — know-your-rights flows, IN the conversation.
-          Shown on a fresh thread; tapping one starts a guided intake. */}
-      {messages.length <= 1 && !situation && (
-        <div className="px-5 pb-2.5">
-          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-brand">Dealing with police? Tap your situation</p>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {SITUATIONS.map((s) => (
-              <button key={s.id} onClick={() => startSituation(s.id)}
-                className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
-                <span aria-hidden>{s.emoji}</span>{s.label}
-              </button>
-            ))}
-          </div>
-          <div className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
-            {STARTERS.map((s) => (
-              <button key={s} onClick={() => send(s)} className="shrink-0 rounded-full border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs text-ink2 active:scale-95">
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {situation && (
+          ONE rail, ALWAYS visible (old threads too), scrollable by touch or
+          drag. Tapping one starts a guided intake in this thread. While a
+          situation is active the rail becomes the "Guiding you" banner. */}
+      {situation ? (
         <div className="mx-5 mb-2 flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs">
           <span aria-hidden>{situationById(situation)?.emoji}</span>
           <span className="min-w-0 flex-1 truncate font-semibold text-brand">Guiding you: {situationById(situation)?.label}</span>
           <a href="tel:911" className="shrink-0 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-bold text-white">911</a>
           <button onClick={() => setSituation(null)} aria-label="End guided flow" className="shrink-0 text-ink3">✕</button>
         </div>
+      ) : (
+        <PillRail>
+          {SITUATIONS.map((s) => (
+            <button key={s.id} onClick={() => startSituation(s.id)}
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-brand/40 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95">
+              <span aria-hidden>{s.emoji}</span>{s.label}
+            </button>
+          ))}
+          {messages.length <= 1 && STARTERS.map((s) => (
+            <button key={s} onClick={() => send(s)} className="whitespace-nowrap rounded-full border border-ink/10 bg-ink/5 px-3 py-1.5 text-xs text-ink2 active:scale-95">
+              {s}
+            </button>
+          ))}
+        </PillRail>
       )}
 
       {/* input */}
@@ -452,6 +448,29 @@ export default function AskScreen({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// One-line horizontal pill rail. Touch scrolls natively (.hscroll); on desktop
+// — where the app hides scrollbars and there's no touch — click-and-drag
+// scrolls it, so the rail is always reachable. Buttons inside still click
+// normally (a drag under ~6px counts as a click).
+function PillRail({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; left: number; moved: boolean } | null>(null);
+  return (
+    <div
+      ref={ref}
+      className="hscroll mx-5 mb-2.5 gap-2 pb-1 select-none cursor-grab active:cursor-grabbing"
+      onMouseDown={(e) => { const el = ref.current; if (!el) return; drag.current = { x: e.pageX, left: el.scrollLeft, moved: false }; }}
+      onMouseMove={(e) => { const el = ref.current, d = drag.current; if (!el || !d) return; const dx = e.pageX - d.x; if (Math.abs(dx) > 6) d.moved = true; el.scrollLeft = d.left - dx; }}
+      onMouseUp={() => { drag.current = null; }}
+      onMouseLeave={() => { drag.current = null; }}
+      onClickCapture={(e) => { if (drag.current?.moved) { e.stopPropagation(); e.preventDefault(); } }}
+      onWheel={(e) => { const el = ref.current; if (!el) return; if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { el.scrollLeft += e.deltaY; } }}
+    >
+      {children}
     </div>
   );
 }

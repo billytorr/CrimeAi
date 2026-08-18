@@ -64,7 +64,7 @@ function siteClause(domains: string[]): string {
 
 export interface Jurisdiction { state?: string; county?: string; city?: string }
 
-export async function retrieveLaw(question: string, j: Jurisdiction, perLevel = 3): Promise<LawHit[]> {
+export async function retrieveLaw(question: string, j: Jurisdiction, perLevel = 2): Promise<LawHit[]> {
   const s = gateway.search();
   if (!s.configured) return [];
   const st = (j.state || "").trim();

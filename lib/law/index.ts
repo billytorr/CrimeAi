@@ -22,6 +22,7 @@ LEGAL-RIGHTS MODE — this question touches the law or a police encounter. Follo
 - Recording police in public is generally protected; don't interfere with the officer.
 - If they are in danger RIGHT NOW, tell them to call 911 first.
 - Be warm and steady — this person may be scared. Short, clear, human. Lead with what they most need to know right now.
+- DON'T DUMP THE LAW. The LAW CONTEXT may hold many entries — that is your reference shelf, not your script. Pick the ONE that answers what they asked, say it in a sentence or two with its citation, then ASK what you need to know to help further (where they are, what stage they're at, what was said). Never recite multiple statutes or cases in one reply unless they ask for the full picture. A person in a serious moment needs one clear thing, not a briefing.
 `.trim();
 
 function formatKnowledge(entries: LawEntry[]): string {
@@ -38,7 +39,7 @@ export interface LawContextResult { context: string; used: boolean; sources: str
 export async function buildLawContext(question: string, j: Jurisdiction, opts: { live?: boolean; timeoutMs?: number; force?: boolean } = {}): Promise<LawContextResult> {
   if (!opts.force && !looksLegal(question)) return { context: "", used: false, sources: [] };
 
-  const baked = matchKnowledge(question, j.state, 5);
+  const baked = matchKnowledge(question, j.state, 3);
   let liveBlock = "";
   const sources: string[] = baked.map((e) => e.source);
 

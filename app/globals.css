@@ -176,3 +176,19 @@ html.native .app-shell {
   }
   .composer-menu { animation: none; }
 }
+
+/* Horizontal pill/chip rails — one line, always scrollable by touch or drag.
+   The global scrollbar hide (above) removes the visual bar; this restores the
+   scroll BEHAVIOUR: horizontal-only touch, momentum, snap, no vertical steal. */
+.hscroll {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.hscroll > * { scroll-snap-align: start; flex: 0 0 auto; }
